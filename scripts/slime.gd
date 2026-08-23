@@ -21,6 +21,8 @@ const TOP_OFFSET := 4.0         # sprite is 8px tall and centred on the node
 
 var direction := -1
 var alive := true
+## Endless mode winds this up with depth once rooms cannot hold more threat.
+var speed_scale := 1.0
 var player: Player              # handed over by Level once it exists
 var is_wall: Callable           # func(tx: int, ty: int) -> bool, supplied by Level
 var is_ground: Callable         # same shape, but one-way slabs count as ground
@@ -56,9 +58,9 @@ func _physics_process(delta: float) -> void:
 		if is_wall.call(ahead, ty) or not is_ground.call(ahead, ty + 1):
 			direction = -direction
 		else:
-			position.x += direction * SPEED * delta
+			position.x += direction * SPEED * speed_scale * delta
 	else:
-		position.x += direction * SPEED * delta
+		position.x += direction * SPEED * speed_scale * delta
 
 	_check_player()
 

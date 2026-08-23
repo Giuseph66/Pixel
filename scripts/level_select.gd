@@ -1,7 +1,10 @@
 class_name LevelSelect
 extends Node2D
 
-## Twelve cards, four across, three rows down.
+## Four cards across, three rows of them on screen at a time.
+##
+## The list is longer than one screen now, so the grid scrolls by whole rows to
+## keep the cursor visible, and a marker on the right says there is more.
 ##
 ## A card is read top to bottom: number, name, best time, gems, and a bar along
 ## the bottom edge showing gem progress at a glance. Room names are wrapped
@@ -28,7 +31,11 @@ const ROW_LINE := 8.0
 const ROW_TIME := 34.0
 const ROW_GEMS := 43.0
 
+## Rows that fit on screen at once.
+const VISIBLE_ROWS := 3
+
 var cursor := 0
+var _scroll := 0
 var _levels: Array = []
 var _time := 0.0
 
@@ -81,11 +88,22 @@ func _handle_input() -> void:
 
 func _card_rect(i: int) -> Rect2:
 	var col := i % COLUMNS
-	var row := i / COLUMNS
+	var row := i / COLUMNS - _scroll
 	return Rect2(
 		ORIGIN + Vector2(col * (CARD.x + GAP.x), row * (CARD.y + GAP.y)),
 		CARD
 	)
+
+
+func _rows_total() -> int:
+	return (_levels.size() + COLUMNS - 1) / COLUMNS
+
+
+## Slide the window the least it can and still show the cursor.
+func _follow_cursor() -> void:
+	var row := cursor / COLUMNS
+	_scroll = clampi(_scroll, row - VISIBLE_ROWS + 1, row)
+	_scroll = clampi(_scroll, 0, maxi(_rows_total() - VISIBLE_ROWS, 0))
 
 
 # -------------------------------------------------------------------- draw ---
@@ -95,11 +113,30 @@ func _draw() -> void:
 	PixelFont.draw_text_centered_shadow(self, Lang.t("select.title"), SCREEN.x * 0.5, 22.0,
 		Palette.WHITE, Palette.MAGENTA_DARK, 2)
 
+	_follow_cursor()
 	for i in _levels.size():
+		var row := i / COLUMNS - _scroll
+		if row < 0 or row >= VISIBLE_ROWS:
+			continue
 		_draw_card(i)
+
+	_draw_scroll_marks()
 
 	PixelFont.draw_text_centered(self, Lang.t("select.footer"),
 		SCREEN.x * 0.5, SCREEN.y - 14.0, Palette.GREY_DARK, 1)
+
+
+## Small arrows down the right edge, so a screenful never looks like the whole
+## list. They blink on the same clock as the selected card's border.
+func _draw_scroll_marks() -> void:
+	var x := SCREEN.x - 12.0
+	var lit := fmod(_time, 0.8) < 0.4
+	if _scroll > 0:
+		PixelFont.draw_text(self, "^", Vector2(x, ORIGIN.y),
+			Palette.MAGENTA if lit else Palette.GREY_DARK, 1)
+	if _scroll + VISIBLE_ROWS < _rows_total():
+		PixelFont.draw_text(self, "V", Vector2(x, SCREEN.y - 30.0),
+			Palette.MAGENTA if lit else Palette.GREY_DARK, 1)
 
 
 func _draw_card(i: int) -> void:

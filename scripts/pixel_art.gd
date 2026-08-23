@@ -198,6 +198,46 @@ const GRIDS := {
 		"#12#211#",
 		"########",
 	],
+	"crystal": [
+		"...##...",
+		"..#cc#..",
+		".#cwwc#.",
+		"#cwwwwc#",
+		"#cwwwwc#",
+		".#cCCc#.",
+		"..#CC#..",
+		"...##...",
+	],
+	"crystal_used": [
+		"...ff...",
+		"..f..f..",
+		".f....f.",
+		"f......f",
+		"f......f",
+		".f....f.",
+		"..f..f..",
+		"...ff...",
+	],
+	"timed_on": [
+		"########",
+		"#pppppp#",
+		"#pbbbbp#",
+		"#pbbbbp#",
+		"#pbbbbp#",
+		"#pbbbbp#",
+		"#pppppp#",
+		"########",
+	],
+	"timed_off": [
+		"ff....ff",
+		"f......f",
+		"........",
+		"........",
+		"........",
+		"........",
+		"f......f",
+		"ff....ff",
+	],
 	"door": [
 		"..########..",
 		".#pppppppp#.",
@@ -332,6 +372,32 @@ static func cube(size_faces: int = 8) -> ImageTexture:
 
 	for p: Vector2i in [Vector2i(5, 2), Vector2i(6, 2), Vector2i(4, 3), Vector2i(5, 3), Vector2i(7, 1)]:
 		img.set_pixel(ox + p.x, oy + p.y, Palette.WHITE)
+
+	_outline_image(img, Palette.OUTLINE)
+	return ImageTexture.create_from_image(img)
+
+
+## Two square rings sharing a middle edge — reads as an infinity symbol at
+## small pixel sizes without needing a diagonal curve. Used by the mode-select
+## screen for endless, the way cube() is used there for story.
+static func infinity_icon(loop: int = 7) -> ImageTexture:
+	var img := Image.create_empty(loop * 4 + 2, loop * 2 + 2, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var ox := 1
+	var oy := 1
+
+	for side in 2:
+		var x0 := side * loop * 2
+		for y in loop * 2:
+			for x in loop * 2:
+				var on_border := x == 0 or x == loop * 2 - 1 or y == 0 or y == loop * 2 - 1
+				if not on_border:
+					continue
+				var shade := Palette.PURPLE if (x + y) % 3 != 0 else Palette.MAGENTA
+				img.set_pixel(ox + x0 + x, oy + y, shade)
+
+	img.set_pixel(ox + loop - 1, oy + 1, Palette.WHITE)
+	img.set_pixel(ox + loop * 3, oy + 1, Palette.WHITE)
 
 	_outline_image(img, Palette.OUTLINE)
 	return ImageTexture.create_from_image(img)

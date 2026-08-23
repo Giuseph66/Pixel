@@ -22,18 +22,87 @@ const START_X := 10             # segments begin past the spawn apron
 const END_X := COLS - 10        # and stop before the exit apron
 const MAX_GEMS := 3
 
-## How many rooms it takes to reach full difficulty.
-const RAMP := 14.0
-
 ## Segments that climb the screen instead of hugging the floor.
 const TALL := ["climb", "tower", "spring", "stack"]
+
+## The depth each segment first shows up at. Rooms keep introducing something
+## the player has not seen for the first twenty or so of them, which is what
+## stops a deep run from feeling like the shallow one with bigger numbers.
+const UNLOCK := {
+	"flat": 0,
+	"ledge": 0,
+	"platform": 0,
+	"pit": 1,
+	"slime": 1,
+	"stack": 2,
+	"spikes": 2,
+	"climb": 3,
+	"spring": 3,
+	"canopy": 4,
+	"tower": 5,
+	"crumble": 6,
+	"saw": 8,
+	"bat": 11,
+	"airsaw": 10,
+	"gauntlet": 13,
+	"nest": 16,
+	"ferry": 4,
+	"beat": 7,
+}
+
+## What each segment is worth in threat. The room is built to a budget of
+## these, so difficulty rises with depth instead of with luck.
+const THREAT := {
+	"flat": 0.0,
+	"ledge": 0.0,
+	"platform": 0.0,
+	"stack": 0.0,
+	"climb": 1.0,
+	"spring": 1.0,
+	"canopy": 1.0,
+	"spikes": 2.0,
+	"tower": 2.0,
+	"pit": 3.0,
+	"slime": 3.0,
+	"bat": 4.0,
+	"crumble": 4.0,
+	"saw": 5.0,
+	"airsaw": 5.0,
+	"gauntlet": 8.0,
+	"nest": 7.0,
+	"ferry": 2.0,
+	"beat": 3.0,
+}
+
+## Threat a room aims for. It climbs without ever levelling off, and every
+## fifth room is a spike — a landmark you can feel coming.
+const THREAT_BASE := 2.0
+const THREAT_STEP := 1.35
+const THREAT_CEILING := 26.0     # what 40 columns can actually hold
+const MILESTONE := 5
+const MILESTONE_BONUS := 1.4
+
+
+## Once a room is as full of threat as 40 columns can hold, difficulty keeps
+## climbing through how fast the things in it move.
+static func intensity(depth: int) -> float:
+	return minf(1.0 + maxf(0.0, float(depth) - 12.0) * 0.035, 2.2)
+
+
+static func target_threat(depth: int) -> float:
+	var t := THREAT_BASE + float(depth) * THREAT_STEP
+	if depth > 0 and (depth + 1) % MILESTONE == 0:
+		t *= MILESTONE_BONUS
+	return minf(t, THREAT_CEILING)
 
 
 ## Build one room. `depth` is 0-based; difficulty ramps with it.
 static func generate(run_seed: int, depth: int) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = run_seed + depth * 7919
-	var d := clampf(float(depth) / RAMP, 0.0, 1.0)
+	var target := target_threat(depth)
+	# 0..1 knob for how nasty an individual segment paints itself.
+	var d := clampf(target / THREAT_CEILING, 0.0, 1.0)
 
 	var g := Levels.blank()
 	Levels.rect(g, 0, FLOOR, COLS, ROWS - FLOOR, "#")
@@ -43,9 +112,11 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 	# flat corridor is the one room shape this game has no business shipping.
 	var tall: String = TALL[rng.randi() % TALL.size()]
 	var tall_at := rng.randi_range(0, 2)
+	if int(UNLOCK[tall]) > depth:
+		tall = ""
 
 	var spots: Array[Vector2i] = []
-	var hazards := 0
+	var threat := 0.0
 	var x := START_X
 	var previous := ""
 	var placed := 0
@@ -54,15 +125,17 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 		var room := END_X - x
 		if room < 5:
 			break
-		var kind := _pick(rng, d, previous, room)
-		if not tall.is_empty() and placed >= tall_at and int(WIDTHS[tall]) <= room:
+		var kind := _pick(rng, depth, previous, room, target - threat, room, target)
+		if not tall.is_empty() and placed >= tall_at and int(WIDTHS[tall]) <= room \
+				and int(UNLOCK[tall]) <= depth:
 			kind = tall
 			tall = ""
 		x += _paint(g, rng, kind, x, room, d, spots)
-		if kind != "flat":
-			hazards += 1
+		threat += float(THREAT[kind])
 		previous = kind
 		placed += 1
+
+	threat += _top_up(g, rng, depth, target - threat, spots)
 
 	Levels.put(g, 4, STAND, "P")
 	Levels.put(g, COLS - 6, STAND, "X")
@@ -74,7 +147,9 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 	return {
 		"name": Lang.tf("endless.room", [depth + 1]),
 		"hint": Lang.t("endless.hint") if depth == 0 else "",
-		"par": 12.0 + float(hazards) * 2.0 + float(depth) * 0.4,
+		"intensity": intensity(depth),
+		"threat": threat,          # what the room actually came out weighing
+		"par": 12.0 + threat * 1.4 + float(depth) * 0.4,
 		"rows": Levels.bake(g),
 	}
 
@@ -94,39 +169,75 @@ const WIDTHS := {
 	"climb": 17,
 	"stack": 10,
 	"tower": 10,
+	"crumble": 9,
+	"saw": 9,
+	"bat": 8,
+	"airsaw": 9,
+	"gauntlet": 13,
+	"nest": 11,
+	"ferry": 11,
+	"beat": 12,
 }
 
 
-## Weight per segment kind at difficulty `d`. Early rooms are mostly shape,
-## late rooms are mostly threat.
-static func _weights(d: float) -> Dictionary:
-	return {
-		"flat": 2.0 - 1.6 * d,
-		"pit": 1.0 + 2.0 * d,
-		"spikes": 0.6 + 1.6 * d,
-		"ledge": 1.4,
-		"platform": 1.4,
-		"slime": 0.8 + 1.8 * d,
-		"spring": 2.2,
-		"canopy": 0.5 + 1.0 * d,
-		"climb": 2.4,
-		"stack": 2.0,
-		"tower": 1.8,
-	}
+## Taste weight per kind, before the budget has its say. This only decides
+## which of two equally threatening segments turns up more often.
+const TASTE := {
+	"flat": 1.0,
+	"pit": 1.6,
+	"spikes": 1.2,
+	"ledge": 1.2,
+	"platform": 1.2,
+	"slime": 1.6,
+	"spring": 2.0,
+	"canopy": 1.0,
+	"climb": 2.2,
+	"stack": 1.8,
+	"tower": 1.6,
+	"crumble": 1.8,
+	"saw": 1.8,
+	"bat": 1.8,
+	"airsaw": 2.0,
+	"gauntlet": 2.2,
+	"nest": 2.0,
+	"ferry": 2.0,
+	"beat": 1.8,
+}
 
 
-static func _pick(rng: RandomNumberGenerator, d: float, previous: String, room: int) -> String:
-	var weights := _weights(d)
+## Choose the next segment. `deficit` is the threat still owed, `span` the
+## columns left: together they say how hard this one slot has to pull, and the
+## pick is pulled towards the kind that carries that much.
+static func _pick(rng: RandomNumberGenerator, depth: int, previous: String, room: int,
+		deficit: float, span: int, target: float) -> String:
+	var slots := maxi(1, span / 9)
+	var need := deficit / float(slots)
+
+	var weights := {}
 	var total := 0.0
 	var pool: Array[String] = []
 
-	for kind: String in weights.keys():
-		if int(WIDTHS[kind]) > room:
+	for kind: String in TASTE.keys():
+		if int(WIDTHS[kind]) > room or int(UNLOCK[kind]) > depth:
 			continue
-		var w: float = maxf(weights[kind], 0.05)
+		# Overshooting is what made deep rooms swing between trivial and
+		# brutal: one segment worth more than the whole remaining budget is
+		# simply not on the table. Past the budget only calm shapes are.
+		# How far past the budget a single segment may push. Generous in a deep
+		# room, where 3 points is small change; strict in an early one, where
+		# it would double the difficulty of the room.
+		if float(THREAT[kind]) > maxf(deficit, 0.0) + minf(3.0, target * 0.35):
+			continue
+		# And a room that still owes a lot cannot afford to spend half its
+		# floor on a wide, harmless staircase.
+		if int(WIDTHS[kind]) >= 10 and float(THREAT[kind]) < need - 1.5:
+			continue
+		var w: float = float(TASTE[kind])
+		# The closer a kind sits to the threat still owed, the likelier it is.
+		w /= 1.0 + absf(float(THREAT[kind]) - need)
 		# Never the same trick twice in a row.
 		if kind == previous:
-			w *= 0.25
+			w *= 0.2
 		weights[kind] = w
 		total += w
 		pool.append(kind)
@@ -140,6 +251,107 @@ static func _pick(rng: RandomNumberGenerator, d: float, previous: String, room: 
 		if roll <= 0.0:
 			return kind
 	return pool[pool.size() - 1]
+
+
+## Segments are coarse, so a room can come in under budget. Sprinkle single
+## hazards into whatever clear floor is left until it does not.
+static func _top_up(g: Array, rng: RandomNumberGenerator, depth: int, deficit: float,
+		spots: Array[Vector2i]) -> float:
+	var added := 0.0
+
+	# First pass: whole patrols, which need a stretch of clear ground. Capped,
+	# because a floor lined end to end with hazards is not a harder room, it is
+	# a flatter one.
+	var floor_adds := 0
+	var tries := 0
+	while added < deficit - 1.0 and tries < 60 and floor_adds < 2:
+		tries += 1
+		floor_adds += 1
+		var x := rng.randi_range(START_X, END_X - 3)
+		if not _clear_floor(g, x, 3):
+			continue
+		if depth >= 1 and rng.randf() < 0.6:
+			Levels.put(g, x + 1, STAND, "S")
+			added += 3.0
+		elif depth >= 2:
+			Levels.rect(g, x + 1, STAND, 2, 1, "^")
+			added += 2.0
+		else:
+			spots.append(Vector2i(x + 1, STAND - 2))
+			added += 1.0
+
+	# Second pass: single spikes, and not only on the floor — anything the
+	# player can stand on will hold one. A dense room reaches its budget this
+	# way instead of quietly coming in soft, and the hazards end up spread
+	# over the structures rather than all along the ground.
+	if depth < 2:
+		return added
+	# A sky full of bats is its own kind of samey, so they are rationed.
+	var bats := 0
+	tries = 0
+	while added < deficit and tries < 200:
+		tries += 1
+		var x := rng.randi_range(START_X, END_X - 1)
+		# A bat needs no ledge, which is exactly why it can still be added to a
+		# room whose floor and platforms are already full.
+		if depth >= int(UNLOCK["bat"]) and bats < 2 and added + 4.0 <= deficit \
+				and rng.randf() < 0.35:
+			var by := rng.randi_range(STAND - 6, STAND - 3)
+			if _clear_air(g, x, by):
+				Levels.put(g, x, by, "B")
+				bats += 1
+				added += 4.0
+				continue
+		var y := rng.randi_range(4, STAND)
+		if not _clear_perch(g, x, y):
+			continue
+		# Ground level already had its share in the first pass.
+		if y == STAND:
+			floor_adds += 1
+			if floor_adds > 3:
+				continue
+		Levels.put(g, x, y, "^")
+		added += 1.0
+
+	return added
+
+
+## True when a single spike can stand at (x, y): something to stand on below,
+## air above, and no spike already touching it left or right.
+static func _clear_perch(g: Array, x: int, y: int) -> bool:
+	if x < 1 or x >= COLS - 1 or y < 2 or y >= ROWS - 1:
+		return false
+	if not (g[y + 1][x] in ["#", "-"]):
+		return false
+	if g[y][x] != "." or g[y - 1][x] != ".":
+		return false
+	if g[y][x - 1] == "^" or g[y][x + 1] == "^":
+		return false
+	return true
+
+
+## Open air with open air around it: room for something that flies.
+static func _clear_air(g: Array, x: int, y: int) -> bool:
+	if x < 2 or x >= COLS - 2 or y < 2 or y >= ROWS - 1:
+		return false
+	for i in range(x - 2, x + 3):
+		for j in range(y - 1, y + 2):
+			if g[j][i] != ".":
+				return false
+	return true
+
+
+## True when `w` columns from `x` are plain walkable ground with clear air.
+## The span checked runs one column wider on each side, so a hazard dropped in
+## here can never butt up against one a segment already placed and grow a run
+## longer than a jump can clear.
+static func _clear_floor(g: Array, x: int, w: int) -> bool:
+	for i in range(x - 1, x + w + 1):
+		if i < 1 or i >= COLS - 1:
+			return false
+		if g[FLOOR][i] != "#" or g[STAND][i] != "." or g[STAND - 1][i] != ".":
+			return false
+	return true
 
 
 # ---------------------------------------------------------------- painting ---
@@ -168,6 +380,22 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _stack(g, rng, x, room, spots)
 		"tower":
 			return _tower(g, rng, x, room, spots)
+		"crumble":
+			return _crumble(g, rng, x, room, d, spots)
+		"saw":
+			return _saw(g, rng, x, room, spots)
+		"bat":
+			return _bat(g, rng, x, room, spots)
+		"airsaw":
+			return _airsaw(g, rng, x, room, spots)
+		"gauntlet":
+			return _gauntlet(g, rng, x, room, d, spots)
+		"nest":
+			return _nest(g, rng, x, room, spots)
+		"ferry":
+			return _ferry(g, rng, x, room, d, spots)
+		"beat":
+			return _beat(g, rng, x, room, d, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -323,6 +551,131 @@ static func _tower(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 	var second := first - rng.randi_range(8, 10)
 	_soft_rect(g, jx - 3, second, 7, 1, "-")
 	spots.append(Vector2i(jx, second - 2))
+	return w
+
+
+## A bridge of crumbling tiles over a spike pit. The bridge is never wider
+## than a jump, so even a player who lets all of it fall can still cross.
+static func _crumble(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var pw := clampi(3 + roundi(d * 2.0), 3, 5)
+	var w := pw + 4
+	if w > room:
+		return _pit(g, rng, x, room, d, spots)
+
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	Levels.rect(g, x + 2, FLOOR, pw, 1, "c")
+	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 3))
+	return w
+
+
+## A pen with a blade in it. Two posts keep the saw inside and give the player
+## something to stand on while they read its timing; the floor of the pen is
+## intact, so crossing it on foot is always an option.
+static func _saw(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(9, 10), room)
+	Levels.rect(g, x + 1, FLOOR - 2, 1, 2, "#")
+	Levels.rect(g, x + w - 2, FLOOR - 2, 1, 2, "#")
+	Levels.put(g, x + w / 2, STAND, "W")
+	spots.append(Vector2i(x + w / 2, STAND - 4))
+	return w
+
+
+## A blade patrolling a slab in mid-air. The floor underneath stays clear, so
+## this is threat that lives in the part of the room a walker never visits —
+## the reason deep rooms do not collapse into a spiked corridor.
+static func _airsaw(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(9, 11), room)
+	var pw := w - 3
+	var py := FLOOR - rng.randi_range(4, 5)
+	_soft_rect(g, x + 1, py, pw, 1, "-")
+	_soft_put(g, x + 1 + pw / 2, py - 1, "W")
+	spots.append(Vector2i(x + 1 + pw / 2, py - 3))
+	return w
+
+
+## A bat over open ground. It owns the air the player jumps through, and it is
+## the one flying thing you are allowed to land on.
+static func _bat(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(8, 11), room)
+	Levels.put(g, x + w / 2, STAND - 4, "B")
+	spots.append(Vector2i(x + w / 2, STAND - 3))
+	return w
+
+
+## Late-game compound: a crumbling bridge over spikes with a ceiling of
+## hanging spikes above it, and something waiting on the far side. Deep rooms
+## need segments that are worth a lot per column, or the budget ends up spread
+## as a carpet along the floor.
+static func _gauntlet(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var pw := clampi(4 + roundi(d), 4, 5)
+	var w := pw + 8
+	if w > room:
+		return _crumble(g, rng, x, room, d, spots)
+
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	Levels.rect(g, x + 2, FLOOR, pw, 1, "c")
+
+	# Low ceiling over the bridge: no jumping your way out of the timing.
+	var cy := FLOOR - 6
+	_soft_rect(g, x + 1, cy, pw + 2, 1, "#")
+	for i in range(x + 2, x + 2 + pw):
+		if rng.randf() < 0.6:
+			_soft_put(g, i, cy + 1, "v")
+
+	Levels.put(g, x + pw + 5, STAND, "S")
+	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 3))
+	return w
+
+
+## Two bats over a spiked floor: the ground is not an option and the air is
+## already taken.
+static func _nest(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(11, 13), room)
+	Levels.rect(g, x + 3, STAND, mini(3, w - 6), 1, "^")
+	Levels.put(g, x + 3, STAND - 5, "B")
+	Levels.put(g, x + w - 4, STAND - 3, "B")
+	spots.append(Vector2i(x + w / 2, STAND - 4))
+	return w
+
+
+## A slab that ferries you over a spiked pit. The pit stays inside a jump, so
+## missing the ferry costs time rather than the room.
+static func _ferry(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var pw := clampi(3 + roundi(d * 2.0), 3, 5)
+	var w := mini(pw + 6, room)
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	var vertical := rng.randf() < 0.35
+	_soft_rect(g, x + 2, FLOOR - rng.randi_range(3, 4), 3, 1, "n" if vertical else "m")
+	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 6))
+	return w
+
+
+## A run of blocks keeping time over a pit. Neighbours alternate phase, so
+## there is always one about to arrive.
+static func _beat(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var pw := clampi(4 + roundi(d), 4, 5)
+	var w := mini(pw + 7, room)
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+
+	var flip := rng.randf() < 0.5
+	var bx := x + 2
+	while bx < x + 2 + pw:
+		_soft_rect(g, bx, STAND, mini(2, x + 2 + pw - bx), 1, "T" if flip else "t")
+		flip = not flip
+		bx += 3
+	spots.append(Vector2i(x + 2 + pw / 2, STAND - 3))
 	return w
 
 

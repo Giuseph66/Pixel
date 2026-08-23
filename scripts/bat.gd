@@ -12,6 +12,7 @@ const SPAN := 26.0               # pixels either side of where it spawned
 const BOB := 9.0
 
 var alive := true
+var speed_scale := 1.0
 
 var _sprite: Sprite2D
 var _area: Area2D
@@ -47,12 +48,12 @@ func _physics_process(delta: float) -> void:
 	_sprite.texture = PixelArt.tex("bat_a" if fmod(_time * 7.0, 2.0) < 1.0 else "bat_b")
 	_sprite.flip_h = _direction < 0
 
-	position.x += _direction * SPEED * delta
+	position.x += _direction * SPEED * speed_scale * delta
 	if absf(position.x - _origin.x) > SPAN:
 		position.x = _origin.x + signf(position.x - _origin.x) * SPAN
 		_direction = -_direction
 	# Whole pixels only, same rule the gem bob follows.
-	position.y = _origin.y + roundf(sin(_time * 2.2) * BOB)
+	position.y = _origin.y + roundf(sin(_time * 2.2 * speed_scale) * BOB)
 
 	_check_player()
 

@@ -11,7 +11,7 @@ func _ready() -> void:
 	opaque = false
 	allow_cancel = true
 	title = Lang.t("pause.title")
-	list_top = 116.0
+	list_top = 112.0
 	footer = Lang.t("pause.footer")
 	items = [
 		{"id": "resume", "label": Lang.t("pause.resume")},

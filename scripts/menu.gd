@@ -9,6 +9,12 @@ signal cancelled
 
 const SCREEN := Vector2(480, 270)
 
+const ITEM_SCALE := 2
+## A glyph is PixelFont.H tall, so an entry is exactly this many pixels of ink.
+## line_height has to stay clear of it or consecutive rows touch.
+const ITEM_HEIGHT := PixelFont.H * ITEM_SCALE
+const CURSOR_GAP := 14.0
+
 var title := ""
 var subtitle := ""
 var footer := ""
@@ -17,7 +23,8 @@ var cursor := 0
 var allow_cancel := false
 var opaque := true              # false lets the paused game show through
 var list_top := 150.0
-var line_height := 14.0
+var list_width := 260.0         # backdrop width behind the (non-opaque) list
+var line_height := 20.0
 
 var _time := 0.0
 
@@ -59,6 +66,13 @@ func set_item_value(id: String, value: String) -> void:
 			return
 
 
+func set_item_label(id: String, label: String) -> void:
+	for item in items:
+		if item["id"] == id:
+			item["label"] = label
+			return
+
+
 # ------------------------------------------------------------------ draw ---
 
 func _draw() -> void:
@@ -67,7 +81,7 @@ func _draw() -> void:
 		draw_backdrop()
 	else:
 		var dim := Palette.BG
-		dim.a = 0.78
+		dim.a = 0.88
 		draw_rect(Rect2(0, 0, SCREEN.x, SCREEN.y), dim)
 	draw_header()
 
@@ -77,6 +91,13 @@ func _draw() -> void:
 	if not subtitle.is_empty():
 		PixelFont.draw_text_centered(self, subtitle, SCREEN.x * 0.5, 62.0, Palette.GREY, 1)
 
+	# Over a live room the list needs its own ground to sit on, or the terrain
+	# behind it competes with the text.
+	if not opaque and not items.is_empty():
+		Util.draw_panel(self, Rect2(_list_left() - 6.0, list_top - 8.0,
+			list_width + 12.0, items.size() * line_height + 10.0),
+			Palette.BG, Palette.FRAME)
+
 	for i in items.size():
 		_draw_item(i)
 
@@ -85,23 +106,32 @@ func _draw() -> void:
 			Palette.GREY_DARK, 1)
 
 
+func _list_left() -> float:
+	return roundf((SCREEN.x - list_width) * 0.5)
+
+
+## Label and value as one centred line, cursor riding beside it. This is the
+## line_height fix from before (20px, not 14 — glyphs are 14px tall at this
+## scale, so 14 left the rows touching) with the centred layout kept.
 func _draw_item(i: int) -> void:
 	var item: Dictionary = items[i]
 	var y := list_top + i * line_height
 	var selected := i == cursor
-	var label: String = item["label"]
-	if item.has("value") and not str(item["value"]).is_empty():
-		label += "  " + str(item["value"])
+
+	var label := str(item["label"])
+	var value := str(item.get("value", ""))
+	if not value.is_empty():
+		label += "  " + value
 
 	var color := Palette.WHITE if selected else Palette.GREY_DARK
-	PixelFont.draw_text_centered(self, label, SCREEN.x * 0.5, y, color, 2)
+	PixelFont.draw_text_centered(self, label, SCREEN.x * 0.5, y, color, ITEM_SCALE)
 
 	if selected:
-		var size := PixelFont.measure(label, 2)
+		var size := PixelFont.measure(label, ITEM_SCALE)
 		# The marker breathes so the eye finds it instantly.
 		var nudge := 0.0 if fmod(_time, 0.7) < 0.35 else 1.0
-		var x := SCREEN.x * 0.5 - size.x * 0.5 - 14.0 - nudge
-		PixelFont.draw_text(self, ">", Vector2(roundf(x), y), Palette.MAGENTA, 2)
+		var x := SCREEN.x * 0.5 - size.x * 0.5 - CURSOR_GAP - nudge
+		PixelFont.draw_text(self, ">", Vector2(roundf(x), y), Palette.MAGENTA, ITEM_SCALE)
 
 
 ## A faint moving field of dots, so no screen is ever dead flat.

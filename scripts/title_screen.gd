@@ -13,15 +13,14 @@ func _ready() -> void:
 	_cube = PixelArt.cube(8)
 	title = ""
 	list_top = 146.0
-	line_height = 14.0
 
+	# Four things you might actually want to press. Story vs. endless is a
+	# choice inside PLAY now (see play_select_screen.gd) rather than a fifth
+	# row here; audio and language live in their own OPTIONS screen.
 	items = [
 		{"id": "play", "label": ""},
 		{"id": "levels", "label": ""},
-		{"id": "endless", "label": ""},
-		{"id": "music", "label": ""},
-		{"id": "sfx", "label": ""},
-		{"id": "language", "label": ""},
+		{"id": "options", "label": ""},
 	]
 	if OS.get_name() != "Web":
 		items.append({"id": "quit", "label": ""})
@@ -29,33 +28,18 @@ func _ready() -> void:
 	refresh_labels()
 
 
-func _on_off(value: bool) -> String:
-	return Lang.t("ui.on") if value else Lang.t("ui.off")
-
-
 ## Rebuild every piece of text on the screen. Called on load and again whenever
-## the language or an audio toggle changes.
+## the language changes.
 func refresh_labels() -> void:
 	footer = Lang.t("title.footer")
 	for item: Dictionary in items:
 		item["label"] = Lang.t("title." + str(item["id"]))
-	set_item_value("music", _on_off(Save.data["music"]))
-	set_item_value("sfx", _on_off(Save.data["sfx"]))
-	set_item_value("language", Lang.language_name())
-
-	var deepest := int(Save.data["endless_best"])
-	set_item_value("endless", Lang.tf("title.endless_best", [deepest]) if deepest > 0 else "")
 
 	var cleared := Save.cleared_count()
 	_stats = ""
 	if cleared > 0:
 		_stats = Lang.tf("title.stats", [cleared, Levels.count(), Save.total_gems()])
 	queue_redraw()
-
-
-func refresh_audio_labels() -> void:
-	set_item_value("music", _on_off(Save.data["music"]))
-	set_item_value("sfx", _on_off(Save.data["sfx"]))
 
 
 func draw_header() -> void:

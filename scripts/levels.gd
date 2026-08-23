@@ -282,6 +282,105 @@ static func _level_12() -> PackedStringArray:
 	return bake(g)
 
 
+## Dash school. The gaps are nine tiles across — a jump covers seven and a
+## half, so the only way over is jump then dash.
+static func _level_13() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for pit: Vector2i in [Vector2i(13, 9), Vector2i(27, 9), Vector2i(41, 9)]:
+		rect(g, pit.x, 27, pit.y, 3, ".")
+		rect(g, pit.x, 30, pit.y, 1, "^")
+	puts(g, [Vector2i(17, 24), Vector2i(31, 24), Vector2i(45, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A chain of crystals over one long pit. Each one hands the dash back, so the
+## room is a single sentence you either finish or fall out of.
+static func _level_14() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 3, ".")
+	rect(g, 10, 30, 40, 1, "^")
+	puts(g, [Vector2i(16, 23), Vector2i(22, 23), Vector2i(28, 23),
+		Vector2i(34, 23), Vector2i(40, 23), Vector2i(46, 23)], "d")
+	puts(g, [Vector2i(19, 20), Vector2i(31, 20), Vector2i(43, 20)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Ferries. Two slabs slide sideways and one rides up and down; each works out
+## its own run from the empty space around it.
+static func _level_15() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 42, 3, ".")
+	rect(g, 10, 30, 42, 1, "^")
+	rect(g, 14, 23, 3, 1, "m")
+	rect(g, 28, 20, 3, 1, "n")
+	rect(g, 42, 23, 3, 1, "m")
+	puts(g, [Vector2i(21, 21), Vector2i(34, 17), Vector2i(48, 21)], "o")
+	put(g, 4, 26, "P")
+	put(g, 55, 26, "X")
+	return bake(g)
+
+
+## Rhythm. Neighbouring pairs run opposite phases, so there is always a next
+## block coming — the room asks you to wait, which no other room does.
+static func _level_16() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 3, ".")
+	rect(g, 10, 30, 40, 1, "^")
+	var x := 12
+	var flip := false
+	while x < 48:
+		rect(g, x, 25, 2, 1, "T" if flip else "t")
+		flip = not flip
+		x += 4
+	puts(g, [Vector2i(20, 22), Vector2i(32, 22), Vector2i(44, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Spike runs eight tiles long: too far to jump, exactly right to dash, with a
+## crystal parked before each one.
+static func _level_17() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for run: int in [14, 28, 42]:
+		rect(g, run, 26, 8, 1, "^")
+	puts(g, [Vector2i(12, 24), Vector2i(26, 24), Vector2i(40, 24)], "d")
+	puts(g, [Vector2i(18, 22), Vector2i(32, 22), Vector2i(46, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The finale of the new stretch: a ferry, a beat, a crystal, a lift, and
+## something in the air over all of it.
+static func _level_18() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 9, 27, 43, 3, ".")
+	rect(g, 9, 30, 43, 1, "^")
+	rect(g, 12, 24, 3, 1, "m")
+	rect(g, 22, 22, 2, 1, "t")
+	rect(g, 26, 22, 2, 1, "T")
+	rect(g, 30, 22, 2, 1, "t")
+	put(g, 35, 20, "d")
+	rect(g, 39, 20, 3, 1, "n")
+	rect(g, 46, 23, 5, 1, "-")
+	put(g, 44, 17, "B")
+	puts(g, [Vector2i(17, 21), Vector2i(27, 19), Vector2i(48, 21)], "o")
+	put(g, 4, 26, "P")
+	put(g, 55, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -357,6 +456,42 @@ static func all() -> Array:
 			"hint": "level.12.hint",
 			"par": 90.0,
 			"rows": _level_12(),
+		},
+		{
+			"name": "level.13.name",
+			"hint": "level.13.hint",
+			"par": 30.0,
+			"rows": _level_13(),
+		},
+		{
+			"name": "level.14.name",
+			"hint": "level.14.hint",
+			"par": 40.0,
+			"rows": _level_14(),
+		},
+		{
+			"name": "level.15.name",
+			"hint": "level.15.hint",
+			"par": 45.0,
+			"rows": _level_15(),
+		},
+		{
+			"name": "level.16.name",
+			"hint": "level.16.hint",
+			"par": 50.0,
+			"rows": _level_16(),
+		},
+		{
+			"name": "level.17.name",
+			"hint": "level.17.hint",
+			"par": 42.0,
+			"rows": _level_17(),
+		},
+		{
+			"name": "level.18.name",
+			"hint": "level.18.hint",
+			"par": 75.0,
+			"rows": _level_18(),
 		},
 	]
 

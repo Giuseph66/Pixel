@@ -12,6 +12,7 @@ const SPEED := 52.0
 const TILE := 8.0
 
 var direction := -1
+var speed_scale := 1.0
 var is_wall: Callable            # func(tx: int, ty: int) -> bool
 var is_ground: Callable          # func(tx: int, ty: int) -> bool
 
@@ -49,9 +50,9 @@ func _physics_process(delta: float) -> void:
 		if is_wall.call(ahead, ty) or not is_ground.call(ahead, ty + 1):
 			direction = -direction
 		else:
-			position.x += direction * SPEED * delta
+			position.x += direction * SPEED * speed_scale * delta
 	else:
-		position.x += direction * SPEED * delta
+		position.x += direction * SPEED * speed_scale * delta
 
 	for body in _area.get_overlapping_bodies():
 		if body is Player and (body as Player).alive:

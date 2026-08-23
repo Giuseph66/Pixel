@@ -34,8 +34,18 @@ const WALL_CLING := 24.0        # lean held into the wall so contact is not lost
 
 const SPRING_VELOCITY := -450.0
 
+# --- dash -------------------------------------------------------------------
+# One charge, spent in the air and given back by the ground, a wall, a stomp or
+# a crystal. It is the only move that ignores gravity, which is what makes it
+# read as a different verb rather than a longer jump.
+const DASH_SPEED := 232.0
+const DASH_TIME := 0.14
+const DASH_KEEP := 0.55         # share of dash speed kept when it ends
+const DASH_COOLDOWN := 0.09
+
 var alive := true
 var frozen := false             # set once the room is won; control is over
+var has_dash := true
 var facing := 1
 ## Where the feet were at the start of this frame. Enemies decide a stomp from
 ## this rather than from velocity: Area2D overlaps arrive a frame late, and by
@@ -47,6 +57,9 @@ var _lock := 0.0
 var _anim := 0.0
 var _was_on_floor := false
 var _wall_dir := 0
+var _dash := 0.0                # seconds of dash left
+var _dash_dir := Vector2.ZERO
+var _dash_cool := 0.0
 
 var sprite: Sprite2D
 var fx: Fx
@@ -81,6 +94,7 @@ func _physics_process(delta: float) -> void:
 	_coyote = maxf(_coyote - delta, 0.0)
 	_buffer = maxf(_buffer - delta, 0.0)
 	_lock = maxf(_lock - delta, 0.0)
+	_dash_cool = maxf(_dash_cool - delta, 0.0)
 
 	var input := 0.0
 	if _lock <= 0.0:
@@ -89,19 +103,71 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("p_jump"):
 		_buffer = JUMP_BUFFER
 
-	_apply_horizontal(input, delta)
-	_apply_gravity(input, delta)
-	_handle_jump()
+	if _dash > 0.0:
+		_tick_dash(delta)
+	else:
+		_try_dash(input)
+		_apply_horizontal(input, delta)
+		_apply_gravity(input, delta)
+		_handle_jump()
 
 	move_and_slide()
 
 	if is_on_floor():
 		_coyote = COYOTE_TIME
+		refill_dash()
 		if not _was_on_floor:
 			_on_land()
+	elif _wall_dir != 0:
+		refill_dash()
 	_was_on_floor = is_on_floor()
 
 	_update_sprite(input)
+
+
+# ------------------------------------------------------------------ dash ---
+
+func _try_dash(input: float) -> void:
+	if not has_dash or _dash_cool > 0.0 or not Input.is_action_just_pressed("p_dash"):
+		return
+
+	# Eight-way, taken from whatever is held. Nothing held dashes the way you
+	# are already facing, so it never fires into a wall you were backing away
+	# from.
+	var vertical := Input.get_axis("p_up", "p_down")
+	var dir := Vector2(input, vertical)
+	if dir.length_squared() < 0.04:
+		dir = Vector2(facing, 0.0)
+	_dash_dir = dir.normalized()
+
+	has_dash = false
+	_dash = DASH_TIME
+	_lock = DASH_TIME
+	velocity = _dash_dir * DASH_SPEED
+	facing = -1 if _dash_dir.x < -0.1 else (1 if _dash_dir.x > 0.1 else facing)
+	Audio.play_varied("dash")
+	_squash(Vector2(1.35, 0.65))
+	if fx != null:
+		fx.emit(_fx_at(), 8, Palette.CYAN, 90.0, -_dash_dir, 0.9, 0.3, 240.0)
+
+
+func _tick_dash(delta: float) -> void:
+	_dash -= delta
+	velocity = _dash_dir * DASH_SPEED
+	if fx != null and randf() < 0.7:
+		fx.emit(_fx_at(), 1, Palette.CYAN_MID, 18.0, -_dash_dir, 0.6, 0.22, 70.0)
+	if _dash <= 0.0:
+		# Keep some of it: a dash that dumps you to a standstill kills every
+		# chain the move exists to enable.
+		velocity = _dash_dir * DASH_SPEED * DASH_KEEP
+		if _dash_dir.y < 0.0:
+			velocity.y = maxf(velocity.y, JUMP_VELOCITY * 0.5)
+		_dash_cool = DASH_COOLDOWN
+
+
+## Give the charge back. Ground, walls, stomps, springs and crystals all do.
+func refill_dash() -> void:
+	has_dash = true
 
 
 func _apply_horizontal(input: float, delta: float) -> void:
@@ -199,7 +265,13 @@ func _update_sprite(input: float) -> void:
 	elif absf(velocity.x) > 12.0:
 		key = "player_run_a" if fmod(_anim * 9.0, 2.0) < 1.0 else "player_run_b"
 
+	if _dash > 0.0:
+		key = "player_jump"
+
 	sprite.texture = PixelArt.tex(key)
+	# Spent dash reads as a dimmer sprite — the charge has to be visible
+	# without a meter stealing screen from a 480x270 room.
+	sprite.modulate = Color(1, 1, 1) if has_dash else Color(0.62, 0.68, 0.9)
 	if _wall_dir != 0:
 		sprite.flip_h = _wall_dir > 0
 	else:
@@ -211,6 +283,8 @@ func _update_sprite(input: float) -> void:
 func spring_bounce() -> void:
 	if frozen or not alive:
 		return
+	refill_dash()
+	_dash = 0.0
 	velocity.y = SPRING_VELOCITY
 	_buffer = 0.0
 	_squash(Vector2(0.7, 1.35))
@@ -221,6 +295,8 @@ func spring_bounce() -> void:
 func stomp() -> void:
 	if frozen or not alive:
 		return
+	refill_dash()
+	_dash = 0.0
 	velocity.y = JUMP_VELOCITY * 0.78
 	_squash(Vector2(1.3, 0.7))
 	Audio.play_varied("stomp")

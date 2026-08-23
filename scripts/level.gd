@@ -21,6 +21,8 @@ var time := 0.0
 var gems_taken := 0
 var gems_total := 0
 var deaths := 0
+## 1.0 in the story; endless winds it up with depth.
+var intensity := 1.0
 var running := false
 var finished := false
 
@@ -41,6 +43,7 @@ func setup(level_index: int, level_data: Dictionary) -> void:
 	index = level_index
 	data = level_data
 	rows = level_data["rows"]
+	intensity = float(level_data.get("intensity", 1.0))
 
 
 func _ready() -> void:
@@ -97,6 +100,11 @@ func tile_at(tx: int, ty: int) -> String:
 	if tx < 0 or tx >= row.length():
 		return "#"
 	return row[tx]
+
+
+## Empty air — what a moving platform measures its runway against.
+func is_air(tx: int, ty: int) -> bool:
+	return tile_at(tx, ty) == "."
 
 
 func is_solid(tx: int, ty: int) -> bool:
@@ -242,6 +250,7 @@ func _spawn_entities() -> void:
 					_entities.add_child(spring)
 				"S":
 					var slime := Slime.new()
+					slime.speed_scale = intensity
 					slime.position = tile_center(tx, ty)
 					slime.is_wall = Callable(self, "is_solid")
 					slime.is_ground = Callable(self, "is_ground")
@@ -249,12 +258,14 @@ func _spawn_entities() -> void:
 					_entities.add_child(slime)
 				"W":
 					var saw := Saw.new()
+					saw.speed_scale = intensity
 					saw.position = tile_center(tx, ty)
 					saw.is_wall = Callable(self, "is_solid")
 					saw.is_ground = Callable(self, "is_ground")
 					_entities.add_child(saw)
 				"B":
 					var bat := Bat.new()
+					bat.speed_scale = intensity
 					bat.position = tile_center(tx, ty)
 					bat.squashed.connect(_on_bat_squashed)
 					_entities.add_child(bat)
@@ -262,6 +273,16 @@ func _spawn_entities() -> void:
 					var block := Crumble.new()
 					block.position = tile_center(tx, ty)
 					_entities.add_child(block)
+				"d":
+					var crystal := DashCrystal.new()
+					crystal.position = tile_center(tx, ty)
+					_entities.add_child(crystal)
+				"t", "T":
+					var timed := TimedBlock.new()
+					timed.inverted = ch == "T"
+					timed.speed_scale = intensity
+					timed.position = tile_center(tx, ty)
+					_entities.add_child(timed)
 				"X":
 					_door = ExitDoor.new()
 					# 'X' marks the bottom tile of a two-tile-tall frame.
@@ -274,6 +295,7 @@ func _spawn_entities() -> void:
 						ty * TILE + TILE - Player.HEIGHT * 0.5
 					)
 
+	_spawn_platforms()
 	_spawn_player()
 
 	# Slimes watch the player themselves, so they need the reference the moment
@@ -283,6 +305,29 @@ func _spawn_entities() -> void:
 			(child as Slime).player = _player
 
 	_update_door_charge()
+
+
+## Moving platforms are runs of tiles rather than single ones, so they get
+## their own pass: 'm' travels sideways, 'n' up and down, and the length of the
+## run is the length of the slab.
+func _spawn_platforms() -> void:
+	for ty in Levels.ROWS:
+		var tx := 0
+		while tx < Levels.COLS:
+			var ch := tile_at(tx, ty)
+			if ch != "m" and ch != "n":
+				tx += 1
+				continue
+			var run := 1
+			while tx + run < Levels.COLS and tile_at(tx + run, ty) == ch:
+				run += 1
+
+			var platform := MovingPlatform.new()
+			platform.speed_scale = intensity
+			platform.setup(run, ch == "n", tx, ty, Callable(self, "is_air"))
+			platform.position = tile_center(tx, ty)
+			_entities.add_child(platform)
+			tx += run
 
 
 func _spawn_player() -> void:
@@ -302,8 +347,9 @@ func get_player() -> Player:
 func _on_gem_collected(gem: Gem) -> void:
 	gems_taken += 1
 	Audio.play("gem", 1.0 + gems_taken * 0.03)
-	fx.emit(fx.to_local(gem.global_position), 10, Palette.GOLD, 80.0,
-		Vector2.ZERO, TAU, 0.4, 180.0)
+	var at := fx.to_local(gem.global_position)
+	fx.emit(at, 10, Palette.GOLD, 80.0, Vector2.ZERO, TAU, 0.4, 180.0)
+	fx.popup(at, "+1", Palette.GOLD)
 	gem.queue_free()
 	_update_door_charge()
 

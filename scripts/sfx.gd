@@ -118,6 +118,15 @@ static func library() -> Dictionary:
 			tone(160.0, 0.09, Wave.NOISE, 0.2, 1.0, 0.001, 0.06),
 		])),
 		"spring": to_stream(tone(200.0, 0.22, Wave.TRIANGLE, 0.4, 3.4, 0.002, 0.08)),
+		# A downward sweep with noise under it: air being cut, not a jump.
+		"dash": to_stream(concat([
+			tone(880.0, 0.06, Wave.PULSE, 0.26, 0.35, 0.001, 0.02),
+			tone(300.0, 0.07, Wave.NOISE, 0.14, 1.0, 0.001, 0.05),
+		])),
+		"crystal": to_stream(concat([
+			tone(note_freq(84), 0.04, Wave.TRIANGLE, 0.24, 1.0, 0.001, 0.02),
+			tone(note_freq(91), 0.11, Wave.TRIANGLE, 0.24, 1.0, 0.001, 0.06),
+		])),
 		"death": to_stream(concat([
 			tone(400.0, 0.08, Wave.SAW, 0.3, 0.5, 0.001, 0.02),
 			tone(200.0, 0.10, Wave.SAW, 0.3, 0.5, 0.001, 0.03),

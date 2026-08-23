@@ -68,7 +68,8 @@ func _setup_input() -> void:
 	_action("p_jump", [KEY_SPACE, KEY_Z, KEY_K, KEY_UP, KEY_W], [JOY_BUTTON_A])
 	_action("p_accept", [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_Z], [JOY_BUTTON_A])
 	_action("p_cancel", [KEY_ESCAPE, KEY_X, KEY_BACKSPACE], [JOY_BUTTON_B])
-	_action("p_restart", [KEY_R], [JOY_BUTTON_X])
+	_action("p_dash", [KEY_SHIFT, KEY_C, KEY_J], [JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_X])
+	_action("p_restart", [KEY_R], [JOY_BUTTON_Y])
 	_action("p_pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START])
 
 
@@ -161,27 +162,46 @@ func _first_unfinished() -> int:
 func _on_title_chosen(id: String) -> void:
 	match id:
 		"play":
-			var index := _first_unfinished()
-			_go(func(): _start_room(index))
+			_go(_show_play_select)
 		"levels":
 			_go(_show_select)
-		"endless":
-			_go(_start_run)
-		"music":
-			var on := not bool(Save.data["music"])
-			Save.set_music(on)
-			Audio.set_music_enabled(on)
-			(_screen as TitleScreen).refresh_audio_labels()
-		"sfx":
-			var on := not bool(Save.data["sfx"])
-			Save.set_sfx(on)
-			Audio.set_sfx_enabled(on)
-			(_screen as TitleScreen).refresh_audio_labels()
-		"language":
-			Lang.cycle()
-			(_screen as TitleScreen).refresh_labels()
+		"options":
+			_go(_show_options)
 		"quit":
 			get_tree().quit()
+
+
+func _show_play_select() -> void:
+	_clear_all()
+	var screen := PlaySelectScreen.new()
+	screen.chosen.connect(_on_play_chosen)
+	screen.cancelled.connect(func(): _go(_show_title))
+	_set_screen(screen)
+
+
+func _on_play_chosen(id: String) -> void:
+	match id:
+		"story":
+			var index := _first_unfinished()
+			_go(func(): _start_room(index))
+		"endless":
+			_go(_start_run)
+
+
+func _show_options() -> void:
+	_clear_all()
+	var screen := OptionsScreen.new()
+	screen.chosen.connect(_on_options_chosen)
+	screen.cancelled.connect(func(): _go(_show_title))
+	_set_screen(screen)
+
+
+## The options screen handles its own toggles; only leaving it reaches here.
+func _on_options_chosen(id: String) -> void:
+	var screen := _screen as OptionsScreen
+	if screen != null and screen.apply(id):
+		return
+	_go(_show_title)
 
 
 func _on_room_picked(index: int) -> void:

@@ -52,6 +52,9 @@ func _draw() -> void:
 func _draw_hint() -> void:
 	if hint.is_empty() or _time > HINT_HOLD + HINT_FADE:
 		return
+	# The pause menu owns the middle of the screen while it is up.
+	if get_tree().paused:
+		return
 	var color := Palette.GREY_DARK
 	if _time > HINT_HOLD:
 		# Two-step fade: pixel art has no business with smooth alpha ramps.
