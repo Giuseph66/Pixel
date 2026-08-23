@@ -13,6 +13,10 @@ var gems_total := 0
 var deaths := 0
 var par := 0.0
 
+## Endless mode reuses the second row for the run's running total, so it gets
+## to rename it. Left empty, it reads "BEST".
+var best_label := ""
+
 var _reveal := 0.0
 
 
@@ -20,6 +24,8 @@ func _ready() -> void:
 	super()
 	title = Lang.t("results.title")
 	subtitle = Lang.t(level_name)
+	if best_label.is_empty():
+		best_label = Lang.t("results.best")
 	list_top = 186.0
 	footer = Lang.t("results.footer")
 
@@ -39,7 +45,7 @@ func draw_header() -> void:
 
 	_row(panel, 0, Lang.t("results.time"), Util.format_time(shown_time),
 		Palette.GOLD if under_par else Palette.WHITE)
-	_row(panel, 1, Lang.t("results.best"), Util.format_time(best),
+	_row(panel, 1, best_label, Util.format_time(best),
 		Palette.GOLD if new_record else Palette.GREY)
 	_row(panel, 2, Lang.t("results.gems"), "%d / %d" % [gems, gems_total],
 		Palette.GOLD if gems_total > 0 and gems >= gems_total else Palette.GREY)

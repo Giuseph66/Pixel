@@ -10,6 +10,8 @@ var data := {
 	"cleared": {},          # level index (as String) -> true
 	"gems": {},             # level index (as String) -> best gem count
 	"total_deaths": 0,
+	"endless_best": 0,      # deepest endless run, in rooms cleared
+	"endless_gems": 0,      # gems taken in the best run
 	"music": true,
 	"sfx": true,
 	"lang": "",             # empty means "guess from the system locale"
@@ -93,6 +95,16 @@ func record_clear(index: int, time: float, gems: int, level_count: int) -> bool:
 	return record
 
 
+## Record a finished endless run. Returns true when it beat the old depth.
+func record_endless(rooms: int, gems: int) -> bool:
+	var record := rooms > int(data["endless_best"])
+	if record:
+		data["endless_best"] = rooms
+		data["endless_gems"] = gems
+	save_game()
+	return record
+
+
 func add_death() -> void:
 	data["total_deaths"] = int(data["total_deaths"]) + 1
 
@@ -119,6 +131,8 @@ func wipe() -> void:
 		"cleared": {},
 		"gems": {},
 		"total_deaths": 0,
+		"endless_best": 0,
+		"endless_gems": 0,
 		"music": bool(data["music"]),
 		"sfx": bool(data["sfx"]),
 		"lang": str(data["lang"]),

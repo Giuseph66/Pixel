@@ -14,14 +14,19 @@ extends RefCounted
 ##   ^  spike, points up       X  exit door (bottom-left tile of the frame)
 ##   v  spike, points down     S  slime
 ##   .  empty air              J  spring pad
+##   W  saw, patrols its row   B  bat, patrols the air
+##   c  crumbling ground, drops a moment after you stand on it
 
 const COLS := 60
 const ROWS := 32
 
 
 # --------------------------------------------------------------- painting ---
+#
+# Public because the endless generator in level_gen.gd paints on the same
+# grid with the same tile characters.
 
-static func _blank() -> Array:
+static func blank() -> Array:
 	var grid := []
 	for y in ROWS:
 		var row := []
@@ -38,7 +43,7 @@ static func _blank() -> Array:
 	return grid
 
 
-static func _rect(grid: Array, x: int, y: int, w: int, h: int, ch: String) -> void:
+static func rect(grid: Array, x: int, y: int, w: int, h: int, ch: String) -> void:
 	for j in range(y, y + h):
 		if j < 0 or j >= ROWS:
 			continue
@@ -48,18 +53,18 @@ static func _rect(grid: Array, x: int, y: int, w: int, h: int, ch: String) -> vo
 			grid[j][i] = ch
 
 
-static func _put(grid: Array, x: int, y: int, ch: String) -> void:
+static func put(grid: Array, x: int, y: int, ch: String) -> void:
 	if x < 0 or y < 0 or x >= COLS or y >= ROWS:
 		return
 	grid[y][x] = ch
 
 
-static func _puts(grid: Array, points: Array, ch: String) -> void:
+static func puts(grid: Array, points: Array, ch: String) -> void:
 	for p: Vector2i in points:
-		_put(grid, p.x, p.y, ch)
+		put(grid, p.x, p.y, ch)
 
 
-static func _bake(grid: Array) -> PackedStringArray:
+static func bake(grid: Array) -> PackedStringArray:
 	var out := PackedStringArray()
 	for row: Array in grid:
 		var line := ""
@@ -73,65 +78,65 @@ static func _bake(grid: Array) -> PackedStringArray:
 
 ## Staircase of ledges. Nothing can kill you here.
 static func _level_1() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 16, 25, 7, 2, "#")
-	_rect(g, 27, 22, 8, 5, "#")
-	_rect(g, 38, 19, 15, 8, "#")
-	_puts(g, [Vector2i(19, 24), Vector2i(30, 21), Vector2i(44, 18)], "o")
-	_put(g, 4, 26, "P")
-	_put(g, 48, 18, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 16, 25, 7, 2, "#")
+	rect(g, 27, 22, 8, 5, "#")
+	rect(g, 38, 19, 15, 8, "#")
+	puts(g, [Vector2i(19, 24), Vector2i(30, 21), Vector2i(44, 18)], "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 18, "X")
+	return bake(g)
 
 
 ## Spiked pits, one-way platforms overhead.
 static func _level_2() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
 	# Each pit is (start column, width): three tiles of air over a bed of spikes.
 	for pit: Vector2i in [Vector2i(13, 5), Vector2i(27, 6), Vector2i(43, 5)]:
 		var start := pit.x
 		var width := pit.y
-		_rect(g, start, 27, width, 3, ".")
-		_rect(g, start, 30, width, 1, "^")
-	_rect(g, 10, 23, 5, 1, "-")
-	_rect(g, 35, 23, 6, 1, "-")
-	_rect(g, 17, 20, 6, 1, "#")
-	_rect(g, 50, 24, 10, 3, "#")
-	_puts(g, [Vector2i(12, 22), Vector2i(19, 19), Vector2i(37, 22)], "o")
-	_put(g, 4, 26, "P")
-	_put(g, 53, 23, "X")
-	return _bake(g)
+		rect(g, start, 27, width, 3, ".")
+		rect(g, start, 30, width, 1, "^")
+	rect(g, 10, 23, 5, 1, "-")
+	rect(g, 35, 23, 6, 1, "-")
+	rect(g, 17, 20, 6, 1, "#")
+	rect(g, 50, 24, 10, 3, "#")
+	puts(g, [Vector2i(12, 22), Vector2i(19, 19), Vector2i(37, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 53, 23, "X")
+	return bake(g)
 
 
 ## Low ceiling with hanging spikes, spike patches on the floor.
 static func _level_3() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 6, 18, 39, 3, "#")
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 6, 18, 39, 3, "#")
 	# Hung where nobody needs to jump: they punish reflex jumping, not routing.
-	_puts(g, [Vector2i(24, 21), Vector2i(25, 21), Vector2i(28, 21), Vector2i(29, 21)], "v")
-	_rect(g, 12, 26, 3, 1, "^")
-	_rect(g, 20, 26, 3, 1, "^")
-	_rect(g, 34, 26, 3, 1, "^")
-	_rect(g, 46, 23, 14, 4, "#")
-	_puts(g, [Vector2i(13, 25), Vector2i(21, 25), Vector2i(35, 25)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 49, 22, "X")
-	return _bake(g)
+	puts(g, [Vector2i(24, 21), Vector2i(25, 21), Vector2i(28, 21), Vector2i(29, 21)], "v")
+	rect(g, 12, 26, 3, 1, "^")
+	rect(g, 20, 26, 3, 1, "^")
+	rect(g, 34, 26, 3, 1, "^")
+	rect(g, 46, 23, 14, 4, "#")
+	puts(g, [Vector2i(13, 25), Vector2i(21, 25), Vector2i(35, 25)], "o")
+	put(g, 3, 26, "P")
+	put(g, 49, 22, "X")
+	return bake(g)
 
 
 ## Patrolling slimes on the ground and on two floating platforms.
 static func _level_4() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 22, 20, 9, 1, "#")
-	_rect(g, 10, 23, 9, 1, "#")
-	_puts(g, [Vector2i(23, 19), Vector2i(11, 22), Vector2i(50, 26)], "o")
-	_puts(g, [Vector2i(26, 19), Vector2i(14, 22), Vector2i(22, 26), Vector2i(44, 26)], "S")
-	_put(g, 3, 26, "P")
-	_put(g, 55, 26, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 20, 9, 1, "#")
+	rect(g, 10, 23, 9, 1, "#")
+	puts(g, [Vector2i(23, 19), Vector2i(11, 22), Vector2i(50, 26)], "o")
+	puts(g, [Vector2i(26, 19), Vector2i(14, 22), Vector2i(22, 26), Vector2i(44, 26)], "S")
+	put(g, 3, 26, "P")
+	put(g, 55, 26, "X")
+	return bake(g)
 
 
 ## Springs. The exit sits two spring-heights above the floor.
@@ -139,140 +144,142 @@ static func _level_4() -> PackedStringArray:
 ## Every platform a spring fires into has to be one-way, or the launch just
 ## slams into its underside — a spring under solid ground goes nowhere.
 static func _level_5() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 22, 8, 15, 1, "-")      # spring at col 28 passes up through this
-	_rect(g, 4, 16, 13, 1, "-")      # spring at col 8 passes up through this
-	_rect(g, 44, 16, 13, 1, "-")     # spring at col 50 passes up through this
-	_rect(g, 20, 20, 13, 1, "#")
-	_puts(g, [Vector2i(8, 26), Vector2i(50, 26), Vector2i(28, 19)], "J")
-	_puts(g, [Vector2i(26, 7), Vector2i(8, 15), Vector2i(50, 15), Vector2i(22, 19)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 32, 7, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 8, 15, 1, "-")      # spring at col 28 passes up through this
+	rect(g, 4, 16, 13, 1, "-")      # spring at col 8 passes up through this
+	rect(g, 44, 16, 13, 1, "-")     # spring at col 50 passes up through this
+	rect(g, 20, 20, 13, 1, "#")
+	puts(g, [Vector2i(8, 26), Vector2i(50, 26), Vector2i(28, 19)], "J")
+	puts(g, [Vector2i(26, 7), Vector2i(8, 15), Vector2i(50, 15), Vector2i(22, 19)], "o")
+	put(g, 3, 26, "P")
+	put(g, 32, 7, "X")
+	return bake(g)
 
 
 ## A wall-jump shaft, with an optional spike run along the floor.
 static func _level_6() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 17, 7, 1, 18, "#")      # right wall of the shaft
-	_rect(g, 12, 9, 1, 16, "#")      # left wall, stops short so you can exit
-	_rect(g, 4, 8, 9, 1, "#")        # landing at the top of the climb
-	_rect(g, 17, 6, 12, 1, "#")
-	_rect(g, 34, 6, 13, 1, "#")
-	_rect(g, 30, 26, 5, 1, "^")
-	_rect(g, 44, 26, 3, 1, "^")
-	_puts(g, [Vector2i(14, 13), Vector2i(15, 19), Vector2i(22, 5), Vector2i(52, 26)], "o")
-	_put(g, 24, 26, "S")
-	_put(g, 3, 26, "P")
-	_put(g, 40, 5, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 17, 7, 1, 18, "#")      # right wall of the shaft
+	rect(g, 12, 9, 1, 16, "#")      # left wall, stops short so you can exit
+	rect(g, 4, 8, 9, 1, "#")        # landing at the top of the climb
+	rect(g, 17, 6, 12, 1, "#")
+	rect(g, 34, 6, 13, 1, "#")
+	rect(g, 30, 26, 5, 1, "^")
+	rect(g, 44, 26, 3, 1, "^")
+	puts(g, [Vector2i(14, 13), Vector2i(15, 19), Vector2i(22, 5), Vector2i(52, 26)], "o")
+	put(g, 24, 26, "S")
+	put(g, 3, 26, "P")
+	put(g, 40, 5, "X")
+	return bake(g)
 
 
-## Slimes in pits: stomp them or jump over. If you miss, spikes catch you.
+## Two routes over three spiked pits: the floor, with slimes patrolling between
+## the pits, or a chain of one-way ledges overhead carrying the gems.
 static func _level_7() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 8, 21, 11, 1, "#")
-	_rect(g, 24, 21, 12, 1, "#")
-	_rect(g, 42, 21, 14, 1, "#")
-	# Three pits with slimes; spike bed below each.
-	for pit: Vector2i in [Vector2i(12, 8), Vector2i(28, 8), Vector2i(46, 8)]:
-		_rect(g, pit.x, pit.y, pit.y, 5, ".")
-		_rect(g, pit.x, pit.y + 5, pit.y, 1, "^")
-	_puts(g, [Vector2i(14, 21), Vector2i(30, 21), Vector2i(48, 21)], "S")
-	_puts(g, [Vector2i(16, 20), Vector2i(32, 20), Vector2i(50, 20), Vector2i(26, 15)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 55, 26, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	# Pits are five tiles wide: 40px, well inside a 61px jump.
+	for pit: Vector2i in [Vector2i(14, 5), Vector2i(28, 5), Vector2i(44, 5)]:
+		rect(g, pit.x, 27, pit.y, 3, ".")
+		rect(g, pit.x, 30, pit.y, 1, "^")
+	# Ledges sit four tiles up with five-tile gaps between them.
+	rect(g, 8, 23, 6, 1, "-")
+	rect(g, 19, 23, 6, 1, "-")
+	rect(g, 30, 23, 6, 1, "-")
+	puts(g, [Vector2i(10, 22), Vector2i(21, 22), Vector2i(32, 22), Vector2i(52, 26)], "o")
+	puts(g, [Vector2i(10, 26), Vector2i(24, 26), Vector2i(38, 26)], "S")
+	put(g, 3, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
 
 
-## Springs under platforms: launch from below to access higher ledges.
+## A spring staircase. Each spring stands on the tier below it and fires
+## through the one-way tier above — a spring under solid ground is a dead end.
 static func _level_8() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 8, 14, 16, 1, "-")
-	_rect(g, 30, 10, 18, 1, "-")
-	_rect(g, 52, 6, 8, 1, "#")
-	_rect(g, 6, 22, 3, 1, "#")
-	_rect(g, 28, 22, 3, 1, "#")
-	_rect(g, 50, 22, 3, 1, "#")
-	_puts(g, [Vector2i(7, 23), Vector2i(29, 23), Vector2i(51, 23)], "J")
-	_puts(g, [Vector2i(10, 13), Vector2i(18, 13), Vector2i(32, 9), Vector2i(40, 9), Vector2i(54, 5)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 56, 5, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 4, 16, 17, 1, "-")      # tier one, reached from the floor spring
+	rect(g, 14, 6, 21, 1, "-")      # tier two, reached from the tier-one spring
+	rect(g, 42, 16, 14, 1, "-")     # optional side tier for one more gem
+	puts(g, [Vector2i(8, 26), Vector2i(18, 15), Vector2i(48, 26)], "J")
+	puts(g, [Vector2i(6, 15), Vector2i(24, 5), Vector2i(32, 5), Vector2i(50, 15)], "o")
+	put(g, 3, 26, "P")
+	put(g, 30, 5, "X")
+	return bake(g)
 
 
-## Narrow corridors with slimes. Dodge or stomp, then navigate tight spaces.
+## A staircase of one-way ledges, three tiles up and four across each time,
+## with a slime waiting on every step.
 static func _level_9() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 10, 22, 7, 1, "#")
-	_rect(g, 20, 18, 7, 1, "#")
-	_rect(g, 30, 14, 7, 1, "#")
-	_rect(g, 40, 10, 7, 1, "#")
-	_rect(g, 50, 6, 10, 1, "#")
-	# Slimes block the path; you must jump over or defeat them.
-	_puts(g, [Vector2i(13, 21), Vector2i(23, 17), Vector2i(33, 13), Vector2i(43, 9)], "S")
-	_puts(g, [Vector2i(11, 20), Vector2i(21, 16), Vector2i(31, 12), Vector2i(41, 8), Vector2i(52, 4)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 55, 5, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 24, 7, 1, "-")
+	rect(g, 21, 21, 7, 1, "-")
+	rect(g, 32, 18, 7, 1, "-")
+	rect(g, 43, 15, 7, 1, "-")
+	rect(g, 52, 12, 7, 1, "-")
+	puts(g, [Vector2i(14, 23), Vector2i(25, 20), Vector2i(36, 17), Vector2i(47, 14)], "S")
+	puts(g, [Vector2i(11, 23), Vector2i(22, 20), Vector2i(33, 17), Vector2i(44, 14), Vector2i(57, 11)], "o")
+	put(g, 3, 26, "P")
+	put(g, 54, 11, "X")
+	return bake(g)
 
 
-## Maze-like with spikes. Find the safe path through a complex layout.
+## Spikes strung along the floor, with a high ledge route above them.
 static func _level_10() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 6, 20, 6, 1, "#")
-	_rect(g, 14, 23, 8, 1, "#")
-	_rect(g, 24, 20, 6, 1, "#")
-	_rect(g, 32, 23, 8, 1, "#")
-	_rect(g, 42, 20, 6, 1, "#")
-	_rect(g, 50, 23, 10, 1, "#")
-	# Spike traps in the gaps.
-	_puts(g, [Vector2i(8, 26), Vector2i(18, 26), Vector2i(28, 26), Vector2i(38, 26), Vector2i(48, 26)], "^")
-	_puts(g, [Vector2i(10, 19), Vector2i(26, 19), Vector2i(44, 19), Vector2i(20, 22), Vector2i(40, 22)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 55, 22, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 6, 20, 6, 1, "#")
+	rect(g, 14, 23, 8, 1, "#")
+	rect(g, 24, 20, 6, 1, "#")
+	rect(g, 32, 23, 8, 1, "#")
+	rect(g, 42, 20, 6, 1, "#")
+	rect(g, 50, 23, 10, 1, "#")
+	puts(g, [Vector2i(8, 26), Vector2i(18, 26), Vector2i(28, 26),
+		Vector2i(38, 26), Vector2i(48, 26)], "^")
+	puts(g, [Vector2i(10, 19), Vector2i(26, 19), Vector2i(44, 19),
+		Vector2i(20, 22), Vector2i(40, 22)], "o")
+	put(g, 3, 26, "P")
+	put(g, 55, 22, "X")
+	return bake(g)
 
 
-## Spring tower: use springs to climb a tall shaft.
+## Two spring launches straight up a tower. Everything above a spring is
+## one-way, so each launch passes through and lands on top.
 static func _level_11() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 22, 22, 2, 1, "#")
-	_rect(g, 21, 16, 2, 1, "#")
-	_rect(g, 22, 10, 2, 1, "#")
-	_rect(g, 21, 4, 2, 1, "#")
-	# Springs on both sides to bounce up the shaft.
-	_puts(g, [Vector2i(19, 23), Vector2i(25, 23), Vector2i(18, 17), Vector2i(26, 17)], "J")
-	_puts(g, [Vector2i(18, 11), Vector2i(26, 11), Vector2i(19, 5), Vector2i(25, 5)], "J")
-	_puts(g, [Vector2i(22, 20), Vector2i(21, 14), Vector2i(22, 8), Vector2i(21, 2)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 22, 1, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 26, 3, 1, "^")
+	rect(g, 22, 18, 13, 1, "-")     # first landing, 9 tiles up
+	rect(g, 20, 8, 13, 1, "-")      # second landing, 10 tiles above that
+	puts(g, [Vector2i(28, 26), Vector2i(26, 17)], "J")
+	puts(g, [Vector2i(24, 17), Vector2i(32, 17), Vector2i(22, 7),
+		Vector2i(31, 7), Vector2i(8, 26)], "o")
+	put(g, 3, 26, "P")
+	put(g, 26, 7, "X")
+	return bake(g)
 
 
-## Final gauntlet: slimes, spikes, springs, walls, pits. Everything at once.
+## The finale. Spikes and a slime on the floor, a wall-jump shaft that is the
+## only way up, then a gap to the last tier. The spring is an optional detour.
 static func _level_12() -> PackedStringArray:
-	var g := _blank()
-	_rect(g, 0, 27, COLS, 5, "#")
-	_rect(g, 6, 22, 8, 1, "#")
-	_rect(g, 18, 19, 8, 1, "-")
-	_rect(g, 30, 16, 8, 1, "#")
-	_rect(g, 42, 13, 8, 1, "-")
-	_rect(g, 20, 8, 1, 8, "#")      # wall to jump on
-	_puts(g, [Vector2i(8, 23), Vector2i(32, 23), Vector2i(50, 23)], "^")
-	_puts(g, [Vector2i(10, 21), Vector2i(34, 15), Vector2i(54, 12)], "S")
-	_puts(g, [Vector2i(22, 23), Vector2i(35, 23), Vector2i(46, 12)], "J")
-	_puts(g, [Vector2i(12, 20), Vector2i(24, 18), Vector2i(36, 14), Vector2i(48, 10), Vector2i(56, 6)], "o")
-	_put(g, 3, 26, "P")
-	_put(g, 56, 5, "X")
-	return _bake(g)
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 8, 26, 2, 1, "^")
+	rect(g, 20, 8, 1, 17, "#")      # shaft, left wall
+	rect(g, 25, 8, 1, 17, "#")      # shaft, right wall
+	rect(g, 25, 7, 12, 1, "#")      # landing on top of the right wall
+	rect(g, 42, 7, 11, 1, "#")      # last tier, five tiles across the gap
+	rect(g, 36, 14, 11, 1, "-")     # optional gem tier under the spring
+	puts(g, [Vector2i(14, 26), Vector2i(45, 6)], "S")
+	put(g, 40, 26, "J")
+	puts(g, [Vector2i(22, 15), Vector2i(28, 6), Vector2i(34, 6),
+		Vector2i(40, 13), Vector2i(50, 6)], "o")
+	put(g, 3, 26, "P")
+	put(g, 48, 6, "X")
+	return bake(g)
 
 
 ## "name" and "hint" are translation keys, not text — every screen that shows

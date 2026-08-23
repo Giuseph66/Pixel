@@ -9,6 +9,19 @@ var _levels: Array = []
 var _current := 0
 var _busy := false
 
+# Endless run state. `_endless` is what every screen branches on; the rest is
+# the running tally shown in the summary once the run ends.
+var _endless := false
+var _run_seed := 0
+var _depth := 0
+var _run_time := 0.0
+var _run_gems := 0
+var _run_deaths := 0
+
+# The room just cleared, held back until the player leaves the results screen.
+# Replaying it from there has to not count twice.
+var _pending: Dictionary = {}
+
 var _level: Level
 var _hud: Hud
 var _screen: Node2D
@@ -152,6 +165,8 @@ func _on_title_chosen(id: String) -> void:
 			_go(func(): _start_room(index))
 		"levels":
 			_go(_show_select)
+		"endless":
+			_go(_start_run)
 		"music":
 			var on := not bool(Save.data["music"])
 			Save.set_music(on)
@@ -176,9 +191,49 @@ func _on_room_picked(index: int) -> void:
 # ---------------------------------------------------------------- gameplay ---
 
 func _start_room(index: int) -> void:
-	_clear_all()
+	_endless = false
 	_current = index
-	var data: Dictionary = _levels[index]
+	_build_room(index, _levels[index])
+
+
+# --------------------------------------------------------------- endless ---
+
+## Begin a fresh endless run. One seed decides the whole run, so a death drops
+## you back into the same room rather than a new one.
+func _start_run() -> void:
+	_endless = true
+	_run_seed = randi()
+	_depth = 0
+	_run_time = 0.0
+	_run_gems = 0
+	_run_deaths = 0
+	_pending = {}
+	_build_room(_depth, LevelGen.generate(_run_seed, _depth))
+
+
+func _next_endless_room() -> void:
+	_build_room(_depth, LevelGen.generate(_run_seed, _depth))
+
+
+## Close the run, bank the record and show the summary.
+func _end_run() -> void:
+	var record := Save.record_endless(_depth, _run_gems)
+	_clear_all()
+
+	var screen := EndingScreen.new()
+	screen.endless = true
+	screen.rooms = _depth
+	screen.total_time = _run_time
+	screen.total_gems = _run_gems
+	screen.deaths = _run_deaths
+	screen.new_record = record
+	screen.chosen.connect(_on_ending_chosen)
+	_set_screen(screen)
+	_endless = false
+
+
+func _build_room(index: int, data: Dictionary) -> void:
+	_clear_all()
 
 	_level = Level.new()
 	_level.setup(index, data)
@@ -202,11 +257,56 @@ func _restart_room() -> void:
 
 
 func _on_room_completed(time: float, gems: int, total: int) -> void:
+	if _endless:
+		_on_endless_room_completed(time, gems, total)
+		return
+
 	var record := Save.record_clear(_current, time, gems, _levels.size())
 	var best := Save.best_time(_current)
 	var deaths := _level.deaths
 	await get_tree().create_timer(0.45).timeout
 	_go(func(): _show_results(time, best, record, gems, total, deaths))
+
+
+func _on_endless_room_completed(time: float, gems: int, total: int) -> void:
+	_pending = {"time": time, "gems": gems, "deaths": _level.deaths}
+	await get_tree().create_timer(0.45).timeout
+	_go(func(): _show_endless_results(time, gems, total, int(_pending["deaths"])))
+
+
+## Fold the finished room into the run total. Called when the player moves on,
+## never when they choose to replay it.
+func _commit_room() -> void:
+	if _pending.is_empty():
+		return
+	_depth += 1
+	_run_time += float(_pending["time"])
+	_run_gems += int(_pending["gems"])
+	_run_deaths += int(_pending["deaths"])
+	_pending = {}
+
+
+## Between endless rooms: the same panel as a story room, minus the records
+## there is nothing to compare against.
+func _show_endless_results(time: float, gems: int, total: int, deaths: int) -> void:
+	_clear_all()
+
+	var screen := ResultsScreen.new()
+	screen.level_name = Lang.tf("endless.room", [_depth + 1])
+	screen.time = time
+	screen.best = _run_time
+	screen.gems = gems
+	screen.gems_total = total
+	screen.deaths = deaths
+	screen.par = 0.0
+	screen.best_label = Lang.t("endless.time")
+	screen.items = [
+		{"id": "continue", "label": Lang.t("results.continue")},
+		{"id": "retry", "label": Lang.t("results.retry")},
+		{"id": "end_run", "label": Lang.t("results.end_run")},
+	]
+	screen.chosen.connect(_on_results_chosen)
+	_set_screen(screen)
 
 
 func _show_results(time: float, best: float, record: bool, gems: int, total: int,
@@ -245,9 +345,20 @@ func _on_results_chosen(id: String) -> void:
 		"next":
 			var index := _current + 1
 			_go(func(): _start_room(index))
+		"continue":
+			_commit_room()
+			_go(_next_endless_room)
+		"end_run":
+			_commit_room()
+			_go(_end_run)
 		"retry":
-			var index := _current
-			_go(func(): _start_room(index))
+			if _endless:
+				# Discard the run so far for this room and play it again.
+				_pending = {}
+				_go(_next_endless_room)
+			else:
+				var index := _current
+				_go(func(): _start_room(index))
 		"levels":
 			_go(_show_select)
 		"ending":
@@ -274,16 +385,20 @@ func _show_ending() -> void:
 
 
 func _on_ending_chosen(id: String) -> void:
-	if id == "levels":
-		_go(_show_select)
-	else:
-		_go(_show_title)
+	match id:
+		"levels":
+			_go(_show_select)
+		"endless":
+			_go(_start_run)
+		_:
+			_go(_show_title)
 
 
 # ------------------------------------------------------------------ pause ---
 
 func _open_pause() -> void:
 	_pause = PauseMenu.new()
+	_pause.endless = _endless
 	_pause.chosen.connect(_on_pause_chosen)
 	_pause.cancelled.connect(_close_pause)
 	add_child(_pause)
@@ -307,6 +422,12 @@ func _on_pause_chosen(id: String) -> void:
 		"levels":
 			_close_pause()
 			_go(_show_select)
+		"end_run":
+			_close_pause()
+			_go(_end_run)
 		"title":
 			_close_pause()
+			if _endless:
+				Save.record_endless(_depth, _run_gems)
+				_endless = false
 			_go(_show_title)

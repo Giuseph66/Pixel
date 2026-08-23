@@ -103,6 +103,12 @@ func is_solid(tx: int, ty: int) -> bool:
 	return tile_at(tx, ty) == "#"
 
 
+## Anything you can stand on, which includes one-way slabs.
+func is_ground(tx: int, ty: int) -> bool:
+	var ch := tile_at(tx, ty)
+	return ch == "#" or ch == "-"
+
+
 func tile_center(tx: int, ty: int) -> Vector2:
 	return Vector2(tx * TILE + TILE * 0.5, ty * TILE + TILE * 0.5)
 
@@ -237,9 +243,25 @@ func _spawn_entities() -> void:
 				"S":
 					var slime := Slime.new()
 					slime.position = tile_center(tx, ty)
-					slime.is_solid = Callable(self, "is_solid")
+					slime.is_wall = Callable(self, "is_solid")
+					slime.is_ground = Callable(self, "is_ground")
 					slime.squashed.connect(_on_slime_squashed)
 					_entities.add_child(slime)
+				"W":
+					var saw := Saw.new()
+					saw.position = tile_center(tx, ty)
+					saw.is_wall = Callable(self, "is_solid")
+					saw.is_ground = Callable(self, "is_ground")
+					_entities.add_child(saw)
+				"B":
+					var bat := Bat.new()
+					bat.position = tile_center(tx, ty)
+					bat.squashed.connect(_on_bat_squashed)
+					_entities.add_child(bat)
+				"c":
+					var block := Crumble.new()
+					block.position = tile_center(tx, ty)
+					_entities.add_child(block)
 				"X":
 					_door = ExitDoor.new()
 					# 'X' marks the bottom tile of a two-tile-tall frame.
@@ -253,6 +275,13 @@ func _spawn_entities() -> void:
 					)
 
 	_spawn_player()
+
+	# Slimes watch the player themselves, so they need the reference the moment
+	# it exists — which is only after the whole grid has been walked.
+	for child in _entities.get_children():
+		if child is Slime:
+			(child as Slime).player = _player
+
 	_update_door_charge()
 
 
@@ -277,6 +306,11 @@ func _on_gem_collected(gem: Gem) -> void:
 		Vector2.ZERO, TAU, 0.4, 180.0)
 	gem.queue_free()
 	_update_door_charge()
+
+
+func _on_bat_squashed(at: Vector2) -> void:
+	fx.emit(fx.to_local(at), 12, Palette.PURPLE, 90.0, Vector2.UP, PI, 0.4, 260.0)
+	shake(2.0)
 
 
 func _on_slime_squashed(at: Vector2) -> void:

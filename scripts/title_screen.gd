@@ -12,12 +12,13 @@ func _ready() -> void:
 	super()
 	_cube = PixelArt.cube(8)
 	title = ""
-	list_top = 154.0
-	line_height = 15.0
+	list_top = 146.0
+	line_height = 14.0
 
 	items = [
 		{"id": "play", "label": ""},
 		{"id": "levels", "label": ""},
+		{"id": "endless", "label": ""},
 		{"id": "music", "label": ""},
 		{"id": "sfx", "label": ""},
 		{"id": "language", "label": ""},
@@ -41,6 +42,9 @@ func refresh_labels() -> void:
 	set_item_value("music", _on_off(Save.data["music"]))
 	set_item_value("sfx", _on_off(Save.data["sfx"]))
 	set_item_value("language", Lang.language_name())
+
+	var deepest := int(Save.data["endless_best"])
+	set_item_value("endless", Lang.tf("title.endless_best", [deepest]) if deepest > 0 else "")
 
 	var cleared := Save.cleared_count()
 	_stats = ""

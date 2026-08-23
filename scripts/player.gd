@@ -37,6 +37,10 @@ const SPRING_VELOCITY := -450.0
 var alive := true
 var frozen := false             # set once the room is won; control is over
 var facing := 1
+## Where the feet were at the start of this frame. Enemies decide a stomp from
+## this rather than from velocity: Area2D overlaps arrive a frame late, and by
+## then a fall has often already ended on the floor with velocity back to zero.
+var previous_bottom := 0.0
 var _coyote := 0.0
 var _buffer := 0.0
 var _lock := 0.0
@@ -65,11 +69,14 @@ func _ready() -> void:
 	sprite.texture = PixelArt.tex("player_idle")
 	add_child(sprite)
 
+	previous_bottom = position.y + HEIGHT * 0.5
+
 
 func _physics_process(delta: float) -> void:
 	if not alive or frozen:
 		return
 
+	previous_bottom = global_position.y + HEIGHT * 0.5
 	_anim += delta
 	_coyote = maxf(_coyote - delta, 0.0)
 	_buffer = maxf(_buffer - delta, 0.0)
