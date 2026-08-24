@@ -288,6 +288,18 @@ const STRINGS := {
 
 	"belt": "CONVEYOR",
 	"belt.desc": "THE FLOOR MOVES. WITH IT YOU FLY, AGAINST IT YOU CRAWL",
+
+	"level.retract_first.name": "PULSE",
+	"level.retract_first.hint": "IT RISES AND FALLS. WAIT FOR THE WINDOW",
+	"level.retract_run.name": "CORRIDOR",
+	"level.retract_run.hint": "RUN THROUGH WHILE THEY ARE DOWN",
+	"level.retract_drop.name": "TIMING",
+	"level.retract_drop.hint": "THE BLOCK AND SPIKE DANCE TOGETHER",
+	"level.retract_saw.name": "DOUBLE TIME",
+	"level.retract_saw.hint": "TWO RHYTHMS, ONE SCREEN",
+
+	"retract": "TIMED SPIKE",
+	"retract.desc": "RISES AND FALLS ON A BEAT. IT BLINKS BEFORE IT BITES",
 },
 
 "pt": {
@@ -502,6 +514,18 @@ const STRINGS := {
 
 	"belt": "ESTEIRA",
 	"belt.desc": "O CHAO ANDA. A FAVOR VOA, CONTRA ARRASTA",
+
+	"level.retract_first.name": "PULSO",
+	"level.retract_first.hint": "SOBE E DESCE. ESPERE A JANELA",
+	"level.retract_run.name": "CORREDOR",
+	"level.retract_run.hint": "CORRA ENQUANTO ESTAO BAIXOS",
+	"level.retract_drop.name": "SINCRONISMO",
+	"level.retract_drop.hint": "O BLOCO E ESPINHO DANCAM JUNTOS",
+	"level.retract_saw.name": "DUPLO RITMO",
+	"level.retract_saw.hint": "DOIS RITMOS, UMA TELA",
+
+	"retract": "ESPINHO PULSANTE",
+	"retract.desc": "SOBE E DESCE NO RITMO. PISCA ANTES DE MORDER",
 },
 
 "es": {
@@ -716,5 +740,17 @@ const STRINGS := {
 
 	"belt": "CINTA",
 	"belt.desc": "EL SUELO ANDA. A FAVOR VUELAS, EN CONTRA ARRASTRAS",
+
+	"level.retract_first.name": "PULSO",
+	"level.retract_first.hint": "SUBE Y BAJA. ESPERA LA VENTANA",
+	"level.retract_run.name": "CORREDOR",
+	"level.retract_run.hint": "CORRE MIENTRAS ESTAN ABAJO",
+	"level.retract_drop.name": "SINCRONIZACION",
+	"level.retract_drop.hint": "EL BLOQUE Y PUA BAILAN JUNTOS",
+	"level.retract_saw.name": "DOBLE RITMO",
+	"level.retract_saw.hint": "DOS RITMOS, UNA PANTALLA",
+
+	"retract": "PUA PULSANTE",
+	"retract.desc": "SUBE Y BAJA A COMPAS. PARPADEA ANTES DE MORDER",
 },
 }

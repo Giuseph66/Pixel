@@ -51,6 +51,7 @@ const UNLOCK := {
 	"vault": 9,
 	"crystal": 6,               # not a segment: see _place_crystals()
 	"ice": 6,
+	"retract": 7,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -78,6 +79,7 @@ const THREAT := {
 	"vault": 2.0,
 	"ice": 2.0,
 	"belt": 1.5,
+	"retract": 2.5,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -187,6 +189,7 @@ const WIDTHS := {
 	"vault": 9,
 	"ice": 8,
 	"belt": 6,
+	"retract": 6,
 }
 
 
@@ -215,6 +218,7 @@ const TASTE := {
 	"vault": 1.6,
 	"ice": 1.6,
 	"belt": 1.4,
+	"retract": 1.5,
 }
 
 
@@ -415,6 +419,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _ice(g, rng, x, room, d, spots)
 		"belt":
 			return _belt(g, rng, x, room, d, spots)
+		"retract":
+			return _retract(g, rng, x, room, d, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -750,6 +756,20 @@ static func _belt(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: fl
 	var ch := ">" if rng.randf() < 0.55 else "<"
 	Levels.rect(g, x, FLOOR, w, 1, ch)
 	spots.append(Vector2i(x + w / 2, STAND - 3))
+	return w
+
+
+## A pulse on the ground. Cheap in space and expensive in time — the segment
+## that doesn't cost distance, only attention.
+static func _retract(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var sw := clampi(2 + roundi(d * 2.0), 2, 4)
+	var w := sw + 4
+	if w > room:
+		return mini(4, room)
+	var flip := rng.randf() < 0.5
+	Levels.rect(g, x + 2, STAND, sw, 1, "Z" if flip else "z")
+	spots.append(Vector2i(x + 2 + sw / 2, STAND - 3))
 	return w
 
 

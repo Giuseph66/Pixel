@@ -536,6 +536,60 @@ static func _level_belt_mix() -> PackedStringArray:
 	return bake(g)
 
 
+## Pulsing spikes: three groups with safe ground between them.
+static func _level_retract_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for x in [14, 26, 38]:
+		rect(g, x, 26, 3, 1, "z")
+	puts(g, [Vector2i(20, 25), Vector2i(32, 25), Vector2i(44, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## Running through alternating spikes: one line up and down.
+static func _level_retract_run() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for x in range(12, 48, 3):
+		if (x / 3) % 2 == 0:
+			put(g, x, 26, "z")
+		else:
+			put(g, x, 26, "Z")
+	puts(g, [Vector2i(24, 25), Vector2i(36, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Timed block and spike: they dance together.
+static func _level_retract_drop() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 24, 20, 12, 1, "t")
+	for x in [26, 30, 34]:
+		put(g, x, 27, "z")
+	puts(g, [Vector2i(28, 26), Vector2i(32, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Spike and saw: two timers on the same screen.
+static func _level_retract_saw() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 24, 40, 1, "#")
+	for x in [16, 22, 28, 34, 40, 46]:
+		put(g, x, 26, "z")
+	put(g, 32, 23, "W")
+	puts(g, [Vector2i(24, 25), Vector2i(40, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -742,6 +796,34 @@ static func all() -> Array:
 			"hint": "level.belt_mix.hint",
 			"par": 42.0,
 			"rows": _level_belt_mix(),
+		},
+		{
+			"id": "retract_first",
+			"name": "level.retract_first.name",
+			"hint": "level.retract_first.hint",
+			"par": 26.0,
+			"rows": _level_retract_first(),
+		},
+		{
+			"id": "retract_run",
+			"name": "level.retract_run.name",
+			"hint": "level.retract_run.hint",
+			"par": 34.0,
+			"rows": _level_retract_run(),
+		},
+		{
+			"id": "retract_drop",
+			"name": "level.retract_drop.name",
+			"hint": "level.retract_drop.hint",
+			"par": 40.0,
+			"rows": _level_retract_drop(),
+		},
+		{
+			"id": "retract_saw",
+			"name": "level.retract_saw.name",
+			"hint": "level.retract_saw.hint",
+			"par": 48.0,
+			"rows": _level_retract_saw(),
 		},
 	]
 
