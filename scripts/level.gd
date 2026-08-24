@@ -112,13 +112,13 @@ func is_air(tx: int, ty: int) -> bool:
 
 func is_solid(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~" or ch == ">" or ch == "<"
+	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "m" or ch == "n" or ch == "r"
 
 
-## Anything you can stand on, which includes one-way slabs, ice, and conveyors.
+## Anything you can stand on, which includes one-way slabs, ice, conveyors, and platforms.
 func is_ground(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "-"
+	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "-" or ch == "m" or ch == "n" or ch == "r"
 
 
 func tile_center(tx: int, ty: int) -> Vector2:
@@ -371,14 +371,14 @@ func _spawn_conveyors() -> void:
 
 
 ## Moving platforms are runs of tiles rather than single ones, so they get
-## their own pass: 'm' travels sideways, 'n' up and down, and the length of the
-## run is the length of the slab.
+## their own pass: 'm' travels sideways, 'n' up and down, 'r' orbits, and the
+## length of the run is the length of the slab.
 func _spawn_platforms() -> void:
 	for ty in Levels.ROWS:
 		var tx := 0
 		while tx < Levels.COLS:
 			var ch := tile_at(tx, ty)
-			if ch != "m" and ch != "n":
+			if ch != "m" and ch != "n" and ch != "r":
 				tx += 1
 				continue
 			var run := 1
@@ -387,7 +387,7 @@ func _spawn_platforms() -> void:
 
 			var platform := MovingPlatform.new()
 			platform.speed_scale = intensity
-			platform.setup(run, ch == "n", tx, ty, Callable(self, "is_air"))
+			platform.setup(run, ch == "n", tx, ty, Callable(self, "is_air"), ch == "r")
 			platform.position = tile_center(tx, ty)
 			_entities.add_child(platform)
 			tx += run

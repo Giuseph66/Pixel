@@ -825,6 +825,27 @@ static func all() -> Array:
 			"par": 48.0,
 			"rows": _level_retract_saw(),
 		},
+		{
+			"id": "orbit_first",
+			"name": "level.orbit_first.name",
+			"hint": "level.orbit_first.hint",
+			"par": 30.0,
+			"rows": _level_orbit_first(),
+		},
+		{
+			"id": "orbit_gems",
+			"name": "level.orbit_gems.name",
+			"hint": "level.orbit_gems.hint",
+			"par": 44.0,
+			"rows": _level_orbit_gems(),
+		},
+		{
+			"id": "orbit_saw",
+			"name": "level.orbit_saw.name",
+			"hint": "level.orbit_saw.hint",
+			"par": 50.0,
+			"rows": _level_orbit_saw(),
+		},
 	]
 
 
