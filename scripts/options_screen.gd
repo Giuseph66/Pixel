@@ -33,8 +33,8 @@ func refresh_labels() -> void:
 	set_item_label("language", Lang.t("title.language"))
 	set_item_label("back", Lang.t("options.back"))
 
-	set_item_value("music", _on_off(Save.data["music"]))
-	set_item_value("sfx", _on_off(Save.data["sfx"]))
+	set_item_value("music", _on_off(Save.settings["music"]))
+	set_item_value("sfx", _on_off(Save.settings["sfx"]))
 	set_item_value("language", Lang.language_name())
 	queue_redraw()
 
@@ -44,11 +44,11 @@ func refresh_labels() -> void:
 func apply(id: String) -> bool:
 	match id:
 		"music":
-			var on := not bool(Save.data["music"])
+			var on := not bool(Save.settings["music"])
 			Save.set_music(on)
 			Audio.set_music_enabled(on)
 		"sfx":
-			var on := not bool(Save.data["sfx"])
+			var on := not bool(Save.settings["sfx"])
 			Save.set_sfx(on)
 			Audio.set_sfx_enabled(on)
 		"language":

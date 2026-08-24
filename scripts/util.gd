@@ -15,6 +15,13 @@ static func format_time(seconds: float) -> String:
 	return "%d:%02d.%02d" % [minutes, secs, cents]
 
 
+## Hours and minutes, for totals that run long enough that centiseconds are
+## noise rather than information.
+static func format_clock(seconds: float) -> String:
+	var total := maxi(floori(seconds), 0)
+	return "%dH %02dM" % [total / 3600, (total % 3600) / 60]
+
+
 ## Panel with a one pixel border, used by every screen.
 static func draw_panel(ci: CanvasItem, rect: Rect2, fill: Color, border: Color) -> void:
 	ci.draw_rect(rect, fill)

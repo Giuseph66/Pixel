@@ -35,8 +35,8 @@ func _ready() -> void:
 
 	_levels = Levels.all()
 
-	Audio.sfx_enabled = bool(Save.data["sfx"])
-	Audio.music_enabled = bool(Save.data["music"])
+	Audio.sfx_enabled = bool(Save.settings["sfx"])
+	Audio.music_enabled = bool(Save.settings["music"])
 
 	_transition = Transition.new()
 	add_child(_transition)
@@ -49,7 +49,9 @@ func _ready() -> void:
 	Audio.start_music()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	Save.add_play_time(delta)
+
 	if _busy or _level == null or _pause != null or _level.finished:
 		return
 	if Input.is_action_just_pressed("p_pause"):
@@ -152,6 +154,21 @@ func _show_select() -> void:
 	_set_screen(screen)
 
 
+func _show_codex() -> void:
+	_clear_all()
+	var screen := CodexScreen.new()
+	screen.cancelled.connect(func(): _go(_show_title))
+	_set_screen(screen)
+
+
+func _show_saves() -> void:
+	_clear_all()
+	var screen := SavesScreen.new()
+	screen.picked.connect(func(_slot: int): _go(_show_title))
+	screen.cancelled.connect(func(): _go(_show_title))
+	_set_screen(screen)
+
+
 func _first_unfinished() -> int:
 	for i in _levels.size():
 		if Save.is_unlocked(i) and not Save.is_cleared(i):
@@ -165,6 +182,10 @@ func _on_title_chosen(id: String) -> void:
 			_go(_show_play_select)
 		"levels":
 			_go(_show_select)
+		"codex":
+			_go(_show_codex)
+		"saves":
+			_go(_show_saves)
 		"options":
 			_go(_show_options)
 		"quit":
@@ -257,6 +278,10 @@ func _build_room(index: int, data: Dictionary) -> void:
 
 	_level = Level.new()
 	_level.setup(index, data)
+	# Endless is the sandbox: it hands over every move from its first room.
+	# The story doles them out as the rooms that teach them come open.
+	_level.dash_unlocked = _endless or Save.can_dash()
+	_level.pound_unlocked = _endless or Save.can_pound()
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)
 	add_child(_level)
@@ -436,6 +461,16 @@ func _on_pause_chosen(id: String) -> void:
 	match id:
 		"resume":
 			_close_pause()
+		"codex":
+			var book := CodexScreen.new()
+			book.opaque = false
+			book.cancelled.connect(func():
+				book.queue_free()
+				if _pause != null:
+					_pause.visible = true)
+			if _pause != null:
+				_pause.visible = false
+			add_child(book)
 		"restart":
 			_close_pause()
 			_restart_room()

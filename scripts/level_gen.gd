@@ -48,6 +48,8 @@ const UNLOCK := {
 	"nest": 16,
 	"ferry": 4,
 	"beat": 7,
+	"vault": 9,
+	"crystal": 6,               # not a segment: see _place_crystals()
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -72,6 +74,7 @@ const THREAT := {
 	"nest": 7.0,
 	"ferry": 2.0,
 	"beat": 3.0,
+	"vault": 2.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -139,6 +142,7 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 
 	Levels.put(g, 4, STAND, "P")
 	Levels.put(g, COLS - 6, STAND, "X")
+	_place_crystals(g, rng, depth)
 	_scatter_gems(g, spots)
 
 	# "name" here is finished text rather than a key. Lang.t() hands back
@@ -177,6 +181,7 @@ const WIDTHS := {
 	"nest": 11,
 	"ferry": 11,
 	"beat": 12,
+	"vault": 9,
 }
 
 
@@ -202,6 +207,7 @@ const TASTE := {
 	"nest": 2.0,
 	"ferry": 2.0,
 	"beat": 1.8,
+	"vault": 1.6,
 }
 
 
@@ -396,6 +402,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _ferry(g, rng, x, room, d, spots)
 		"beat":
 			return _beat(g, rng, x, room, d, spots)
+		"vault":
+			return _vault(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -672,10 +680,44 @@ static func _beat(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: fl
 	var flip := rng.randf() < 0.5
 	var bx := x + 2
 	while bx < x + 2 + pw:
-		_soft_rect(g, bx, STAND, mini(2, x + 2 + pw - bx), 1, "T" if flip else "t")
+		_soft_rect(g, bx, FLOOR, mini(2, x + 2 + pw - bx), 1, "T" if flip else "t")
 		flip = not flip
 		bx += 3
 	spots.append(Vector2i(x + 2 + pw / 2, STAND - 3))
+	return w
+
+
+## Dash crystals, once the run is deep enough that a second dash is worth
+## routing around. They go in open air above the walkway, where they turn a
+## gap into a choice rather than a wait.
+static func _place_crystals(g: Array, rng: RandomNumberGenerator, depth: int) -> void:
+	if depth < int(UNLOCK["crystal"]):
+		return
+	var wanted := 1 if depth < 14 else 2
+	var placed := 0
+	var tries := 0
+	while placed < wanted and tries < 60:
+		tries += 1
+		var x := rng.randi_range(START_X, END_X - 1)
+		var y := rng.randi_range(STAND - 6, STAND - 2)
+		if not _clear_air(g, x, y):
+			continue
+		Levels.put(g, x, y, "d")
+		placed += 1
+
+
+## A gem sealed under breakable ground, with spikes flanking the lid. The
+## floor route is untouched — this is a detour that costs a pound, not a wall.
+static func _vault(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(9, 11), room)
+	var lid := x + 3
+	Levels.rect(g, lid, FLOOR, 3, 1, "k")
+	Levels.rect(g, lid, FLOOR + 1, 3, 2, ".")
+	spots.append(Vector2i(lid + 1, FLOOR + 2))
+	if rng.randf() < 0.6:
+		Levels.put(g, lid - 1, STAND, "^")
+		Levels.put(g, lid + 3, STAND, "^")
 	return w
 
 

@@ -20,6 +20,8 @@ func _ready() -> void:
 	items = [
 		{"id": "play", "label": ""},
 		{"id": "levels", "label": ""},
+		{"id": "codex", "label": ""},
+		{"id": "saves", "label": ""},
 		{"id": "options", "label": ""},
 	]
 	if OS.get_name() != "Web":

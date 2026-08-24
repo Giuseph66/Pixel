@@ -23,6 +23,9 @@ var gems_total := 0
 var deaths := 0
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
+## Endless sets both true; the story asks Save which rooms are open yet.
+var dash_unlocked := true
+var pound_unlocked := true
 var running := false
 var finished := false
 
@@ -273,6 +276,11 @@ func _spawn_entities() -> void:
 					var block := Crumble.new()
 					block.position = tile_center(tx, ty)
 					_entities.add_child(block)
+				"k":
+					var breakable := Breakable.new()
+					breakable.position = tile_center(tx, ty)
+					breakable.broken.connect(_on_block_broken)
+					_entities.add_child(breakable)
 				"d":
 					var crystal := DashCrystal.new()
 					crystal.position = tile_center(tx, ty)
@@ -295,8 +303,20 @@ func _spawn_entities() -> void:
 						ty * TILE + TILE - Player.HEIGHT * 0.5
 					)
 
+	_discover_contents()
 	_spawn_platforms()
 	_spawn_player()
+
+
+## Walk the grid once and open a codex page for anything in it. Seeing counts:
+## a saw you never touched is still a saw you have now met.
+func _discover_contents() -> void:
+	for ty in Levels.ROWS:
+		var row := rows[ty]
+		for tx in row.length():
+			var id: String = Codex.BY_TILE.get(row[tx], "")
+			if not id.is_empty():
+				Save.discover(id)
 
 	# Slimes watch the player themselves, so they need the reference the moment
 	# it exists — which is only after the whole grid has been walked.
@@ -334,7 +354,10 @@ func _spawn_player() -> void:
 	_player = Player.new()
 	_player.position = _spawn
 	_player.fx = fx
+	_player.dash_unlocked = dash_unlocked
+	_player.pound_unlocked = pound_unlocked
 	_player.died.connect(_on_player_died)
+	_player.pounded.connect(_on_player_pounded)
 	_entities.add_child(_player)
 
 
@@ -346,12 +369,35 @@ func get_player() -> Player:
 
 func _on_gem_collected(gem: Gem) -> void:
 	gems_taken += 1
+	Save.add_gem()
 	Audio.play("gem", 1.0 + gems_taken * 0.03)
 	var at := fx.to_local(gem.global_position)
 	fx.emit(at, 10, Palette.GOLD, 80.0, Vector2.ZERO, TAU, 0.4, 180.0)
 	fx.popup(at, "+1", Palette.GOLD)
 	gem.queue_free()
 	_update_door_charge()
+
+
+## A ground pound clears the ground it lands on: blocks give way, and anything
+## standing right there is squashed. The player does not know what is nearby,
+## so the level answers for it.
+func _on_player_pounded(at: Vector2) -> void:
+	shake(5.0)
+	fx.emit(fx.to_local(at), 16, Palette.CYAN, 110.0, Vector2.UP, PI, 0.4, 220.0)
+
+	for child in _entities.get_children():
+		var distance := at.distance_to((child as Node2D).global_position)
+		if child is Breakable and distance <= Player.POUND_REACH + 6.0:
+			(child as Breakable).shatter()
+		elif child is Slime and distance <= Player.POUND_REACH:
+			(child as Slime).die()
+		elif child is Bat and distance <= Player.POUND_REACH:
+			(child as Bat).die()
+
+
+func _on_block_broken(at: Vector2) -> void:
+	Audio.play_varied("break")
+	fx.emit(fx.to_local(at), 12, Palette.GOLD, 95.0, Vector2.ZERO, TAU, 0.45, 260.0)
 
 
 func _on_bat_squashed(at: Vector2) -> void:

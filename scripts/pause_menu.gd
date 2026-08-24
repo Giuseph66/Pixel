@@ -16,6 +16,7 @@ func _ready() -> void:
 	items = [
 		{"id": "resume", "label": Lang.t("pause.resume")},
 		{"id": "restart", "label": Lang.t("pause.restart")},
+		{"id": "codex", "label": Lang.t("title.codex")},
 	]
 	if endless:
 		items.append({"id": "end_run", "label": Lang.t("pause.end_run")})

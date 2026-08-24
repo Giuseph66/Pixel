@@ -8,6 +8,7 @@ extends CharacterBody2D
 signal died
 signal gem_grabbed(position: Vector2)
 signal bounced(position: Vector2)
+signal pounded(position: Vector2)
 
 const WIDTH := 6
 const HEIGHT := 10
@@ -43,9 +44,26 @@ const DASH_TIME := 0.14
 const DASH_KEEP := 0.55         # share of dash speed kept when it ends
 const DASH_COOLDOWN := 0.09
 
+# --- ground pound -----------------------------------------------------------
+# Down plus jump in mid-air. It commits: no steering on the way down and a beat
+# of recovery on landing, paid for with the ability to break blocks, clear
+# anything standing where you land, and get the dash back.
+const POUND_SPEED := 430.0
+const POUND_HANG := 0.08        # a held breath before the drop, so it reads
+const POUND_RECOVER := 0.13
+const POUND_REACH := 13.0       # pixels around the landing that get cleared
+
+## Stomping enemies without touching the ground pays more each time.
+const CHAIN_STEP := 0.09
+const CHAIN_MAX := 1.45
+
 var alive := true
 var frozen := false             # set once the room is won; control is over
 var has_dash := true
+## Set by the level before the player enters the tree. The story hands these
+## over as its rooms unlock; endless grants both from the first room.
+var dash_unlocked := true
+var pound_unlocked := true
 var facing := 1
 ## Where the feet were at the start of this frame. Enemies decide a stomp from
 ## this rather than from velocity: Area2D overlaps arrive a frame late, and by
@@ -60,6 +78,10 @@ var _wall_dir := 0
 var _dash := 0.0                # seconds of dash left
 var _dash_dir := Vector2.ZERO
 var _dash_cool := 0.0
+var _pound := 0                 # 0 none, 1 hanging, 2 falling
+var _pound_hang := 0.0
+var _recover := 0.0
+var _chain := 0
 
 var sprite: Sprite2D
 var fx: Fx
@@ -83,6 +105,9 @@ func _ready() -> void:
 	add_child(sprite)
 
 	previous_bottom = position.y + HEIGHT * 0.5
+	# The two moves you have before the game teaches you anything.
+	Save.discover("run")
+	Save.discover("jump")
 
 
 func _physics_process(delta: float) -> void:
@@ -95,6 +120,7 @@ func _physics_process(delta: float) -> void:
 	_buffer = maxf(_buffer - delta, 0.0)
 	_lock = maxf(_lock - delta, 0.0)
 	_dash_cool = maxf(_dash_cool - delta, 0.0)
+	_recover = maxf(_recover - delta, 0.0)
 
 	var input := 0.0
 	if _lock <= 0.0:
@@ -103,9 +129,15 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("p_jump"):
 		_buffer = JUMP_BUFFER
 
-	if _dash > 0.0:
+	if _recover > 0.0:
+		velocity.x = move_toward(velocity.x, 0.0, FRICTION_GROUND * delta)
+		velocity.y += GRAVITY_DOWN * delta
+	elif _pound > 0:
+		_tick_pound(delta)
+	elif _dash > 0.0:
 		_tick_dash(delta)
 	else:
+		_try_pound()
 		_try_dash(input)
 		_apply_horizontal(input, delta)
 		_apply_gravity(input, delta)
@@ -115,6 +147,7 @@ func _physics_process(delta: float) -> void:
 
 	if is_on_floor():
 		_coyote = COYOTE_TIME
+		_chain = 0
 		refill_dash()
 		if not _was_on_floor:
 			_on_land()
@@ -125,10 +158,76 @@ func _physics_process(delta: float) -> void:
 	_update_sprite(input)
 
 
+# ----------------------------------------------------------------- pound ---
+
+func _try_pound() -> void:
+	if not pound_unlocked:
+		return
+	if is_on_floor() or _wall_dir != 0:
+		return
+	if not (Input.is_action_pressed("p_down") and Input.is_action_just_pressed("p_jump")):
+		return
+
+	_found("pound")
+	_pound = 1
+	_pound_hang = POUND_HANG
+	_buffer = 0.0
+	velocity = Vector2.ZERO
+	_squash(Vector2(0.6, 1.4))
+	Audio.play_varied("pound")
+
+
+func _tick_pound(delta: float) -> void:
+	if _pound == 1:
+		_pound_hang -= delta
+		velocity = Vector2.ZERO
+		if _pound_hang <= 0.0:
+			_pound = 2
+		return
+
+	velocity = Vector2(0.0, POUND_SPEED)
+	if fx != null and randf() < 0.6:
+		fx.emit(_fx_at(Vector2(0, -4)), 1, Palette.CYAN_MID, 26.0,
+			Vector2.UP, 0.7, 0.2, 40.0)
+
+	if is_on_floor():
+		_land_pound()
+
+
+func _land_pound() -> void:
+	_pound = 0
+	_recover = POUND_RECOVER
+	_chain = 0
+	refill_dash()
+	velocity = Vector2.ZERO
+	_squash(Vector2(1.5, 0.5))
+	Audio.play("stomp")
+	if fx != null:
+		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN, 14)
+	# The level owns what a landing hits — blocks, slimes, bats. It knows where
+	# they all are; the player only knows it hit the ground hard.
+	pounded.emit(global_position + Vector2(0, HEIGHT * 0.5))
+
+
+func is_pounding() -> bool:
+	return _pound == 2
+
+
+## Note a first-time move and say so on screen. The callout is the only place
+## the codex ever interrupts play, and only ever once per entry.
+func _found(entry: String) -> void:
+	if not Save.discover(entry):
+		return
+	if fx != null:
+		fx.popup(_fx_at(Vector2(0, -6)), Lang.t("codex.new"), Palette.CYAN, 0.9)
+
+
 # ------------------------------------------------------------------ dash ---
 
 func _try_dash(input: float) -> void:
-	if not has_dash or _dash_cool > 0.0 or not Input.is_action_just_pressed("p_dash"):
+	# Holding dash chains automatically whenever a new charge is available.
+	if not dash_unlocked or not has_dash or _dash_cool > 0.0 \
+			or not Input.is_action_pressed("p_dash"):
 		return
 
 	# Eight-way, taken from whatever is held. Nothing held dashes the way you
@@ -140,6 +239,7 @@ func _try_dash(input: float) -> void:
 		dir = Vector2(facing, 0.0)
 	_dash_dir = dir.normalized()
 
+	_found("dash")
 	has_dash = false
 	_dash = DASH_TIME
 	_lock = DASH_TIME
@@ -194,6 +294,7 @@ func _apply_gravity(input: float, delta: float) -> void:
 			var steering_away := absf(input) > 0.01 and signf(input) != float(dir)
 			if not steering_away:
 				_wall_dir = dir
+				_found("wall")
 
 	var g := GRAVITY_UP if velocity.y < 0.0 else GRAVITY_DOWN
 	velocity.y += g * delta
@@ -267,11 +368,14 @@ func _update_sprite(input: float) -> void:
 
 	if _dash > 0.0:
 		key = "player_jump"
+	if _pound > 0:
+		key = "player_fall"
 
 	sprite.texture = PixelArt.tex(key)
 	# Spent dash reads as a dimmer sprite — the charge has to be visible
 	# without a meter stealing screen from a 480x270 room.
-	sprite.modulate = Color(1, 1, 1) if has_dash else Color(0.62, 0.68, 0.9)
+	sprite.modulate = Color(1, 1, 1) if (has_dash or not dash_unlocked) \
+		else Color(0.62, 0.68, 0.9)
 	if _wall_dir != 0:
 		sprite.flip_h = _wall_dir > 0
 	else:
@@ -292,12 +396,18 @@ func spring_bounce() -> void:
 	bounced.emit(global_position)
 
 
+## Bouncing off an enemy. Each one taken without touching the ground in
+## between throws you higher, so a row of them is a route rather than a queue.
 func stomp() -> void:
 	if frozen or not alive:
 		return
+	_found("stomp")
 	refill_dash()
 	_dash = 0.0
-	velocity.y = JUMP_VELOCITY * 0.78
+	_pound = 0
+	_chain += 1
+	var boost := minf(1.0 + float(_chain - 1) * CHAIN_STEP, CHAIN_MAX)
+	velocity.y = JUMP_VELOCITY * 0.78 * boost
 	_squash(Vector2(1.3, 0.7))
 	Audio.play_varied("stomp")
 

@@ -123,6 +123,12 @@ static func library() -> Dictionary:
 			tone(880.0, 0.06, Wave.PULSE, 0.26, 0.35, 0.001, 0.02),
 			tone(300.0, 0.07, Wave.NOISE, 0.14, 1.0, 0.001, 0.05),
 		])),
+		# Wind-up whine, then the hit is the existing stomp.
+		"pound": to_stream(tone(220.0, 0.10, Wave.PULSE, 0.22, 2.6, 0.002, 0.03)),
+		"break": to_stream(concat([
+			tone(320.0, 0.05, Wave.NOISE, 0.26, 1.0, 0.001, 0.02),
+			tone(140.0, 0.09, Wave.SQUARE, 0.2, 0.5, 0.001, 0.05),
+		])),
 		"crystal": to_stream(concat([
 			tone(note_freq(84), 0.04, Wave.TRIANGLE, 0.24, 1.0, 0.001, 0.02),
 			tone(note_freq(91), 0.11, Wave.TRIANGLE, 0.24, 1.0, 0.001, 0.06),

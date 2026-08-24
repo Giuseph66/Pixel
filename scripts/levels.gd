@@ -16,6 +16,9 @@ extends RefCounted
 ##   .  empty air              J  spring pad
 ##   W  saw, patrols its row   B  bat, patrols the air
 ##   c  crumbling ground, drops a moment after you stand on it
+##   d  dash crystal            m  slab that slides sideways
+##   t  timed block, on first   n  slab that rides up and down
+##   T  timed block, off first  k  breakable block, opens to a ground pound
 
 const COLS := 60
 const ROWS := 32
@@ -296,15 +299,15 @@ static func _level_13() -> PackedStringArray:
 	return bake(g)
 
 
-## A chain of crystals over one long pit. Each one hands the dash back, so the
-## room is a single sentence you either finish or fall out of.
+## An inverted stair of crystals over one long pit. Each crystal hands the
+## dash back, so the route stays airborne from start to finish.
 static func _level_14() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
 	rect(g, 10, 27, 40, 3, ".")
 	rect(g, 10, 30, 40, 1, "^")
-	puts(g, [Vector2i(16, 23), Vector2i(22, 23), Vector2i(28, 23),
-		Vector2i(34, 23), Vector2i(40, 23), Vector2i(46, 23)], "d")
+	puts(g, [Vector2i(14, 23), Vector2i(20, 23), Vector2i(26, 24),
+		Vector2i(32, 24), Vector2i(38, 25), Vector2i(44, 25)], "d")
 	puts(g, [Vector2i(19, 20), Vector2i(31, 20), Vector2i(43, 20)], "o")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
@@ -378,6 +381,54 @@ static func _level_18() -> PackedStringArray:
 	puts(g, [Vector2i(17, 21), Vector2i(27, 19), Vector2i(48, 21)], "o")
 	put(g, 4, 26, "P")
 	put(g, 55, 26, "X")
+	return bake(g)
+
+
+## Pound school. Three pockets sealed under breakable lids, each with a gem
+## in it. Nothing here can kill you — the room only asks you to find the verb.
+static func _level_19() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for lid: int in [14, 28, 42]:
+		rect(g, lid, 27, 3, 1, "k")
+		rect(g, lid, 28, 3, 2, ".")
+		put(g, lid + 1, 29, "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The whole middle of the floor is breakable, and the room under it is where
+## the gems live. Break in wherever you like; the way back out is the hole you
+## made.
+static func _level_20() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 27, 35, 1, "k")
+	rect(g, 12, 28, 32, 3, ".")
+	rect(g, 20, 30, 5, 1, "^")
+	rect(g, 34, 30, 5, 1, "^")
+	puts(g, [Vector2i(16, 29), Vector2i(30, 29), Vector2i(42, 29)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Bouncing across. Every slime taken without touching the ground throws you
+## higher than the last, so the crossing gets easier the better you read it.
+static func _level_21() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 3, ".")
+	rect(g, 10, 30, 40, 1, "^")
+	var x := 14
+	while x < 48:
+		rect(g, x, 24, 2, 1, "-")
+		put(g, x, 23, "S")
+		x += 6
+	puts(g, [Vector2i(21, 20), Vector2i(33, 20), Vector2i(45, 20)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
 	return bake(g)
 
 
@@ -492,6 +543,24 @@ static func all() -> Array:
 			"hint": "level.18.hint",
 			"par": 75.0,
 			"rows": _level_18(),
+		},
+		{
+			"name": "level.19.name",
+			"hint": "level.19.hint",
+			"par": 35.0,
+			"rows": _level_19(),
+		},
+		{
+			"name": "level.20.name",
+			"hint": "level.20.hint",
+			"par": 55.0,
+			"rows": _level_20(),
+		},
+		{
+			"name": "level.21.name",
+			"hint": "level.21.hint",
+			"par": 60.0,
+			"rows": _level_21(),
 		},
 	]
 
