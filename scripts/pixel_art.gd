@@ -458,6 +458,24 @@ static func paint_tile(img: Image, tx: int, ty: int, up: bool, down: bool,
 			img.set_pixel(ox + TILE - 1, oy, Palette.OUTLINE)
 
 
+## A vertical run of ordinary wall, left edge exposed — the texture a wall you
+## can cling to actually has in a room, not a flat rectangle standing in for
+## it. `up` and `down` are true for every tile (the column keeps going past
+## both ends), so paint_tile only outlines the exposed left face and leaves
+## the lit rim for an actual floor tile to use.
+static var _wall_cache: Dictionary = {}
+
+static func wall_strip(tiles: int) -> ImageTexture:
+	if _wall_cache.has(tiles):
+		return _wall_cache[tiles]
+	var img := Image.create_empty(TILE, TILE * tiles, false, Image.FORMAT_RGBA8)
+	for ty in tiles:
+		paint_tile(img, 0, ty, true, true, false, true)
+	var t := ImageTexture.create_from_image(img)
+	_wall_cache[tiles] = t
+	return t
+
+
 ## One-way platform: a thin lit slab you can jump up through.
 static func paint_platform(img: Image, tx: int, ty: int) -> void:
 	var ox := tx * TILE
