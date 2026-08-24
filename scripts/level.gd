@@ -90,13 +90,6 @@ func _process(delta: float) -> void:
 		position = _base_position
 
 
-func _exit_tree() -> void:
-	# A queued codex shot is a photograph of *this* room. Once the room is gone
-	# there is nothing left to photograph, so drop anything still waiting rather
-	# than let the shutter fire on whatever replaced it.
-	Shots.cancel()
-
-
 func shake(amount: float = 3.0) -> void:
 	_shake = maxf(_shake, amount)
 
@@ -322,14 +315,8 @@ func _discover_contents() -> void:
 		var row := rows[ty]
 		for tx in row.length():
 			var id: String = Codex.BY_TILE.get(row[tx], "")
-			if id.is_empty():
-				continue
-			if Save.discover(id):
-				# Frame the tile that opened the page, in the room where it was
-				# first seen. Every request in this pass is served by one frame
-				# grab, so a room full of firsts still costs a single read. The
-				# delay lets the screen wipe finish before the shutter fires.
-				Shots.request(id, to_global(tile_center(tx, ty)), 0.6)
+			if not id.is_empty():
+				Save.discover(id)
 
 	# Slimes watch the player themselves, so they need the reference the moment
 	# it exists — which is only after the whole grid has been walked.

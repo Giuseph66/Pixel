@@ -257,13 +257,6 @@ func _draw_entry_page(page: Rect2) -> void:
 			_draw_icon(entry["sprite"],
 				Vector2(cx, plate.position.y + plate.size.y * 0.5 + bob), ICON_PAGE)
 
-		# The photograph from the moment it was discovered, tucked in as a
-		# corner inset. The animation says what it does; the shot says where you
-		# were standing when you first met it.
-		var shot := Shots.texture(entry["id"])
-		if shot != null:
-			_draw_shot_inset(shot, plate)
-
 	var y := plate.position.y + plate.size.y + 14.0
 	if known:
 		PixelFont.draw_text_centered(self, Lang.t("codex." + entry["id"] + ".name"),
@@ -276,20 +269,6 @@ func _draw_entry_page(page: Rect2) -> void:
 			Palette.GREY_DARK, 1)
 
 	_draw_page_dots(page, entries, cx)
-
-
-## The discovery photograph, as a small framed inset in the plate's corner.
-## Only the middle of the shot is used: it is already centred on the subject, so
-## cropping loses nothing and leaves the animation the room it needs.
-const INSET := Vector2(44.0, 32.0)
-
-func _draw_shot_inset(shot: Texture2D, plate: Rect2) -> void:
-	var full := Vector2(shot.get_width(), shot.get_height())
-	var region := Rect2(((full - INSET) * 0.5).floor(), INSET)
-	var at := plate.position + plate.size - INSET - Vector2(3.0, 3.0)
-	at = Vector2(roundf(at.x), roundf(at.y))
-	draw_texture_rect_region(shot, Rect2(at, INSET), region)
-	draw_rect(Rect2(at, INSET), Palette.GREY_DARK, false, 1.0)
 
 
 ## Corner ticks instead of a full border: the plate frames the icon without

@@ -126,6 +126,11 @@ static func _jump(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: flo
 	# Held on the ground for the first slice, then a single arc.
 	if u < 0.22:
 		_stand(ci, "player_idle", cx, floor_y)
+		# The hold phase IS just after landing — the arc wraps back to u=0 the
+		# instant it touches down, so "time into the hold" doubles as "time
+		# since landing" for free.
+		_burst(ci, Vector2(cx, floor_y), u * 1.5, 0.3, 6, Palette.CYAN_DARK, 30.0, 90.0,
+			1.0, -PI * 0.5, PI)
 		return
 	var p := (u - 0.22) / 0.78
 	var h := sin(p * PI) * 34.0
@@ -145,6 +150,12 @@ static func _wall(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: flo
 	# flip_h is true when the wall is on the right, matching player.gd.
 	_spr(ci, "player_wall", Vector2(wall_x - 10.0, y), SCALE, true)
 
+	# A fleck peeling off the wall every third of a second, the same sparse
+	# rate player.gd's own 25%-per-frame roll averages out to.
+	var since := fmod(t, 0.3)
+	_burst(ci, Vector2(wall_x - 6.0, y + 2.0), since, 0.3, 1, Palette.CYAN_DARK, 16.0, 70.0,
+		1.0, PI, PI * 0.7)
+
 
 static func _stomp(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
 	_ground(ci, rect, floor_y)
@@ -159,6 +170,8 @@ static func _stomp(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: fl
 		# Contact: the slime goes flat, the player is thrown back up.
 		_spr(ci, "slime_b", Vector2(cx, floor_y - 4.0), SCALE, false, 1.0, Vector2(1.4, 0.4))
 		_spr(ci, "player_jump", Vector2(cx, slime_y - 18.0))
+		_burst(ci, Vector2(cx, slime_y), (u - 0.45) * 1.8, 0.3, 8, Palette.GREEN, 60.0, 200.0,
+			1.0, -PI * 0.5, TAU)
 	else:
 		var p := (u - 0.6) / 0.4
 		_spr(ci, "player_jump", Vector2(cx, lerpf(slime_y - 18.0, rect.position.y + 12.0, p)))
@@ -178,6 +191,11 @@ static func _dash(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: flo
 			SCALE, false, 0.3 - 0.07 * float(i))
 	_stand(ci, "player_jump", lerpf(cx - span, cx + span, travel), floor_y)
 
+	# Kicked off at the exact instant the streak starts, blown backward against
+	# the direction of travel — the same burst player.gd fires from _try_dash.
+	_burst(ci, Vector2(cx - span, floor_y - 8.0), u * 1.5, 0.25, 6, Palette.CYAN, 50.0, 160.0,
+		1.0, PI, PI * 0.9)
+
 
 static func _pound(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
 	var u := _cycle(t, 2.0)
@@ -193,6 +211,8 @@ static func _pound(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: fl
 		_spr(ci, "breakable", Vector2(cx, block_y + 8.0 * SCALE * 0.5), SCALE, false, 0.5)
 		_spr(ci, "player_fall", Vector2(cx, block_y - 6.0))
 		ci.draw_rect(Rect2(cx - 18.0, block_y + 12.0, 36.0, 2.0), Palette.WHITE)
+		_burst(ci, Vector2(cx, block_y + 8.0 * SCALE * 0.5), (u - 0.4) * 2.0, 0.3, 10,
+			Palette.FRAME, 70.0, 220.0, 1.0, -PI * 0.5, TAU)
 	else:
 		# Ground opened: the block is gone and stays gone.
 		var gap := 8.0 * SCALE
@@ -259,6 +279,8 @@ static func _crystal(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: 
 	_spr(ci, "crystal" if u < 0.5 else "crystal_used", Vector2(cx, y), SCALE_SMALL)
 	if u >= 0.5 and u < 0.56:
 		ci.draw_rect(Rect2(cx - 14.0, y - 1.0, 28.0, 2.0), Palette.CYAN)
+		_burst(ci, Vector2(cx, y), (u - 0.5) * 2.2, 0.25, 8, Palette.CYAN, 45.0, 0.0,
+			1.0, 0.0, TAU)
 
 
 # -------------------------------------------------------------------- world ---
@@ -289,6 +311,10 @@ static func _spike(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: fl
 	var x := lerpf(cx - span, cx + span, u)
 	var h := sin(u * PI) * 34.0
 	_stand(ci, "player_jump" if u < 0.5 else "player_fall", x, floor_y - h)
+	# The arc lands right as u wraps to 0, so early-cycle time is time since
+	# the clear landed clean.
+	_burst(ci, Vector2(cx - span, floor_y), u * 2.0, 0.25, 5, Palette.CYAN_DARK, 26.0, 90.0,
+		1.0, -PI * 0.5, PI * 0.8)
 
 
 static func _spring(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
@@ -298,6 +324,9 @@ static func _spring(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: f
 	var fired := h < 5.0
 	_stand(ci, "spring_fired" if fired else "spring", cx, floor_y)
 	_stand(ci, "player_jump" if u < 0.5 else "player_fall", cx, floor_y - 12.0 - h)
+	# Fires at u=0/wrap, same trick as the jump and spike landings.
+	_burst(ci, Vector2(cx, floor_y - 6.0), u * 1.7, 0.28, 8, Palette.MAGENTA, 55.0, 140.0,
+		1.0, -PI * 0.5, PI * 0.7)
 
 
 static func _crumble(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
@@ -319,9 +348,12 @@ static func _crumble(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: 
 		_spr(ci, "crumble_cracked", block_centre + Vector2(0.0, p * 44.0), SCALE, false,
 			maxf(0.0, 1.0 - p))
 		_spr(ci, "player_fall", Vector2(cx, block_top - 10.0 + p * 34.0))
+		_burst(ci, block_centre, (u - 0.5) * 2.4, 0.3, 6, Palette.GREY_DARK, 40.0, 200.0,
+			1.0, -PI * 0.5, PI)
 
 
 static func _timed(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
+	_ground(ci, rect, floor_y)
 	# Three blocks on staggered phases, each blinking before it goes: the
 	# pattern is the mechanic, so one block alone would not explain it.
 	var span := 8.0 * SCALE
@@ -333,6 +365,10 @@ static func _timed(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: fl
 		if on and phase > 0.42 and fmod(t * 10.0, 2.0) < 1.0:
 			alpha = 0.45          # warning flicker
 		_spr(ci, "timed_on" if on else "timed_off", pos, SCALE, false, alpha)
+		# Sparks the instant a block turns back on — phase wraps to 0 right as
+		# it does, so phase itself is time-since-on once divided back out of
+		# the 0.7 rate it was scaled by.
+		_burst(ci, pos, phase / 0.7, 0.2, 4, Palette.CYAN, 30.0, 0.0, 1.0, 0.0, TAU)
 
 	var walk := _pingpong(t, 2.1)
 	var x: float = cx - span + span * 2.0 * float(walk[0])
@@ -357,6 +393,8 @@ static func _breakable(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t
 	elif u < 0.5:
 		_spr(ci, "player_fall", Vector2(cx, block_centre.y - 14.0))
 		ci.draw_rect(Rect2(cx - 16.0, block_centre.y - 2.0, 32.0, 2.0), Palette.WHITE)
+		_burst(ci, block_centre, (u - 0.42) * 2.2, 0.3, 8, Palette.GREY_DARK, 55.0, 210.0,
+			1.0, -PI * 0.5, TAU)
 	else:
 		_spr(ci, "player_fall", Vector2(cx, lerpf(block_centre.y - 14.0, floor_y - 10.0,
 			(u - 0.5) / 0.5)))

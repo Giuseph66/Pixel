@@ -218,9 +218,6 @@ func is_pounding() -> bool:
 func _found(entry: String) -> void:
 	if not Save.discover(entry):
 		return
-	# Photograph the move as it happens: the book page for DASH should be the
-	# dash you actually did, not a drawing of one.
-	Shots.request(entry, global_position)
 	if fx != null:
 		fx.popup(_fx_at(Vector2(0, -6)), Lang.t("codex.new"), Palette.CYAN, 0.9)
 

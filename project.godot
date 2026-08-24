@@ -21,7 +21,6 @@ config/icon="res://assets/branding/icon.svg"
 Save="*res://scripts/save_manager.gd"
 Lang="*res://scripts/i18n.gd"
 Audio="*res://scripts/audio_manager.gd"
-Shots="*res://scripts/codex_shots.gd"
 
 [display]
 
