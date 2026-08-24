@@ -112,13 +112,13 @@ func is_air(tx: int, ty: int) -> bool:
 
 func is_solid(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~"
+	return ch == "#" or ch == "~" or ch == ">" or ch == "<"
 
 
-## Anything you can stand on, which includes one-way slabs and ice.
+## Anything you can stand on, which includes one-way slabs, ice, and conveyors.
 func is_ground(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~" or ch == "-"
+	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "-"
 
 
 func tile_center(tx: int, ty: int) -> Vector2:
@@ -173,6 +173,13 @@ func _bake_terrain() -> ImageTexture:
 			elif ch == "~":
 				# Ice is painted like terrain but with a different palette
 				PixelArt.paint_ice(img, tx, ty,
+					is_solid(tx, ty - 1),
+					is_solid(tx, ty + 1),
+					is_solid(tx - 1, ty),
+					is_solid(tx + 1, ty))
+			elif ch == ">" or ch == "<":
+				# Conveyors are painted as normal ground but with animated sprite on top
+				PixelArt.paint_tile(img, tx, ty,
 					is_solid(tx, ty - 1),
 					is_solid(tx, ty + 1),
 					is_solid(tx - 1, ty),
@@ -311,6 +318,7 @@ func _spawn_entities() -> void:
 						ty * TILE + TILE - Player.HEIGHT * 0.5
 					)
 
+	_spawn_conveyors()
 	_spawn_platforms()
 	_spawn_player()
 	_discover_contents()
@@ -333,6 +341,27 @@ func _discover_contents() -> void:
 			(child as Slime).player = _player
 
 	_update_door_charge()
+
+
+## Conveyors are runs of tiles rather than single ones, so they get
+## their own pass: '>' pushes right, '<' pushes left.
+func _spawn_conveyors() -> void:
+	for ty in Levels.ROWS:
+		var tx := 0
+		while tx < Levels.COLS:
+			var ch := tile_at(tx, ty)
+			if ch != ">" and ch != "<":
+				tx += 1
+				continue
+			var run := 1
+			while tx + run < Levels.COLS and tile_at(tx + run, ty) == ch:
+				run += 1
+
+			var conveyor := Conveyor.new()
+			conveyor.setup(1 if ch == ">" else -1, float(run * 8))
+			conveyor.position = Vector2(float(tx * 8), float(ty * 8))
+			_entities.add_child(conveyor)
+			tx += run
 
 
 ## Moving platforms are runs of tiles rather than single ones, so they get

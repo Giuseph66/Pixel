@@ -483,6 +483,59 @@ static func _level_ice_slime() -> PackedStringArray:
 	return bake(g)
 
 
+## Belt moves: three sections of moving ground alternating with calm.
+static func _level_belt_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for x in [10, 26, 42]:
+		rect(g, x, 27, 6, 1, ">")
+	puts(g, [Vector2i(13, 26), Vector2i(29, 26), Vector2i(45, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Walking against the belt: the belt pushes left, the goal is right.
+static func _level_belt_against() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 1, "<")
+	puts(g, [Vector2i(30, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Belt launch: moving ground accelerates the jump across a pit.
+static func _level_belt_launch() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 27, 10, 1, ">")
+	rect(g, 24, 27, 6, 3, ".")           # the pit
+	rect(g, 24, 30, 6, 1, "^")
+	rect(g, 34, 27, 8, 1, ">")
+	puts(g, [Vector2i(20, 24), Vector2i(40, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## Belts crossing: alternating directions with slimes on top.
+static func _level_belt_mix() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for x in [10, 18, 26, 34, 42]:
+		if (x / 8) % 2 == 0:
+			rect(g, x, 27, 4, 1, ">")
+		else:
+			rect(g, x, 27, 4, 1, "<")
+	puts(g, [Vector2i(16, 26), Vector2i(32, 26), Vector2i(48, 26)], "o")
+	puts(g, [Vector2i(12, 26), Vector2i(28, 26)], "S")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -661,6 +714,34 @@ static func all() -> Array:
 			"hint": "level.ice_slime.hint",
 			"par": 40.0,
 			"rows": _level_ice_slime(),
+		},
+		{
+			"id": "belt_first",
+			"name": "level.belt_first.name",
+			"hint": "level.belt_first.hint",
+			"par": 20.0,
+			"rows": _level_belt_first(),
+		},
+		{
+			"id": "belt_against",
+			"name": "level.belt_against.name",
+			"hint": "level.belt_against.hint",
+			"par": 30.0,
+			"rows": _level_belt_against(),
+		},
+		{
+			"id": "belt_launch",
+			"name": "level.belt_launch.name",
+			"hint": "level.belt_launch.hint",
+			"par": 32.0,
+			"rows": _level_belt_launch(),
+		},
+		{
+			"id": "belt_mix",
+			"name": "level.belt_mix.name",
+			"hint": "level.belt_mix.hint",
+			"par": 42.0,
+			"rows": _level_belt_mix(),
 		},
 	]
 

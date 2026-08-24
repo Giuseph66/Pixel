@@ -22,6 +22,8 @@ const FRICTION_AIR := 260.0
 const FRICTION_ICE := 120.0       # ~1/10 of ground friction
 const ACCEL_ICE := 420.0          # accelerates more slowly on ice too
 
+const CONVEYOR_PUSH := 55.0       # px/s pushed by moving belts, ~half run speed
+
 const GRAVITY_UP := 900.0
 const GRAVITY_DOWN := 1180.0
 const MAX_FALL := 330.0
