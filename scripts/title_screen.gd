@@ -13,14 +13,14 @@ func _ready() -> void:
 	_cube = PixelArt.cube(8)
 	title = ""
 	list_top = 146.0
+	show_codex_button = true
 
-	# Four things you might actually want to press. Story vs. endless is a
-	# choice inside PLAY now (see play_select_screen.gd) rather than a fifth
-	# row here; audio and language live in their own OPTIONS screen.
+	# Story vs. endless is a choice inside PLAY now (see play_select_screen.gd)
+	# rather than its own row; audio and language live in OPTIONS; the codex is
+	# the book icon top-right, not a row buried in a list of six other things.
 	items = [
 		{"id": "play", "label": ""},
 		{"id": "levels", "label": ""},
-		{"id": "codex", "label": ""},
 		{"id": "saves", "label": ""},
 		{"id": "options", "label": ""},
 	]

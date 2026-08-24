@@ -5,29 +5,44 @@ extends RefCounted
 ## the first time you meet it — an empty page is a promise, not a gap.
 ##
 ## Text lives in i18n under codex.<id>.name and codex.<id>.text; this file only
-## says what exists, what kind it is, and which sprite stands for it.
+## says what exists, which chapter it belongs to, and which sprite stands for
+## it. CodexScreen reads CHAPTERS to lay the book out — one chapter per tab,
+## entries kept in the order they are written here.
 
-const MOVE := "move"
-const ENEMY := "enemy"
+const ABILITY := "ability"
+const CREATURE := "creature"
+const COLLECTIBLE := "collectible"
 const WORLD := "world"
 
+## Tab order, top to bottom. Each entry: kind id, name key, accent colour.
+const CHAPTERS := [
+	{"kind": ABILITY, "label": "codex.cat.ability", "color": Palette.CYAN},
+	{"kind": CREATURE, "label": "codex.cat.creature", "color": Palette.GREEN},
+	{"kind": COLLECTIBLE, "label": "codex.cat.collectible", "color": Palette.GOLD},
+	{"kind": WORLD, "label": "codex.cat.world", "color": Palette.PURPLE},
+]
+
 const ENTRIES := [
-	{"id": "run", "kind": MOVE, "sprite": "player_run_a"},
-	{"id": "jump", "kind": MOVE, "sprite": "player_jump"},
-	{"id": "wall", "kind": MOVE, "sprite": "player_wall"},
-	{"id": "stomp", "kind": MOVE, "sprite": "player_fall"},
-	{"id": "dash", "kind": MOVE, "sprite": "player_jump"},
-	{"id": "pound", "kind": MOVE, "sprite": "player_fall"},
+	# Abilities use pictograms, not player poses. The game only has a handful of
+	# player sprites, so run/jump/wall/stomp all resolved to near-identical
+	# little figures and the chapter looked like one entry repeated six times.
+	{"id": "run", "kind": ABILITY, "sprite": "icon_run"},
+	{"id": "jump", "kind": ABILITY, "sprite": "icon_jump"},
+	{"id": "wall", "kind": ABILITY, "sprite": "icon_wall"},
+	{"id": "stomp", "kind": ABILITY, "sprite": "icon_stomp"},
+	{"id": "dash", "kind": ABILITY, "sprite": "icon_dash"},
+	{"id": "pound", "kind": ABILITY, "sprite": "icon_pound"},
 
-	{"id": "slime", "kind": ENEMY, "sprite": "slime_a"},
-	{"id": "bat", "kind": ENEMY, "sprite": "bat_a"},
-	{"id": "saw", "kind": ENEMY, "sprite": "saw_a"},
+	{"id": "slime", "kind": CREATURE, "sprite": "slime_a"},
+	{"id": "bat", "kind": CREATURE, "sprite": "bat_a"},
+	{"id": "saw", "kind": CREATURE, "sprite": "saw_a"},
 
-	{"id": "gem", "kind": WORLD, "sprite": "gem"},
-	{"id": "door", "kind": WORLD, "sprite": "door"},
+	{"id": "gem", "kind": COLLECTIBLE, "sprite": "gem"},
+	{"id": "crystal", "kind": COLLECTIBLE, "sprite": "crystal"},
+
+	{"id": "door", "kind": WORLD, "sprite": "icon_door"},
 	{"id": "spike", "kind": WORLD, "sprite": "spike"},
 	{"id": "spring", "kind": WORLD, "sprite": "spring"},
-	{"id": "crystal", "kind": WORLD, "sprite": "crystal"},
 	{"id": "crumble", "kind": WORLD, "sprite": "crumble"},
 	{"id": "timed", "kind": WORLD, "sprite": "timed_on"},
 	{"id": "breakable", "kind": WORLD, "sprite": "breakable"},
@@ -63,3 +78,19 @@ static func entry(id: String) -> Dictionary:
 		if e["id"] == id:
 			return e
 	return {}
+
+
+## Every entry belonging to one chapter, in book order.
+static func in_chapter(kind: String) -> Array:
+	var out: Array = []
+	for e: Dictionary in ENTRIES:
+		if e["kind"] == kind:
+			out.append(e)
+	return out
+
+
+static func chapter_index(kind: String) -> int:
+	for i in CHAPTERS.size():
+		if CHAPTERS[i]["kind"] == kind:
+			return i
+	return 0

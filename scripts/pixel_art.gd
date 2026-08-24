@@ -276,6 +276,110 @@ const GRIDS := {
 		"#pp######pp#",
 		".##########.",
 	],
+
+	# Codex icons. Every one is 8x8, exactly like the entity sprites, so the
+	# book can scale all of them by the same integer factor — mixing a 12x16
+	# door with 8x8 creatures made one tower over the rest.
+	#
+	# Abilities get pictograms rather than player poses: run, jump, wall, stomp
+	# and dash are the *same* two or three sprites in the game (idle, jump,
+	# fall), so a page per ability showed the same little blue figure five times
+	# over. An arrow says which verb it is; a character sprite cannot.
+	"icon_run": [
+		"........",
+		"..c..c..",
+		"...c..c.",
+		"....c..c",
+		"...c..c.",
+		"..c..c..",
+		"........",
+		"11111111",
+	],
+	"icon_jump": [
+		"...cc...",
+		"..cccc..",
+		".cccccc.",
+		"...cc...",
+		"...cc...",
+		"...cc...",
+		"........",
+		"11111111",
+	],
+	"icon_wall": [
+		"..cc.111",
+		".cccc111",
+		"ccccc111",
+		"..cc.111",
+		"..cc.111",
+		"..cc.111",
+		"..cc.111",
+		".....111",
+	],
+	"icon_stomp": [
+		"...cc...",
+		"...cc...",
+		"...cc...",
+		".cccccc.",
+		"..cccc..",
+		"...cc...",
+		"........",
+		"11.11.11",
+	],
+	"icon_dash": [
+		"........",
+		"1.......",
+		".....c..",
+		"......c.",
+		"11cccccc",
+		"......c.",
+		".....c..",
+		"1.......",
+	],
+	"icon_pound": [
+		"...mm...",
+		"...mm...",
+		".mmmmmm.",
+		"..mmmm..",
+		"...mm...",
+		"........",
+		"11111111",
+		"m......m",
+	],
+	# The playable door is 12x16; this is its 8x8 stand-in for the book.
+	"icon_door": [
+		"..####..",
+		".#pppp#.",
+		".#pbbp#.",
+		".#pbbp#.",
+		".#pbbp#.",
+		".#pbbp#.",
+		".#pwbp#.",
+		".######.",
+	],
+	# Open book for the corner button.
+	#
+	# Two things this had to get right. The outer edges run straight down: an
+	# earlier attempt started the top rows inset and widened them going down,
+	# which is the silhouette of two hills, not a book. Only the *top* edge
+	# steps inward, and that is what reads as pages fanned open.
+	#
+	# The rim is gold, not OUTLINE. OUTLINE is #07070f against a #0f0f1b
+	# background — darker than the thing it is meant to stand out from, so it
+	# vanished and left an undefined white blob with no spine. Gold separates
+	# from the background and matches the cover on the codex page.
+	"icon_book": [
+		"YY...........YY",
+		"YwwY.......YwwY",
+		"YwwwwY...YwwwwY",
+		"YwwwwwY.YwwwwwY",
+		"YwwwwwwYwwwwwwY",
+		"Yw1111wYw1111wY",
+		"YwwwwwwYwwwwwwY",
+		"Yw1111wYw1111wY",
+		"YwwwwwwYwwwwwwY",
+		"YyyyyyyYyyyyyyY",
+		".YYYYYYYYYYYYY.",
+	],
 }
 
 static var _cache: Dictionary = {}

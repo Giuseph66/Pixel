@@ -73,6 +73,9 @@ func _setup_input() -> void:
 	_action("p_dash", [KEY_SHIFT, KEY_C, KEY_J], [JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_X])
 	_action("p_restart", [KEY_R], [JOY_BUTTON_Y])
 	_action("p_pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START])
+	# Only ever read on a menu screen (title, pause), never in a live room, so
+	# reusing the C key p_dash already owns causes no real conflict.
+	_action("p_codex", [KEY_C, KEY_TAB], [JOY_BUTTON_LEFT_SHOULDER])
 
 
 func _action(action: String, keys: Array, buttons: Array = [],

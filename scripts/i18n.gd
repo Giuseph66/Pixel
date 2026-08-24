@@ -93,7 +93,12 @@ const STRINGS := {
 
 	"codex.title": "CODEX",
 	"codex.found": "%d OF %d FOUND",
-	"codex.footer": "ARROWS TO BROWSE, ESC TO GO BACK",
+	"codex.footer": "UP/DOWN CHAPTER, LEFT/RIGHT PAGE, ESC BACK",
+
+	"codex.cat.ability": "ABILITIES",
+	"codex.cat.creature": "CREATURES",
+	"codex.cat.collectible": "COLLECTIBLES",
+	"codex.cat.world": "WORLD",
 	"codex.unknown": "NOT FOUND YET",
 	"codex.new": "NEW!",
 
@@ -278,7 +283,12 @@ const STRINGS := {
 
 	"codex.title": "LIVRO",
 	"codex.found": "%d DE %d ENCONTRADOS",
-	"codex.footer": "SETAS PARA VER, ESC PARA VOLTAR",
+	"codex.footer": "CIMA/BAIXO CAPITULO, ESQ/DIR PAGINA, ESC VOLTA",
+
+	"codex.cat.ability": "HABILIDADES",
+	"codex.cat.creature": "CRIATURAS",
+	"codex.cat.collectible": "COLETAVEIS",
+	"codex.cat.world": "MUNDO",
 	"codex.unknown": "AINDA NAO ENCONTRADO",
 	"codex.new": "NOVO!",
 
@@ -463,7 +473,12 @@ const STRINGS := {
 
 	"codex.title": "LIBRO",
 	"codex.found": "%d DE %d ENCONTRADOS",
-	"codex.footer": "FLECHAS PARA VER, ESC PARA VOLVER",
+	"codex.footer": "ARRIBA/ABAJO CAPITULO, IZQ/DER PAGINA, ESC VOLVER",
+
+	"codex.cat.ability": "HABILIDADES",
+	"codex.cat.creature": "CRIATURAS",
+	"codex.cat.collectible": "COLECCIONABLES",
+	"codex.cat.world": "MUNDO",
 	"codex.unknown": "AUN NO ENCONTRADO",
 	"codex.new": "NUEVO!",
 

@@ -148,6 +148,9 @@ func reset_slot(index: int) -> void:
 	slots[index] = blank_slot()
 	if index == active:
 		data = slots[index]
+	# The codex screenshots belong to the playthrough, not to the install, so
+	# starting over has to take the pictures with it.
+	Shots.wipe(index)
 	save_game()
 
 

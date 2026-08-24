@@ -26,11 +26,19 @@ var list_top := 150.0
 var list_width := 260.0         # backdrop width behind the (non-opaque) list
 var line_height := 20.0
 
+## Set by TitleScreen and PauseMenu: draws the book icon top-right and lets
+## p_codex emit chosen("codex") from anywhere on the screen, not just from a
+## row in the list. Screens where the book makes no sense (options, results,
+## a room-select grid with its own layout) leave this off.
+var show_codex_button := false
+
 var _time := 0.0
+var _codex_icon: Texture2D
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_codex_icon = PixelArt.tex("icon_book")
 
 
 func _process(delta: float) -> void:
@@ -40,6 +48,11 @@ func _process(delta: float) -> void:
 
 
 func _handle_input() -> void:
+	if show_codex_button and Input.is_action_just_pressed("p_codex"):
+		Audio.play("menu_select")
+		chosen.emit("codex")
+		return
+
 	if items.is_empty():
 		return
 	if Input.is_action_just_pressed("p_up"):
@@ -105,6 +118,9 @@ func _draw() -> void:
 		PixelFont.draw_text_centered(self, footer, SCREEN.x * 0.5, SCREEN.y - 16.0,
 			Palette.GREY_DARK, 1)
 
+	if show_codex_button:
+		_draw_codex_button()
+
 
 func _list_left() -> float:
 	return roundf((SCREEN.x - list_width) * 0.5)
@@ -132,6 +148,29 @@ func _draw_item(i: int) -> void:
 		var nudge := 0.0 if fmod(_time, 0.7) < 0.35 else 1.0
 		var x := SCREEN.x * 0.5 - size.x * 0.5 - CURSOR_GAP - nudge
 		PixelFont.draw_text(self, ">", Vector2(roundf(x), y), Palette.MAGENTA, ITEM_SCALE)
+
+
+## Book icon, top-right, with the shortcut key under it and a pulsing dot
+## while something in the codex is still unfound.
+func _draw_codex_button() -> void:
+	var size := Vector2(_codex_icon.get_width(), _codex_icon.get_height()) * 2.0
+	var pos := Vector2(SCREEN.x - size.x - 10.0, 7.0)
+	var hover := roundf(sin(_time * 2.2))
+	draw_texture_rect(_codex_icon, Rect2(pos + Vector2(0.0, hover), size), false)
+
+	# Unread marker, so the book advertises itself while anything is still
+	# undiscovered and then stops nagging once the collection is complete.
+	if Save.known_count() < Codex.count() and fmod(_time, 1.0) < 0.6:
+		draw_rect(Rect2(pos.x + size.x - 3.0, pos.y - 2.0, 4.0, 4.0), Palette.MAGENTA)
+
+	# A framed keycap rather than a bare letter: this font's "C" on its own
+	# reads as a bracket at scale 1.
+	# FRAME is only a shade off the background, so the cap gets a grey border to
+	# actually be visible as a key.
+	var cap := Rect2(pos.x + size.x * 0.5 - 5.0, pos.y + size.y + 3.0, 10.0, 10.0)
+	Util.draw_panel(self, cap, Palette.BG_SOFT, Palette.GREY_DARK)
+	PixelFont.draw_text_centered(self, "C", cap.position.x + cap.size.x * 0.5,
+		cap.position.y + 2.0, Palette.WHITE, 1)
 
 
 ## A faint moving field of dots, so no screen is ever dead flat.

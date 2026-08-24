@@ -13,10 +13,10 @@ func _ready() -> void:
 	title = Lang.t("pause.title")
 	list_top = 112.0
 	footer = Lang.t("pause.footer")
+	show_codex_button = true
 	items = [
 		{"id": "resume", "label": Lang.t("pause.resume")},
 		{"id": "restart", "label": Lang.t("pause.restart")},
-		{"id": "codex", "label": Lang.t("title.codex")},
 	]
 	if endless:
 		items.append({"id": "end_run", "label": Lang.t("pause.end_run")})
