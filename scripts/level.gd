@@ -257,6 +257,12 @@ func _spawn_entities() -> void:
 					gem.collected.connect(_on_gem_collected)
 					_entities.add_child(gem)
 					gems_total += 1
+				"O":
+					var gem := Gem.new()
+					gem.secret = true
+					gem.position = tile_center(tx, ty)
+					gem.collected.connect(_on_gem_collected)
+					_entities.add_child(gem)
 				"^", "v":
 					var spike := Spike.new()
 					spike.setup(ch == "v")
@@ -412,14 +418,19 @@ func get_player() -> Player:
 # --------------------------------------------------------------- events ---
 
 func _on_gem_collected(gem: Gem) -> void:
-	gems_taken += 1
-	Save.add_gem()
-	Audio.play("gem", 1.0 + gems_taken * 0.03)
+	if gem.secret:
+		Save.add_secret()
+		Audio.play("gem", 1.35)  # higher pitch for secret
+	else:
+		gems_taken += 1
+		Save.add_gem()
+		Audio.play("gem", 1.0 + gems_taken * 0.03)
 	var at := fx.to_local(gem.global_position)
 	fx.emit(at, 10, Palette.GOLD, 80.0, Vector2.ZERO, TAU, 0.4, 180.0)
 	fx.popup(at, "+1", Palette.GOLD)
 	gem.queue_free()
-	_update_door_charge()
+	if not gem.secret:
+		_update_door_charge()
 
 
 ## A ground pound clears the ground it lands on: blocks give way, and anything

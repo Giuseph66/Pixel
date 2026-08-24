@@ -3,6 +3,7 @@ extends Area2D
 
 signal collected(gem: Gem)
 
+var secret := false           # true for hidden gems that don't count toward door
 var _time := 0.0
 var _sprite: Sprite2D
 

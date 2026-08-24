@@ -47,6 +47,7 @@ static func blank_slot() -> Dictionary:
 		"cleared": {},          # room index (as String) -> true
 		"gems": {},             # room index (as String) -> best gem count
 		"medals": {},           # room id -> bitmask (1=time, 2=gems, 4=clean)
+		"secrets": {},          # room id -> true when secret gem taken
 		"total_deaths": 0,
 		"endless_best": 0,      # deepest endless run, in rooms cleared
 		"endless_gems": 0,      # gems taken in that run
@@ -330,6 +331,10 @@ func add_death() -> void:
 
 
 func add_gem() -> void:
+	data["gems_taken"] = int(data["gems_taken"]) + 1
+
+
+func add_secret() -> void:
 	data["gems_taken"] = int(data["gems_taken"]) + 1
 
 
