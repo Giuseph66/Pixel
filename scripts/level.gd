@@ -111,13 +111,14 @@ func is_air(tx: int, ty: int) -> bool:
 
 
 func is_solid(tx: int, ty: int) -> bool:
-	return tile_at(tx, ty) == "#"
+	var ch := tile_at(tx, ty)
+	return ch == "#" or ch == "~"
 
 
-## Anything you can stand on, which includes one-way slabs.
+## Anything you can stand on, which includes one-way slabs and ice.
 func is_ground(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "-"
+	return ch == "#" or ch == "~" or ch == "-"
 
 
 func tile_center(tx: int, ty: int) -> Vector2:
@@ -165,6 +166,13 @@ func _bake_terrain() -> ImageTexture:
 			var ch := tile_at(tx, ty)
 			if ch == "#":
 				PixelArt.paint_tile(img, tx, ty,
+					is_solid(tx, ty - 1),
+					is_solid(tx, ty + 1),
+					is_solid(tx - 1, ty),
+					is_solid(tx + 1, ty))
+			elif ch == "~":
+				# Ice is painted like terrain but with a different palette
+				PixelArt.paint_ice(img, tx, ty,
 					is_solid(tx, ty - 1),
 					is_solid(tx, ty + 1),
 					is_solid(tx - 1, ty),
@@ -356,6 +364,7 @@ func _spawn_player() -> void:
 	_player.fx = fx
 	_player.dash_unlocked = dash_unlocked
 	_player.pound_unlocked = pound_unlocked
+	_player.surface_at = Callable(self, "tile_at")
 	_player.died.connect(_on_player_died)
 	_player.pounded.connect(_on_player_pounded)
 	_entities.add_child(_player)

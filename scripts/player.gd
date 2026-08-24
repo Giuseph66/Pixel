@@ -12,12 +12,15 @@ signal pounded(position: Vector2)
 
 const WIDTH := 6
 const HEIGHT := 10
+const TILE := 8.0
 
 const RUN_SPEED := 112.0
 const ACCEL_GROUND := 1000.0
 const ACCEL_AIR := 640.0
 const FRICTION_GROUND := 1250.0
 const FRICTION_AIR := 260.0
+const FRICTION_ICE := 120.0       # ~1/10 of ground friction
+const ACCEL_ICE := 420.0          # accelerates more slowly on ice too
 
 const GRAVITY_UP := 900.0
 const GRAVITY_DOWN := 1180.0
@@ -131,7 +134,7 @@ func _physics_process(delta: float) -> void:
 
 	if _recover > 0.0:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION_GROUND * delta)
-		velocity.y += GRAVITY_DOWN * delta
+		velocity.y += GRAVITY_DOWN * gravity_scale * delta
 	elif _pound > 0:
 		_tick_pound(delta)
 	elif _dash > 0.0:
@@ -143,6 +146,8 @@ func _physics_process(delta: float) -> void:
 		_apply_gravity(input, delta)
 		_handle_jump()
 
+	velocity += external_force * delta
+	external_force = Vector2.ZERO
 	move_and_slide()
 
 	if is_on_floor():
@@ -271,12 +276,22 @@ func refill_dash() -> void:
 
 
 func _apply_horizontal(input: float, delta: float) -> void:
-	var target := input * RUN_SPEED
+	var target := input * RUN_SPEED * speed_scale
 	var rate := 0.0
 	if absf(input) > 0.01:
-		rate = ACCEL_GROUND if is_on_floor() else ACCEL_AIR
+		# Acceleration depends on surface
+		if is_on_floor():
+			var tile := ground_tile()
+			rate = ACCEL_ICE if tile == "~" else ACCEL_GROUND
+		else:
+			rate = ACCEL_AIR
 	else:
-		rate = FRICTION_GROUND if is_on_floor() else FRICTION_AIR
+		# Friction depends on surface
+		if is_on_floor():
+			var tile := ground_tile()
+			rate = FRICTION_ICE if tile == "~" else FRICTION_GROUND
+		else:
+			rate = FRICTION_AIR
 	velocity.x = move_toward(velocity.x, target, rate * delta)
 	if absf(input) > 0.01:
 		facing = -1 if input < 0.0 else 1
@@ -297,7 +312,7 @@ func _apply_gravity(input: float, delta: float) -> void:
 				_found("wall")
 
 	var g := GRAVITY_UP if velocity.y < 0.0 else GRAVITY_DOWN
-	velocity.y += g * delta
+	velocity.y += g * gravity_scale * delta
 
 	if _wall_dir != 0 and velocity.y > 0.0:
 		velocity.y = minf(velocity.y, WALL_SLIDE_SPEED)
@@ -308,7 +323,7 @@ func _apply_gravity(input: float, delta: float) -> void:
 			fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 2.0)), 1,
 				Palette.CYAN_DARK, 22.0, Vector2(-_wall_dir, -0.4), 0.9, 0.28, 90.0)
 	else:
-		velocity.y = minf(velocity.y, MAX_FALL)
+		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale)
 
 
 func _handle_jump() -> void:
@@ -410,6 +425,25 @@ func stomp() -> void:
 	velocity.y = JUMP_VELOCITY * 0.78 * boost
 	_squash(Vector2(1.3, 0.7))
 	Audio.play_varied("stomp")
+
+
+## Surface consultado a cada frame: injetado por Level antes de entrar na árvore.
+var surface_at: Callable
+var external_force := Vector2.ZERO
+var speed_scale := 1.0
+var gravity_scale := 1.0
+
+## Caractere sob os pés, ou "." quando não há chão.
+func ground_tile() -> String:
+	if not surface_at.is_valid() or not is_on_floor():
+		return "."
+	var tx := floori(global_position.x / TILE)
+	var ty := floori((global_position.y + HEIGHT * 0.5 + 2.0) / TILE)
+	return surface_at.call(tx, ty)
+
+
+func push(force: Vector2) -> void:
+	external_force += force
 
 
 ## Walk into the exit: hand control over and get pulled into the frame.

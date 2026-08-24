@@ -486,6 +486,42 @@ static func paint_platform(img: Image, tx: int, ty: int) -> void:
 		img.set_pixel(ox + x, oy + 2, Palette.OUTLINE)
 
 
+## Ice tile: similar to normal terrain but with a lighter palette to show slipperiness.
+## Edges show WHITE for the lit rim, body is CYAN_MID, with two fixed bright pixels.
+static func paint_ice(img: Image, tx: int, ty: int, up: bool, down: bool,
+		left: bool, right: bool) -> void:
+	var ox := tx * TILE
+	var oy := ty * TILE
+
+	# Fill with lighter color (ice is brighter)
+	for y in TILE:
+		for x in TILE:
+			img.set_pixel(ox + x, oy + y, Palette.CYAN_MID)
+
+	# Two fixed bright pixels per tile (no randomness so it doesn't shimmer)
+	img.set_pixel(ox + 2, oy + 2, Palette.WHITE)
+	img.set_pixel(ox + 6, oy + 5, Palette.WHITE)
+
+	if not left:
+		for y in TILE:
+			img.set_pixel(ox, oy + y, Palette.OUTLINE)
+	if not right:
+		for y in TILE:
+			img.set_pixel(ox + TILE - 1, oy + y, Palette.OUTLINE)
+	if not down:
+		for x in TILE:
+			img.set_pixel(ox + x, oy + TILE - 1, Palette.OUTLINE)
+	if not up:
+		# Bright rim on top of ice
+		for x in TILE:
+			img.set_pixel(ox + x, oy, Palette.WHITE)
+			img.set_pixel(ox + x, oy + 1, Palette.CYAN_MID)
+		if not left:
+			img.set_pixel(ox, oy, Palette.OUTLINE)
+		if not right:
+			img.set_pixel(ox + TILE - 1, oy, Palette.OUTLINE)
+
+
 # ------------------------------------------------------------- title cube ---
 
 ## The logo cube, rebuilt from the same maths as logo/make_logo.py.

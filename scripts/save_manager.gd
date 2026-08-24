@@ -19,6 +19,8 @@ const AUTOSAVE := 15.0          # seconds of play between disk writes
 ## so the move arrives with the room built to teach it.
 const DASH_ROOM := 12           # 0-based: room 13, "FIRST DASH"
 const POUND_ROOM := 18          # room 19, "SLAM"
+const DASH_ROOM_ID := "first_dash"
+const POUND_ROOM_ID := "slam"
 
 var settings := {
 	"music": true,
@@ -95,6 +97,9 @@ func _read(path: String) -> void:
 	active = clampi(int(parsed.get("active", 0)), 0, SLOTS - 1)
 	data = slots[active]
 
+	# Migrate old numeric keys to stable room IDs (schema 1 -> 2)
+	_migrate_to_schema_2()
+
 
 func _import_legacy() -> void:
 	var f := FileAccess.open(LEGACY, FileAccess.READ)
@@ -116,6 +121,48 @@ func _import_legacy() -> void:
 
 	active = 0
 	data = slots[0]
+	save_game()
+
+
+## Migrate old numeric keys to stable room IDs (schema 1 -> 2).
+## Old keys were str(index), new keys are room IDs like "first_dash".
+func _migrate_to_schema_2() -> void:
+	if data.get("schema") == 2:
+		return  # Already migrated
+
+	# List of room IDs in the original order (21 rooms)
+	var old_order := [
+		"first_steps", "prickly", "ceiling_spikes", "slime_time", "bounce",
+		"the_climb", "double_trouble", "spring_stair", "ledge_climb", "spike_gauntlet",
+		"spring_tower", "wall_finale", "first_dash", "crystal_chain", "platform_ride",
+		"beat", "dash_gauntlet", "mid_finale", "slam", "break_in", "chain_bounce"
+	]
+
+	# Migrate best_times
+	var new_times := {}
+	for i in range(old_order.size()):
+		var old_key := str(i)
+		if data["best_times"].has(old_key):
+			new_times[old_order[i]] = data["best_times"][old_key]
+	data["best_times"] = new_times
+
+	# Migrate cleared
+	var new_cleared := {}
+	for i in range(old_order.size()):
+		var old_key := str(i)
+		if data["cleared"].has(old_key):
+			new_cleared[old_order[i]] = data["cleared"][old_key]
+	data["cleared"] = new_cleared
+
+	# Migrate gems
+	var new_gems := {}
+	for i in range(old_order.size()):
+		var old_key := str(i)
+		if data["gems"].has(old_key):
+			new_gems[old_order[i]] = data["gems"][old_key]
+	data["gems"] = new_gems
+
+	data["schema"] = 2
 	save_game()
 
 
@@ -157,20 +204,25 @@ func slot_is_empty(index: int) -> bool:
 
 # ---------------------------------------------------------------- queries ---
 
+## Get the stable key for a room by index. Uses room ID if available, falls back to string index.
+func _key(index: int) -> String:
+	return String(Levels.all()[index].get("id", str(index)))
+
+
 func is_unlocked(index: int) -> bool:
 	return index < int(data["unlocked"])
 
 
 func is_cleared(index: int) -> bool:
-	return bool(data["cleared"].get(str(index), false))
+	return bool(data["cleared"].get(_key(index), false))
 
 
 func best_time(index: int) -> float:
-	return float(data["best_times"].get(str(index), 0.0))
+	return float(data["best_times"].get(_key(index), 0.0))
 
 
 func best_gems(index: int) -> int:
-	return int(data["gems"].get(str(index), 0))
+	return int(data["gems"].get(_key(index), 0))
 
 
 func total_gems() -> int:
@@ -187,11 +239,13 @@ func cleared_count() -> int:
 ## Abilities ride on room unlocks: reach the room that teaches the move and you
 ## have the move, in that room and every other one.
 func can_dash() -> bool:
-	return is_unlocked(DASH_ROOM)
+	var dash_index := Levels.index_of(DASH_ROOM_ID)
+	return dash_index >= 0 and is_unlocked(dash_index)
 
 
 func can_pound() -> bool:
-	return is_unlocked(POUND_ROOM)
+	var pound_index := Levels.index_of(POUND_ROOM_ID)
+	return pound_index >= 0 and is_unlocked(pound_index)
 
 
 # --------------------------------------------------------------- discovery ---
@@ -219,7 +273,7 @@ func known_count() -> int:
 
 ## Record a finished room. Returns true when the time was a new record.
 func record_clear(index: int, time: float, gems: int, level_count: int) -> bool:
-	var key := str(index)
+	var key := _key(index)
 	var record := false
 
 	data["used"] = true

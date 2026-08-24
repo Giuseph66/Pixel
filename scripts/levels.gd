@@ -437,126 +437,147 @@ static func _level_21() -> PackedStringArray:
 static func all() -> Array:
 	return [
 		{
+			"id": "first_steps",
 			"name": "level.1.name",
 			"hint": "level.1.hint",
 			"par": 20.0,
 			"rows": _level_1(),
 		},
 		{
+			"id": "prickly",
 			"name": "level.2.name",
 			"hint": "level.2.hint",
 			"par": 28.0,
 			"rows": _level_2(),
 		},
 		{
+			"id": "ceiling_spikes",
 			"name": "level.3.name",
 			"hint": "level.3.hint",
 			"par": 32.0,
 			"rows": _level_3(),
 		},
 		{
+			"id": "slime_time",
 			"name": "level.4.name",
 			"hint": "level.4.hint",
 			"par": 38.0,
 			"rows": _level_4(),
 		},
 		{
+			"id": "bounce",
 			"name": "level.5.name",
 			"hint": "level.5.hint",
 			"par": 42.0,
 			"rows": _level_5(),
 		},
 		{
+			"id": "the_climb",
 			"name": "level.6.name",
 			"hint": "level.6.hint",
 			"par": 60.0,
 			"rows": _level_6(),
 		},
 		{
+			"id": "double_trouble",
 			"name": "level.7.name",
 			"hint": "level.7.hint",
 			"par": 45.0,
 			"rows": _level_7(),
 		},
 		{
+			"id": "spring_stair",
 			"name": "level.8.name",
 			"hint": "level.8.hint",
 			"par": 50.0,
 			"rows": _level_8(),
 		},
 		{
+			"id": "ledge_climb",
 			"name": "level.9.name",
 			"hint": "level.9.hint",
 			"par": 55.0,
 			"rows": _level_9(),
 		},
 		{
+			"id": "spike_gauntlet",
 			"name": "level.10.name",
 			"hint": "level.10.hint",
 			"par": 48.0,
 			"rows": _level_10(),
 		},
 		{
+			"id": "spring_tower",
 			"name": "level.11.name",
 			"hint": "level.11.hint",
 			"par": 52.0,
 			"rows": _level_11(),
 		},
 		{
+			"id": "wall_finale",
 			"name": "level.12.name",
 			"hint": "level.12.hint",
 			"par": 90.0,
 			"rows": _level_12(),
 		},
 		{
+			"id": "first_dash",
 			"name": "level.13.name",
 			"hint": "level.13.hint",
 			"par": 30.0,
 			"rows": _level_13(),
 		},
 		{
+			"id": "crystal_chain",
 			"name": "level.14.name",
 			"hint": "level.14.hint",
 			"par": 40.0,
 			"rows": _level_14(),
 		},
 		{
+			"id": "platform_ride",
 			"name": "level.15.name",
 			"hint": "level.15.hint",
 			"par": 45.0,
 			"rows": _level_15(),
 		},
 		{
+			"id": "beat",
 			"name": "level.16.name",
 			"hint": "level.16.hint",
 			"par": 50.0,
 			"rows": _level_16(),
 		},
 		{
+			"id": "dash_gauntlet",
 			"name": "level.17.name",
 			"hint": "level.17.hint",
 			"par": 42.0,
 			"rows": _level_17(),
 		},
 		{
+			"id": "mid_finale",
 			"name": "level.18.name",
 			"hint": "level.18.hint",
 			"par": 75.0,
 			"rows": _level_18(),
 		},
 		{
+			"id": "slam",
 			"name": "level.19.name",
 			"hint": "level.19.hint",
 			"par": 35.0,
 			"rows": _level_19(),
 		},
 		{
+			"id": "break_in",
 			"name": "level.20.name",
 			"hint": "level.20.hint",
 			"par": 55.0,
 			"rows": _level_20(),
 		},
 		{
+			"id": "chain_bounce",
 			"name": "level.21.name",
 			"hint": "level.21.hint",
 			"par": 60.0,
@@ -567,3 +588,10 @@ static func all() -> Array:
 
 static func count() -> int:
 	return all().size()
+
+
+static func index_of(room_id: String) -> int:
+	for i in all().size():
+		if all()[i].get("id", "") == room_id:
+			return i
+	return -1
