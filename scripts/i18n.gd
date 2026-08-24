@@ -264,6 +264,18 @@ const STRINGS := {
 	"level.20.hint": "BREAK IN ANYWHERE. THE HOLE IS ALSO THE WAY OUT",
 	"level.21.name": "CHAIN",
 	"level.21.hint": "EACH SLIME TAKEN IN A ROW THROWS YOU HIGHER",
+
+	"level.ice_first.name": "SLIPPERY START",
+	"level.ice_first.hint": "THE GROUND IS SLIPPERY. PLAN AHEAD",
+	"level.ice_edge.name": "SKATING EDGE",
+	"level.ice_edge.hint": "DRIFT BETWEEN FROZEN PLATES",
+	"level.ice_wall.name": "FROZEN BRAKE",
+	"level.ice_wall.hint": "USE THE WALL TO STOP",
+	"level.ice_slime.name": "SLIME ON ICE",
+	"level.ice_slime.hint": "THEY SLIDE TOO",
+
+	"ice": "ICE",
+	"ice.desc": "NO GRIP. STOPPING COSTS GROUND, SO AIM EARLY",
 },
 
 "pt": {
@@ -454,6 +466,18 @@ const STRINGS := {
 	"level.20.hint": "ENTRE POR ONDE QUISER. O BURACO TAMBEM E A SAIDA",
 	"level.21.name": "CORRENTE",
 	"level.21.hint": "CADA GOSMA EM SEQUENCIA TE JOGA MAIS ALTO",
+
+	"level.ice_first.name": "COMECO ESCORREGADIO",
+	"level.ice_first.hint": "O CHAO E ESCORREGADIO. PLANEJE ANTES",
+	"level.ice_edge.name": "BEIRA GELADA",
+	"level.ice_edge.hint": "DESLIZE ENTRE PLACAS CONGELADAS",
+	"level.ice_wall.name": "FREIO CONGELADO",
+	"level.ice_wall.hint": "USE A PAREDE PARA PARAR",
+	"level.ice_slime.name": "GOSMA NO GELO",
+	"level.ice_slime.hint": "ELAS ESCORREGAM TAMBEM",
+
+	"ice": "GELO",
+	"ice.desc": "SEM ATRITO. PARAR CUSTA CHAO. MIRE ANTES",
 },
 
 "es": {
@@ -644,5 +668,17 @@ const STRINGS := {
 	"level.20.hint": "ENTRA POR DONDE QUIERAS. EL HUECO TAMBIEN ES SALIDA",
 	"level.21.name": "CADENA",
 	"level.21.hint": "CADA LIMO SEGUIDO TE LANZA MAS ALTO",
+
+	"level.ice_first.name": "COMIENZO RESBALADIZO",
+	"level.ice_first.hint": "EL SUELO RESBALA. PLANIFICA ANTES",
+	"level.ice_edge.name": "BORDE HELADO",
+	"level.ice_edge.hint": "DESLIZA ENTRE PLACAS CONGELADAS",
+	"level.ice_wall.name": "FRENO CONGELADO",
+	"level.ice_wall.hint": "USA LA PARED PARA FRENAR",
+	"level.ice_slime.name": "LIMO EN HIELO",
+	"level.ice_slime.hint": "ELLOS TAMBIEN RESBALAN",
+
+	"ice": "HIELO",
+	"ice.desc": "SIN AGARRE. FRENAR CUESTA SUELO. APUNTA ANTES",
 },
 }

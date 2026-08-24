@@ -432,6 +432,57 @@ static func _level_21() -> PackedStringArray:
 	return bake(g)
 
 
+## Slippery ground from start to finish. No obstacles, only inertia.
+static func _level_ice_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 1, "~")          # ice surface, only top line
+	puts(g, [Vector2i(18, 26), Vector2i(30, 26), Vector2i(42, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Ice plates separated by pits with spikes at the bottom.
+static func _level_ice_edge() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	# Ice plates of 8 tiles, separated by 4-tile pits with spikes
+	for x in [10, 28, 46]:
+		rect(g, x, 27, 8, 1, "~")
+		if x + 8 < COLS:
+			rect(g, x + 8, 29, 4, 1, "^")
+	puts(g, [Vector2i(14, 26), Vector2i(32, 26), Vector2i(50, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Ice corridor ending in a tall wall — the wall is your brake.
+static func _level_ice_wall() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 6, 15, 48, 1, "#")          # wall in the middle
+	rect(g, 8, 27, 44, 1, "~")          # ice below
+	puts(g, [Vector2i(24, 26), Vector2i(36, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 14, "X")
+	return bake(g)
+
+
+## Ice with walking slimes — the slimes move on ice too.
+static func _level_ice_slime() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 27, 40, 1, "~")
+	rect(g, 24, 25, 12, 1, "-")         # escape platform
+	puts(g, [Vector2i(18, 26), Vector2i(40, 26)], "o")
+	puts(g, [Vector2i(14, 26), Vector2i(26, 26), Vector2i(44, 26)], "S")
+	put(g, 4, 26, "P")
+	put(g, 54, 24, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -582,6 +633,34 @@ static func all() -> Array:
 			"hint": "level.21.hint",
 			"par": 60.0,
 			"rows": _level_21(),
+		},
+		{
+			"id": "ice_first",
+			"name": "level.ice_first.name",
+			"hint": "level.ice_first.hint",
+			"par": 22.0,
+			"rows": _level_ice_first(),
+		},
+		{
+			"id": "ice_edge",
+			"name": "level.ice_edge.name",
+			"hint": "level.ice_edge.hint",
+			"par": 30.0,
+			"rows": _level_ice_edge(),
+		},
+		{
+			"id": "ice_wall",
+			"name": "level.ice_wall.name",
+			"hint": "level.ice_wall.hint",
+			"par": 34.0,
+			"rows": _level_ice_wall(),
+		},
+		{
+			"id": "ice_slime",
+			"name": "level.ice_slime.name",
+			"hint": "level.ice_slime.hint",
+			"par": 40.0,
+			"rows": _level_ice_slime(),
 		},
 	]
 

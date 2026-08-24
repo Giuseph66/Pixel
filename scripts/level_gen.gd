@@ -50,6 +50,7 @@ const UNLOCK := {
 	"beat": 7,
 	"vault": 9,
 	"crystal": 6,               # not a segment: see _place_crystals()
+	"ice": 6,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -75,6 +76,7 @@ const THREAT := {
 	"ferry": 2.0,
 	"beat": 3.0,
 	"vault": 2.0,
+	"ice": 2.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -182,6 +184,7 @@ const WIDTHS := {
 	"ferry": 11,
 	"beat": 12,
 	"vault": 9,
+	"ice": 8,
 }
 
 
@@ -208,6 +211,7 @@ const TASTE := {
 	"ferry": 2.0,
 	"beat": 1.8,
 	"vault": 1.6,
+	"ice": 1.6,
 }
 
 
@@ -404,6 +408,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _beat(g, rng, x, room, d, spots)
 		"vault":
 			return _vault(g, rng, x, room, spots)
+		"ice":
+			return _ice(g, rng, x, room, d, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -718,6 +724,16 @@ static func _vault(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 	if rng.randf() < 0.6:
 		Levels.put(g, lid - 1, STAND, "^")
 		Levels.put(g, lid + 3, STAND, "^")
+	return w
+
+
+## A plate of ice in the middle of the path. No threat by itself, but encodes
+## momentum loss as a spatial problem rather than just a time cost.
+static func _ice(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(8, 12), room)
+	Levels.rect(g, x, FLOOR, w, 1, "~")
+	spots.append(Vector2i(x + w / 2, STAND - 3))
 	return w
 
 
