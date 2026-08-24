@@ -35,6 +35,10 @@ var data: Dictionary = {}
 var _since_write := 0.0
 
 
+const MEDAL_TIME := 1
+const MEDAL_GEMS := 2
+const MEDAL_CLEAN := 4
+
 static func blank_slot() -> Dictionary:
 	return {
 		"used": false,          # false until the slot has been played at all
@@ -42,6 +46,7 @@ static func blank_slot() -> Dictionary:
 		"best_times": {},       # room index (as String) -> seconds
 		"cleared": {},          # room index (as String) -> true
 		"gems": {},             # room index (as String) -> best gem count
+		"medals": {},           # room id -> bitmask (1=time, 2=gems, 4=clean)
 		"total_deaths": 0,
 		"endless_best": 0,      # deepest endless run, in rooms cleared
 		"endless_gems": 0,      # gems taken in that run
@@ -225,6 +230,10 @@ func best_gems(index: int) -> int:
 	return int(data["gems"].get(_key(index), 0))
 
 
+func medals(index: int) -> int:
+	return int(data["medals"].get(_key(index), 0))
+
+
 func total_gems() -> int:
 	var sum := 0
 	for v in data["gems"].values():
@@ -272,7 +281,7 @@ func known_count() -> int:
 # ---------------------------------------------------------------- updates ---
 
 ## Record a finished room. Returns true when the time was a new record.
-func record_clear(index: int, time: float, gems: int, level_count: int) -> bool:
+func record_clear(index: int, time: float, gems: int, level_count: int, deaths: int = 0, par: float = 0.0) -> bool:
 	var key := _key(index)
 	var record := false
 
@@ -287,8 +296,22 @@ func record_clear(index: int, time: float, gems: int, level_count: int) -> bool:
 	if index + 1 >= int(data["unlocked"]) and index + 1 < level_count:
 		data["unlocked"] = index + 2
 
+	_award(index, time, gems, level_count, deaths, par)
 	save_game()
 	return record
+
+
+func _award(index: int, time: float, gems: int, total: int, deaths: int, par: float) -> void:
+	var key := _key(index)
+	var earned := 0
+	if par > 0.0 and time <= par:
+		earned |= MEDAL_TIME
+	if total > 0 and gems >= total:
+		earned |= MEDAL_GEMS
+	if deaths == 0:
+		earned |= MEDAL_CLEAN
+	var before := medals(index)
+	data["medals"][key] = before | earned
 
 
 ## Record a finished endless run. Returns true when it beat the old depth.
