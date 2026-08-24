@@ -306,6 +306,12 @@ func _spawn_entities() -> void:
 					timed.speed_scale = intensity
 					timed.position = tile_center(tx, ty)
 					_entities.add_child(timed)
+				"z", "Z":
+					var retract := RetractSpike.new()
+					retract.setup(ch == "Z")
+					retract.speed_scale = intensity
+					retract.position = tile_center(tx, ty)
+					_entities.add_child(retract)
 				"X":
 					_door = ExitDoor.new()
 					# 'X' marks the bottom tile of a two-tile-tall frame.

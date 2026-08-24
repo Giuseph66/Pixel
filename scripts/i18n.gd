@@ -276,6 +276,18 @@ const STRINGS := {
 
 	"ice": "ICE",
 	"ice.desc": "NO GRIP. STOPPING COSTS GROUND, SO AIM EARLY",
+
+	"level.belt_first.name": "CONVEYOR START",
+	"level.belt_first.hint": "THE FLOOR MOVES. GO WITH IT",
+	"level.belt_against.name": "AGAINST THE CURRENT",
+	"level.belt_against.hint": "YOU CAN FIGHT THE BELT",
+	"level.belt_launch.name": "BELT BOOST",
+	"level.belt_launch.hint": "CATCH THE BELT AT THE RIGHT MOMENT",
+	"level.belt_mix.name": "CROSSING BELTS",
+	"level.belt_mix.hint": "THE SLIMES MOVE TOO",
+
+	"belt": "CONVEYOR",
+	"belt.desc": "THE FLOOR MOVES. WITH IT YOU FLY, AGAINST IT YOU CRAWL",
 },
 
 "pt": {
@@ -478,6 +490,18 @@ const STRINGS := {
 
 	"ice": "GELO",
 	"ice.desc": "SEM ATRITO. PARAR CUSTA CHAO. MIRE ANTES",
+
+	"level.belt_first.name": "COMECO ESTEIRA",
+	"level.belt_first.hint": "O CHAO ANDA. VA COM ELE",
+	"level.belt_against.name": "CONTRA O FLUXO",
+	"level.belt_against.hint": "VOCE PODE LUTAR CONTRA",
+	"level.belt_launch.name": "LANCAMENTO ESTEIRA",
+	"level.belt_launch.hint": "PEGUE A ESTEIRA NO MOMENTO CERTO",
+	"level.belt_mix.name": "ESTEIRAS CRUZADAS",
+	"level.belt_mix.hint": "AS GOSMAS SE MEXEM TAMBEM",
+
+	"belt": "ESTEIRA",
+	"belt.desc": "O CHAO ANDA. A FAVOR VOA, CONTRA ARRASTA",
 },
 
 "es": {
@@ -680,5 +704,17 @@ const STRINGS := {
 
 	"ice": "HIELO",
 	"ice.desc": "SIN AGARRE. FRENAR CUESTA SUELO. APUNTA ANTES",
+
+	"level.belt_first.name": "CINTA INICIO",
+	"level.belt_first.hint": "EL SUELO SE MUEVE. MUEVETE CON EL",
+	"level.belt_against.name": "CONTRA LA CORRIENTE",
+	"level.belt_against.hint": "PUEDES LUCHAR CONTRA LA CINTA",
+	"level.belt_launch.name": "LANZAMIENTO CINTA",
+	"level.belt_launch.hint": "ATRAPA LA CINTA EN EL MOMENTO CORRECTO",
+	"level.belt_mix.name": "CINTAS CRUZADAS",
+	"level.belt_mix.hint": "LOS LIMOS TAMBIEN SE MUEVEN",
+
+	"belt": "CINTA",
+	"belt.desc": "EL SUELO ANDA. A FAVOR VUELAS, EN CONTRA ARRASTRAS",
 },
 }

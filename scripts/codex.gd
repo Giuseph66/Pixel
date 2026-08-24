@@ -48,6 +48,7 @@ const ENTRIES := [
 	{"id": "breakable", "kind": WORLD, "sprite": "breakable"},
 	{"id": "platform", "kind": WORLD, "sprite": "platform_icon"},
 	{"id": "ice", "kind": WORLD, "sprite": "ice"},
+	{"id": "belt", "kind": WORLD, "sprite": "belt_a"},
 ]
 
 ## Which entry a level tile reveals, for the pass that runs when a room builds.
@@ -68,6 +69,8 @@ const BY_TILE := {
 	"m": "platform",
 	"n": "platform",
 	"~": "ice",
+	">": "belt",
+	"<": "belt",
 }
 
 

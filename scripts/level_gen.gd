@@ -77,6 +77,7 @@ const THREAT := {
 	"beat": 3.0,
 	"vault": 2.0,
 	"ice": 2.0,
+	"belt": 1.5,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -185,6 +186,7 @@ const WIDTHS := {
 	"beat": 12,
 	"vault": 9,
 	"ice": 8,
+	"belt": 6,
 }
 
 
@@ -212,6 +214,7 @@ const TASTE := {
 	"beat": 1.8,
 	"vault": 1.6,
 	"ice": 1.6,
+	"belt": 1.4,
 }
 
 
@@ -410,6 +413,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _vault(g, rng, x, room, spots)
 		"ice":
 			return _ice(g, rng, x, room, d, spots)
+		"belt":
+			return _belt(g, rng, x, room, d, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -733,6 +738,17 @@ static func _ice(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: flo
 		spots: Array[Vector2i]) -> int:
 	var w := mini(rng.randi_range(8, 12), room)
 	Levels.rect(g, x, FLOOR, w, 1, "~")
+	spots.append(Vector2i(x + w / 2, STAND - 3))
+	return w
+
+
+## A moving belt that pushes the player horizontally. Half the time right (>),
+## half the time left (<). With the belt you fly, against it you crawl.
+static func _belt(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(6, 10), room)
+	var ch := ">" if rng.randf() < 0.55 else "<"
+	Levels.rect(g, x, FLOOR, w, 1, ch)
 	spots.append(Vector2i(x + w / 2, STAND - 3))
 	return w
 
