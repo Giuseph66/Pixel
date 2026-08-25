@@ -25,13 +25,13 @@ Ordem de leitura e de implementação é a numeração dos arquivos.
 | [09](09-gemas-secretas.md) | Gemas secretas | 1 | `O` | 0 (altera 8) | ✅ feito |
 | [10](10-combo-de-movimento.md) | Combo de movimento | 1 | — | 3 | ✅ feito |
 | [11](11-salas-remixadas.md) | Salas remixadas | 1 | — | 0 (reusa as 47) | ✅ feito |
-| [12](12-interruptores.md) | Interruptores e portas | 2 | `i` `g` `G` | 5 | ⏳ em andamento |
-| [13](13-vento.md) | Correntes de vento | 2 | `u` | 4 | ⬜ pendente |
-| [14](14-bloco-de-fase.md) | Bloco de fase | 2 | `p` | 5 | ⬜ pendente |
-| [15](15-portais.md) | Portais | 2 | `q` `Q` | 5 | ⬜ pendente |
-| [16](16-lasers.md) | Lasers telegrafados | 2 | `L` | 4 | ⬜ pendente |
-| [17](17-morcego-transportador.md) | Morcego transportador | 2 | `F` | 4 | ⬜ pendente |
-| [18](18-pulo-carregado.md) | Pulo carregado | 2 | — | 3 | ⬜ pendente |
+| [12](12-interruptores.md) | Interruptores e portas | 2 | `i` `g` `G` | 5 | ✅ feito |
+| [13](13-vento.md) | Correntes de vento | 2 | `u` `U` | 4 | ✅ feito |
+| [14](14-bloco-de-fase.md) | Bloco de fase | 2 | `p` | 5 | ✅ feito |
+| [15](15-portais.md) | Portais | 2 | `q` `Q` | 5 | ✅ feito |
+| [16](16-lasers.md) | Lasers telegrafados | 2 | `L` | 4 | ✅ feito |
+| [17](17-morcego-transportador.md) | Morcego transportador | 2 | `F` | 4 | ✅ feito |
+| [18](18-pulo-carregado.md) | Pulo carregado | 2 | — | 3 | ✅ feito |
 | [19](19-impulso-de-parede.md) | Impulso de parede | 2 | — | 3 | ⬜ não planejado nesta rodada |
 | [20](20-modificadores-infinito.md) | Modificadores do infinito | 2 | — | 0 | ⬜ não planejado nesta rodada |
 | [21](21-blocos-fantasma.md) | Blocos-fantasma | 2 | `h` `H` | 4 | ⬜ não planejado nesta rodada |
@@ -48,6 +48,33 @@ Nota sobre o passo 11: o plano original previa um quarto painel em
 terceiro slot — SANDBOX — de um trabalho anterior a este plano. O remix entrou
 como um alternador (`R`) dentro da tela de seleção de salas em vez de um quinto
 lugar apertado numa tela de 480px de largura.
+
+Notas gerais sobre os passos 12-18, todos implementados nesta rodada:
+
+- **Passo 12** (interruptores): a variante temporizada de "desligar serras"
+  descrita como opcional não entrou; `switch_saw` combina botão+porta com uma
+  serra no mesmo corredor em vez disso, e o texto da sala foi ajustado para
+  não prometer o que não foi construído.
+- **Passo 15** (portais): sem segmento no infinito, exatamente como o próprio
+  plano recomenda ("não fazer agora, porque quebra a prova de alcançabilidade
+  do gerador").
+- **Passo 17** (morcego balsa): o alcance do patrulhamento é um valor fixo
+  generoso (`SPAN`), não medido contra a sala como `MovingPlatform` faz — mais
+  simples, e suficiente para as salas construídas.
+- **Passo 18** (pulo carregado): implementada a variante "parado no chão"
+  (não a alternativa "carregar no wall slide" que o plano oferece como
+  substituta). Sem playtest humano, não dá para confirmar qual das três
+  reações previstas pelo plano ("ninguém usa", "todo mundo usa em todo
+  lugar", "só onde exigido") descreve o resultado — as 3 salas exigem a
+  mecânica, o resto da campanha não.
+
+**Limite honesto, repetido do passo 14 em diante:** nenhuma das salas com
+dash, portal, vento ou pulo carregado foi jogada por um humano. `verify_rooms.py`
+prova estrutura (existe P, existe X, nada flutua sem chão) — já pegou pelo
+menos quatro bugs reais de posicionamento nesta rodada (portas e pontes um
+tile fora do lugar). Não prova que uma travessia de dash, um arco de portal ou
+um pulo carregado realmente alcança onde deveria. Jogar essas salas e ajustar
+números é trabalho que ainda falta.
 
 ---
 
@@ -78,14 +105,13 @@ caracteres por linha.
 
 ### Orçamento de caracteres de tile
 
-**Em uso hoje:** `. # - ^ v o S J W B c k d t T X P m n`
+**Em uso hoje** (passos 00-18, todos entregues): `. # - ^ v o O S J W B c k d
+t T X P m n r e E A z Z ~ > < i g G u U p q Q L F`
 
-**Reservados por estes passos:** `~` gelo · `>` `<` esteira · `z` espinho
-retrátil · `r` plataforma circular · `e` slime elástico · `E` inimigo-escudo ·
-`A` lava · `O` gema secreta · `i` interruptor · `g` `G` porta comandada ·
-`u` vento · `p` bloco de fase · `q` `Q` portais · `L` laser · `F` morcego
-transportador · `h` `H` bloco-fantasma · `V` zona de gravidade invertida ·
-`y` `Y` clone e sensor
+**Ainda reservados, passos 19-25 (não planejados nesta rodada):** `h` `H`
+bloco-fantasma · `V` zona de gravidade invertida · `y` `Y` clone e sensor.
+Passos 19 (impulso de parede), 20 (modificadores do infinito) e 25 (fantasma
+do recorde) não pedem tile novo.
 
 ### Checklist de fechamento (todo passo com tile novo)
 
