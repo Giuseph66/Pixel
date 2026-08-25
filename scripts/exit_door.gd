@@ -4,14 +4,14 @@ extends Area2D
 ## The way out. Its interior is drawn every frame rather than being a sprite,
 ## so the swirl inside can react to how many gems are still on the level.
 
-signal entered
+signal entered(player: Player)
 
 const FRAME_W := 12
 const FRAME_H := 16
 
 var charge := 0.0            # 0..1, how complete the level is
 var _time := 0.0
-var _used := false
+var _entered_peers: Dictionary = {}
 var _canvas: Node2D
 
 
@@ -58,8 +58,13 @@ func _draw_interior() -> void:
 
 
 func _on_body_entered(body: Node2D) -> void:
-	if _used:
-		return
 	if body is Player and (body as Player).alive:
-		_used = true
-		entered.emit()
+		var player := body as Player
+		if _entered_peers.has(player.peer_id):
+			return
+		_entered_peers[player.peer_id] = true
+		entered.emit(player)
+
+
+func reset_player(peer_id: int) -> void:
+	_entered_peers.erase(peer_id)

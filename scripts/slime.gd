@@ -23,7 +23,7 @@ var direction := -1
 var alive := true
 ## Endless mode winds this up with depth once rooms cannot hold more threat.
 var speed_scale := 1.0
-var player: Player              # handed over by Level once it exists
+var players: Array[Player] = [] # handed over by Level once they exist
 var is_wall: Callable           # func(tx: int, ty: int) -> bool, supplied by Level
 var is_ground: Callable         # same shape, but one-way slabs count as ground
 
@@ -31,7 +31,7 @@ var _sprite: Sprite2D
 var _time := 0.0
 ## Whether the player's feet were clear of the slime's head on the last frame
 ## they were not yet touching it. This is the entire stomp test.
-var _approached_from_above := true
+var _approached_from_above: Dictionary = {}
 
 
 func _ready() -> void:
@@ -62,11 +62,16 @@ func _physics_process(delta: float) -> void:
 	else:
 		position.x += direction * SPEED * speed_scale * delta
 
-	_check_player()
+	_check_players()
 
 
-func _check_player() -> void:
-	if player == null or not player.alive or player.frozen:
+func _check_players() -> void:
+	for player: Player in players:
+		_check_player(player)
+
+
+func _check_player(player: Player) -> void:
+	if not is_instance_valid(player) or not player.alive or player.frozen:
 		return
 
 	var delta_pos := player.global_position - global_position
@@ -76,10 +81,10 @@ func _check_player() -> void:
 	if not touching:
 		# Remember the approach while there is still an approach to remember.
 		var feet := player.global_position.y + Player.HEIGHT * 0.5
-		_approached_from_above = feet <= global_position.y - TOP_OFFSET
+		_approached_from_above[player.peer_id] = feet <= global_position.y - TOP_OFFSET
 		return
 
-	if _approached_from_above:
+	if bool(_approached_from_above.get(player.peer_id, true)):
 		player.stomp()
 		die()
 	else:

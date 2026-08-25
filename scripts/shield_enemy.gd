@@ -18,7 +18,7 @@ const TOP_OFFSET := 4.0
 var direction := -1
 var alive := true
 var speed_scale := 1.0
-var player: Player
+var players: Array[Player] = []
 var is_wall: Callable
 var is_ground: Callable
 
@@ -51,11 +51,16 @@ func _physics_process(delta: float) -> void:
 	else:
 		position.x += direction * SPEED * speed_scale * delta
 
-	_check_player()
+	_check_players()
 
 
-func _check_player() -> void:
-	if player == null or not player.alive or player.frozen:
+func _check_players() -> void:
+	for player: Player in players:
+		_check_player(player)
+
+
+func _check_player(player: Player) -> void:
+	if not is_instance_valid(player) or not player.alive or player.frozen:
 		return
 
 	var delta_pos := player.global_position - global_position

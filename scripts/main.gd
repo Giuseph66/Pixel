@@ -38,6 +38,7 @@ var _hud: Hud
 var _screen: Node2D
 var _pause: PauseMenu
 var _transition: Transition
+var _cli_network := false
 
 
 func _ready() -> void:
@@ -51,8 +52,12 @@ func _ready() -> void:
 
 	_transition = Transition.new()
 	add_child(_transition)
+	Session.game_start_requested.connect(_on_network_game_start)
+	Session.lobby_requested.connect(_on_network_lobby_requested)
+	Session.host_left.connect(_on_network_host_left)
 
 	_show_title()
+	_parse_network_args()
 
 	# The music loop is synthesised sample by sample, so let the title screen
 	# draw one frame before that work blocks the main thread.
@@ -87,6 +92,42 @@ func _setup_input() -> void:
 	# Only ever read on a menu screen (title, pause), never in a live room, so
 	# reusing the C key p_dash already owns causes no real conflict.
 	_action("p_codex", [KEY_C, KEY_TAB], [JOY_BUTTON_LEFT_SHOULDER])
+
+
+func _parse_network_args() -> void:
+	var role := ""
+	var address := "127.0.0.1"
+	var port := SessionManager.DEFAULT_PORT
+	var capacity := 4
+	var player_name := "PLAYER"
+	var mode := "story"
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--net-role="):
+			role = arg.trim_prefix("--net-role=")
+		elif arg.begins_with("--net-address="):
+			address = arg.trim_prefix("--net-address=")
+		elif arg.begins_with("--net-port="):
+			port = int(arg.trim_prefix("--net-port="))
+		elif arg.begins_with("--net-capacity="):
+			capacity = int(arg.trim_prefix("--net-capacity="))
+		elif arg.begins_with("--net-name="):
+			player_name = arg.trim_prefix("--net-name=")
+		elif arg.begins_with("--net-mode="):
+			mode = arg.trim_prefix("--net-mode=")
+	if role == "host":
+		_cli_network = true
+		Session.local_profile = {"name": player_name, "color": 0}
+		if Session.host_lan({"mode": mode, "max_players": capacity, "port": port}) == OK:
+			_show_lobby()
+	elif role == "client":
+		_cli_network = true
+		Session.state_changed.connect(_on_cli_session_state)
+		Session.join_lan(address, port, {"name": player_name, "color": 1})
+
+
+func _on_cli_session_state(next: int, _reason: String) -> void:
+	if _cli_network and next == SessionManager.State.LOBBY:
+		_show_lobby()
 
 
 func _action(action: String, keys: Array, buttons: Array = [],
@@ -194,6 +235,8 @@ func _on_title_chosen(id: String) -> void:
 	match id:
 		"play":
 			_go(_show_play_select)
+		"multiplayer":
+			_go(_show_multiplayer)
 		"levels":
 			_go(_show_select)
 		"codex":
@@ -212,6 +255,101 @@ func _show_play_select() -> void:
 	screen.chosen.connect(_on_play_chosen)
 	screen.cancelled.connect(func(): _go(_show_title))
 	_set_screen(screen)
+
+
+func _show_multiplayer() -> void:
+	_clear_all()
+	var screen := MultiplayerScreen.new()
+	screen.chosen.connect(_on_multiplayer_chosen)
+	screen.cancelled.connect(func(): _go(_show_title))
+	_set_screen(screen)
+
+
+func _on_multiplayer_chosen(id: String) -> void:
+	match id:
+		"host":
+			_go(_show_host_lobby)
+		"join":
+			_go(_show_join_lobby)
+		_:
+			_go(_show_title)
+
+
+func _show_host_lobby() -> void:
+	_clear_all()
+	var screen := HostScreen.new()
+	screen.created.connect(func(): _go(_show_lobby))
+	screen.cancelled.connect(func(): _go(_show_multiplayer))
+	_set_screen(screen)
+
+
+func _show_join_lobby() -> void:
+	_clear_all()
+	var screen := JoinScreen.new()
+	screen.joined.connect(func(): _go(_show_lobby))
+	screen.cancelled.connect(func():
+		Session.leave()
+		_go(_show_multiplayer))
+	_set_screen(screen)
+
+
+func _show_lobby() -> void:
+	_clear_all()
+	var screen := LobbyScreen.new()
+	screen.cancelled.connect(func():
+		Session.leave()
+		_go(_show_multiplayer))
+	_set_screen(screen)
+
+
+func _on_network_game_start(config: Dictionary) -> void:
+	if _busy:
+		return
+	_go(func(): _start_network_game(config))
+
+
+func _start_network_game(config: Dictionary) -> void:
+	var mode := str(config.get("mode", "story"))
+	if mode == "endless":
+		_endless = true
+		_sandbox = false
+		_run_seed = int(config.get("seed", 0))
+		if _run_seed == 0:
+			_run_seed = randi()
+		_depth = 0
+		_run_time = 0.0
+		_run_gems = 0
+		_run_deaths = 0
+		_pending = {}
+		_build_room(0, LevelGen.generate(_run_seed, _depth))
+	elif mode == "sandbox" and config.get("room_data", {}) is Dictionary \
+			and not config["room_data"].is_empty():
+		_endless = false
+		_sandbox = true
+		var received_room: Dictionary = config["room_data"]
+		_sandbox_room = Sandbox.normalise(received_room)
+		if not Session.room_data_matches(received_room) or not Sandbox.is_playable(_sandbox_room):
+			Session.leave()
+			_go(_show_title)
+			return
+		_build_room(0, Sandbox.to_level_data(_sandbox_room))
+	else:
+		_start_room(clampi(int(config.get("level_index", 0)), 0, _levels.size() - 1))
+	if _level != null:
+		_level.competitive = mode == "competitive"
+	Session.mark_playing()
+
+
+func _on_network_lobby_requested() -> void:
+	if _busy:
+		return
+	_go(_show_lobby)
+
+
+func _on_network_host_left() -> void:
+	if _busy:
+		return
+	_go(_show_title)
 
 
 func _on_play_chosen(id: String) -> void:
@@ -388,7 +526,7 @@ func _build_room(index: int, data: Dictionary) -> void:
 	_clear_all()
 
 	# Nothing a custom room does may reach the save file — see Save.tracking.
-	Save.tracking = not _sandbox
+	Save.tracking = not _sandbox and not Session.is_active()
 
 	_level = Level.new()
 	_level.setup(index, data)
@@ -399,8 +537,8 @@ func _build_room(index: int, data: Dictionary) -> void:
 		_level.dash_unlocked = bool(_sandbox_room.get("dash", true))
 		_level.pound_unlocked = bool(_sandbox_room.get("pound", true))
 	else:
-		_level.dash_unlocked = _endless or Save.can_dash()
-		_level.pound_unlocked = _endless or Save.can_pound()
+		_level.dash_unlocked = Session.is_active() or _endless or Save.can_dash()
+		_level.pound_unlocked = Session.is_active() or _endless or Save.can_pound()
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)
 	add_child(_level)
@@ -417,6 +555,8 @@ func _build_room(index: int, data: Dictionary) -> void:
 ## death count, which is what the clean-run medal is judged on. Dying and
 ## respawning is not: that is the same attempt, and it already cost you.
 func _restart_room() -> void:
+	if Session.is_active():
+		return
 	_level.restart()
 	_level.time = 0.0
 	_level.deaths = 0
@@ -425,6 +565,11 @@ func _restart_room() -> void:
 
 
 func _on_room_completed(time: float, gems: int, total: int) -> void:
+	if Session.is_active():
+		await get_tree().create_timer(0.45).timeout
+		if Session.is_host():
+			Session.return_to_lobby()
+		return
 	if _sandbox:
 		var deaths := _level.deaths
 		await get_tree().create_timer(0.45).timeout

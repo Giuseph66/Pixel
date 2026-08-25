@@ -91,6 +91,15 @@ var _chain := 0
 var sprite: Sprite2D
 var fx: Fx
 
+## Multiplayer keeps the movement code shared with offline. The host gives a
+## remote player an input provider; clients simulate only their own player and
+## interpolate the rest from snapshots.
+var peer_id := 1
+var networked := false
+var locally_controlled := true
+var input_provider: Callable
+var _network_target := Vector2.ZERO
+
 
 func _ready() -> void:
 	collision_layer = 1
@@ -116,6 +125,9 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if networked and Session.is_client() and not locally_controlled:
+		_tick_remote(delta)
+		return
 	if not alive or frozen:
 		return
 
@@ -127,11 +139,15 @@ func _physics_process(delta: float) -> void:
 	_dash_cool = maxf(_dash_cool - delta, 0.0)
 	_recover = maxf(_recover - delta, 0.0)
 
-	var input := 0.0
-	if _lock <= 0.0:
-		input = Input.get_axis("p_left", "p_right")
+	var controls := _read_controls()
+	if networked and locally_controlled and Session.is_client():
+		Session.send_input(controls)
 
-	if Input.is_action_just_pressed("p_jump"):
+	var input := _axis(controls, "left", "right")
+	if _lock <= 0.0:
+		input = _axis(controls, "left", "right")
+
+	if _pressed(controls, "jump_pressed"):
 		_buffer = JUMP_BUFFER
 
 	if _recover > 0.0:
@@ -142,11 +158,11 @@ func _physics_process(delta: float) -> void:
 	elif _dash > 0.0:
 		_tick_dash(delta)
 	else:
-		_try_pound()
-		_try_dash(input)
+		_try_pound(controls)
+		_try_dash(input, controls)
 		_apply_horizontal(input, delta)
 		_apply_gravity(input, delta)
-		_handle_jump()
+		_handle_jump(controls)
 
 	velocity += external_force * delta
 	external_force = Vector2.ZERO
@@ -165,14 +181,81 @@ func _physics_process(delta: float) -> void:
 	_update_sprite(input)
 
 
+# ------------------------------------------------------------- controls ---
+
+func _read_controls() -> Dictionary:
+	if input_provider.is_valid():
+		return input_provider.call()
+	return {
+		"left": Input.is_action_pressed("p_left"),
+		"right": Input.is_action_pressed("p_right"),
+		"up": Input.is_action_pressed("p_up"),
+		"down": Input.is_action_pressed("p_down"),
+		"jump": Input.is_action_pressed("p_jump"),
+		"dash": Input.is_action_pressed("p_dash"),
+		"jump_pressed": Input.is_action_just_pressed("p_jump"),
+		"jump_released": Input.is_action_just_released("p_jump"),
+	}
+
+
+func _held(controls: Dictionary, key: String) -> bool:
+	return bool(controls.get(key, false))
+
+
+func _pressed(controls: Dictionary, key: String) -> bool:
+	return bool(controls.get(key, false))
+
+
+func _axis(controls: Dictionary, negative: String, positive: String) -> float:
+	return float(int(_held(controls, positive)) - int(_held(controls, negative)))
+
+
+func network_snapshot() -> Dictionary:
+	return {
+		"peer_id": peer_id,
+		"x": position.x,
+		"y": position.y,
+		"vx": velocity.x,
+		"vy": velocity.y,
+		"alive": alive,
+		"frozen": frozen,
+		"dash": has_dash,
+		"facing": facing,
+	}
+
+
+func apply_network_snapshot(snapshot: Dictionary) -> void:
+	var target := Vector2(float(snapshot.get("x", position.x)), float(snapshot.get("y", position.y)))
+	if locally_controlled:
+		if position.distance_to(target) > 18.0:
+			position = target
+		else:
+			position = position.lerp(target, 0.35)
+	else:
+		_network_target = target
+	velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
+	alive = bool(snapshot.get("alive", alive))
+	frozen = bool(snapshot.get("frozen", frozen))
+	has_dash = bool(snapshot.get("dash", has_dash))
+	facing = int(snapshot.get("facing", facing))
+	if sprite != null:
+		sprite.visible = alive
+
+
+func _tick_remote(delta: float) -> void:
+	_anim += delta
+	position = position.lerp(_network_target, minf(delta * 14.0, 1.0))
+	_update_sprite(0.0)
+
+
 # ----------------------------------------------------------------- pound ---
 
-func _try_pound() -> void:
+func _try_pound(controls: Dictionary) -> void:
 	if not pound_unlocked:
 		return
 	if is_on_floor() or _wall_dir != 0:
 		return
-	if not (Input.is_action_pressed("p_down") and Input.is_action_just_pressed("p_jump")):
+	if not (_held(controls, "down") and _pressed(controls, "jump_pressed")):
 		return
 
 	_found("pound")
@@ -231,16 +314,16 @@ func _found(entry: String) -> void:
 
 # ------------------------------------------------------------------ dash ---
 
-func _try_dash(input: float) -> void:
+func _try_dash(input: float, controls: Dictionary) -> void:
 	# Holding dash chains automatically whenever a new charge is available.
 	if not dash_unlocked or not has_dash or _dash_cool > 0.0 \
-			or not Input.is_action_pressed("p_dash"):
+			or not _held(controls, "dash"):
 		return
 
 	# Eight-way, taken from whatever is held. Nothing held dashes the way you
 	# are already facing, so it never fires into a wall you were backing away
 	# from.
-	var vertical := Input.get_axis("p_up", "p_down")
+	var vertical := _axis(controls, "up", "down")
 	var dir := Vector2(input, vertical)
 	if dir.length_squared() < 0.04:
 		dir = Vector2(facing, 0.0)
@@ -342,7 +425,7 @@ func _apply_gravity(input: float, delta: float) -> void:
 		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale)
 
 
-func _handle_jump() -> void:
+func _handle_jump(controls: Dictionary) -> void:
 	if _buffer > 0.0:
 		if _coyote > 0.0:
 			velocity.y = JUMP_VELOCITY
@@ -363,7 +446,7 @@ func _handle_jump() -> void:
 					Palette.CYAN, 70.0, Vector2(-_wall_dir, -0.5), 1.2, 0.3, 200.0)
 
 	# Releasing the button early cuts the rise short.
-	if Input.is_action_just_released("p_jump") and velocity.y < 0.0:
+	if _pressed(controls, "jump_released") and velocity.y < 0.0:
 		velocity.y *= JUMP_CUT
 
 
@@ -502,6 +585,10 @@ func enter_door(at: Vector2) -> void:
 func kill() -> void:
 	if not alive or frozen:
 		return
+	# Only the host may decide a network death. Clients receive it in the next
+	# authoritative snapshot instead of killing themselves on a divergent frame.
+	if networked and Session.is_client():
+		return
 	alive = false
 	velocity = Vector2.ZERO
 	sprite.visible = false
@@ -510,6 +597,21 @@ func kill() -> void:
 		fx.emit(_fx_at(), 26, Palette.CYAN, 130.0, Vector2.ZERO, TAU, 0.6, 300.0)
 		fx.emit(_fx_at(), 10, Palette.WHITE, 90.0, Vector2.ZERO, TAU, 0.4, 260.0)
 	died.emit()
+
+
+func respawn(at: Vector2) -> void:
+	position = at
+	velocity = Vector2.ZERO
+	alive = true
+	frozen = false
+	has_dash = true
+	_dash = 0.0
+	_pound = 0
+	_recover = 0.0
+	_network_target = at
+	if sprite != null:
+		sprite.visible = true
+		sprite.scale = Vector2.ONE
 
 
 func grab_gem(at: Vector2) -> void:

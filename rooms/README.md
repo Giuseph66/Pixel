@@ -33,16 +33,16 @@ sobrescrever o recorde de uma sala escrita à mão em `levels.gd`.
   "format": "pixel.room",
   "version": 1,
   "room": {
-    "id": "example_tour",
-    "name": "EXEMPLO",
-    "hint": "UMA DICA DE UMA LINHA",
-    "par": 30.0,
-    "intensity": 1.0,
-    "dash": true,
-    "pound": true,
-    "seed": 4242,
-    "author": "SEU NOME",
-    "rows": ["############...", "..."]
+	"id": "example_tour",
+	"name": "EXEMPLO",
+	"hint": "UMA DICA DE UMA LINHA",
+	"par": 30.0,
+	"intensity": 1.0,
+	"dash": true,
+	"pound": true,
+	"seed": 4242,
+	"author": "SEU NOME",
+	"rows": ["############...", "..."]
   }
 }
 ```

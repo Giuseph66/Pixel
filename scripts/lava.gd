@@ -12,7 +12,7 @@ const RISE := 9.0               # px/s, about a tile and a bit per second
 const MAX_SCALE := 2.2
 
 var speed_scale := 1.0
-var player: Player
+var players: Array[Player] = []
 ## Set false once the room is won, so the tide cannot drown a finished run.
 var running := true
 
@@ -39,12 +39,13 @@ func _physics_process(delta: float) -> void:
 	_surface -= RISE * minf(speed_scale, MAX_SCALE) * delta
 	queue_redraw()
 
-	if player == null or not player.alive or player.frozen:
-		return
-	# Lava and player share the Level's local space. Comparing this against the
-	# player's global position counted the HUD offset as lava overlap.
-	if player.position.y + Player.HEIGHT * 0.5 >= _surface:
-		player.kill()
+	for player: Player in players:
+		if not is_instance_valid(player) or not player.alive or player.frozen:
+			continue
+		# Lava and player share the Level's local space. Comparing this against
+		# global position counted the HUD offset as lava overlap.
+		if player.position.y + Player.HEIGHT * 0.5 >= _surface:
+			player.kill()
 
 
 func stop() -> void:

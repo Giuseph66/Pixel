@@ -44,9 +44,13 @@ var _background: Sprite2D
 var _entities: Node2D
 var _bodies: Node2D
 var _player: Player
+var _players: Dictionary = {}
 var _door: ExitDoor
 var _lava: Lava
 var _spawn := Vector2.ZERO
+var _snapshot_time := 0.0
+var _door_arrivals: Dictionary = {}
+var competitive := false
 
 
 func setup(level_index: int, level_data: Dictionary) -> void:
@@ -81,6 +85,10 @@ func _ready() -> void:
 	add_child(fx)
 
 	_spawn_entities()
+	if Session.is_active():
+		Session.snapshot_received.connect(_on_network_snapshot)
+		Session.world_event_received.connect(_on_network_world_event)
+		Session.roster_changed.connect(_on_roster_changed)
 	running = true
 
 
@@ -96,6 +104,36 @@ func _process(delta: float) -> void:
 		)
 	elif position != _base_position:
 		position = _base_position
+
+
+func _physics_process(delta: float) -> void:
+	if not Session.is_active() or not Session.is_host() or not running:
+		return
+	_snapshot_time += delta
+	if _snapshot_time < 0.05:
+		return
+	_snapshot_time = 0.0
+	var players: Array = []
+	for player: Player in _players.values():
+		players.append(player.network_snapshot())
+	var entities: Array = []
+	for child: Node2D in _entities.get_children():
+		if child is Player:
+			continue
+		entities.append({
+			"node": str(child.name),
+			"x": child.position.x,
+			"y": child.position.y,
+			"visible": child.visible,
+		})
+	Session.publish_snapshot({
+		"time": time,
+		"gems_taken": gems_taken,
+		"gems_total": gems_total,
+		"deaths": deaths,
+		"players": players,
+		"entities": entities,
+	})
 
 
 func shake(amount: float = 3.0) -> void:
@@ -264,15 +302,17 @@ func _spawn_entities() -> void:
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
 			var ch := tile_at(tx, ty)
-			match ch:
-				"o":
-					var gem := Gem.new()
-					gem.position = tile_center(tx, ty)
+		match ch:
+			"o":
+				var gem := Gem.new()
+				gem.name = "gem_%d_%d" % [tx, ty]
+				gem.position = tile_center(tx, ty)
 					gem.collected.connect(_on_gem_collected)
 					_entities.add_child(gem)
 					gems_total += 1
-				"O":
-					var gem := Gem.new()
+			"O":
+				var gem := Gem.new()
+				gem.name = "secret_%d_%d" % [tx, ty]
 					gem.secret = true
 					gem.position = tile_center(tx, ty)
 					gem.collected.connect(_on_gem_collected)
@@ -359,6 +399,7 @@ func _spawn_entities() -> void:
 					_entities.add_child(retract)
 				"X":
 					_door = ExitDoor.new()
+					_door.name = "door_%d_%d" % [tx, ty]
 					# 'X' marks the bottom tile of a two-tile-tall frame.
 					_door.position = tile_center(tx, ty) + Vector2(TILE * 0.5, -TILE * 0.5)
 					_door.entered.connect(_on_door_entered)
@@ -371,7 +412,7 @@ func _spawn_entities() -> void:
 
 	_spawn_conveyors()
 	_spawn_platforms()
-	_spawn_player()
+	_spawn_players()
 	_discover_contents()
 
 
@@ -385,17 +426,19 @@ func _discover_contents() -> void:
 			if not id.is_empty():
 				Save.discover(id)
 
-	# Slimes watch the player themselves, so they need the reference the moment
-	# it exists — which is only after the whole grid has been walked.
+	# Enemies receive all current players. Offline has one player, preserving the
+	# old path; a network host can resolve contact for every peer.
 	for child in _entities.get_children():
 		if child is Slime:
-			(child as Slime).player = _player
+			(child as Slime).players = get_players()
 		elif child is ElasticSlime:
-			(child as ElasticSlime).player = _player
+			(child as ElasticSlime).players = get_players()
 		elif child is ShieldEnemy:
-			(child as ShieldEnemy).player = _player
+			(child as ShieldEnemy).players = get_players()
 	if _lava != null:
-		_lava.player = _player
+		_lava.players = get_players()
+	if Session.is_client():
+		_observe_host_world()
 
 	_update_door_charge()
 
@@ -444,25 +487,64 @@ func _spawn_platforms() -> void:
 			tx += run
 
 
-func _spawn_player() -> void:
-	_player = Player.new()
-	_player.position = _spawn
-	_player.fx = fx
-	_player.dash_unlocked = dash_unlocked
-	_player.pound_unlocked = pound_unlocked
-	_player.surface_at = Callable(self, "tile_at")
-	_player.died.connect(_on_player_died)
-	_player.pounded.connect(_on_player_pounded)
-	_entities.add_child(_player)
+func _spawn_players() -> void:
+	_players = {}
+	var peer_ids: Array = [1]
+	if Session.is_active():
+		peer_ids = Session.participants.keys()
+		peer_ids.sort()
+	for peer_id: int in peer_ids:
+		_spawn_player(peer_id)
+
+
+func _spawn_player(peer_id: int) -> void:
+	var player := Player.new()
+	player.name = "Player_%d" % peer_id
+	player.peer_id = peer_id
+	player.networked = Session.is_active()
+	player.locally_controlled = peer_id == Session.local_peer_id()
+	if player.networked and Session.is_host() and peer_id != 1:
+		player.input_provider = Session.input_for.bind(peer_id)
+	player.position = _spawn + Vector2(float((_players.size() % 3) * 3), 0.0)
+	player.fx = fx
+	player.dash_unlocked = dash_unlocked
+	player.pound_unlocked = pound_unlocked
+	player.surface_at = Callable(self, "tile_at")
+	player.died.connect(_on_player_died.bind(player))
+	player.pounded.connect(_on_player_pounded)
+	_entities.add_child(player)
+	_players[peer_id] = player
+	if peer_id == Session.local_peer_id() or _player == null:
+		_player = player
 
 
 func get_player() -> Player:
 	return _player
 
 
+func get_players() -> Array[Player]:
+	var out: Array[Player] = []
+	for player: Player in _players.values():
+		out.append(player)
+	return out
+
+
 # --------------------------------------------------------------- events ---
 
 func _on_gem_collected(gem: Gem) -> void:
+	if Session.is_active() and not Session.is_host():
+		return
+	_collect_gem(gem)
+	if Session.is_active():
+		Session.publish_world_event("GEM_TAKEN", {
+			"node": str(gem.name),
+			"secret": gem.secret,
+		})
+
+
+func _collect_gem(gem: Gem) -> void:
+	if not is_instance_valid(gem) or gem.is_queued_for_deletion():
+		return
 	var at := fx.to_local(gem.global_position)
 	if gem.secret:
 		# Deliberately outside gems_total: the door fills from the gems the
@@ -487,6 +569,8 @@ func _on_gem_collected(gem: Gem) -> void:
 ## standing right there is squashed. The player does not know what is nearby,
 ## so the level answers for it.
 func _on_player_pounded(at: Vector2) -> void:
+	if Session.is_active() and not Session.is_host():
+		return
 	shake(5.0)
 	fx.emit(fx.to_local(at), 16, Palette.CYAN, 110.0, Vector2.UP, PI, 0.4, 220.0)
 
@@ -530,13 +614,30 @@ func _update_door_charge() -> void:
 	_door.charge = 1.0 if gems_total == 0 else float(gems_taken) / float(gems_total)
 
 
-func _on_door_entered() -> void:
+func _on_door_entered(player: Player) -> void:
+	if finished:
+		return
+	if Session.is_active() and not Session.is_host():
+		return
+	if Session.is_active():
+		_door_arrivals[player.peer_id] = true
+		if not competitive and _door_arrivals.size() < Session.participants.size():
+			return
+	else:
+		_door_arrivals[player.peer_id] = true
+	_finish_room()
+	if Session.is_active():
+		Session.publish_world_event("ROOM_COMPLETED", {})
+
+
+func _finish_room() -> void:
 	if finished:
 		return
 	finished = true
 	running = false
-	if _player != null:
-		_player.enter_door(_door.global_position)
+	for player: Player in _players.values():
+		if competitive or _door_arrivals.has(player.peer_id):
+			player.enter_door(_door.global_position)
 	if _lava != null:
 		_lava.stop()
 	Audio.play("door")
@@ -544,22 +645,100 @@ func _on_door_entered() -> void:
 	completed.emit(time, gems_taken, gems_total)
 
 
-func _on_player_died() -> void:
+func _on_player_died(player: Player) -> void:
 	if finished:
 		return
 	deaths += 1
-	Save.add_death()
+	_door_arrivals.erase(player.peer_id)
+	if _door != null:
+		_door.reset_player(player.peer_id)
+	if not Session.is_active() or Session.is_host():
+		Save.add_death()
 	shake(4.0)
 	player_died.emit()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
 	if is_inside_tree() and not finished:
-		restart()
+		if Session.is_active():
+			player.respawn(_spawn)
+		else:
+			restart()
+
+
+func _on_network_snapshot(snapshot: Dictionary) -> void:
+	if not Session.is_client() or finished:
+		return
+	time = float(snapshot.get("time", time))
+	gems_taken = int(snapshot.get("gems_taken", gems_taken))
+	gems_total = int(snapshot.get("gems_total", gems_total))
+	deaths = int(snapshot.get("deaths", deaths))
+	for player_state: Dictionary in snapshot.get("players", []):
+		var peer_id := int(player_state.get("peer_id", -1))
+		var player: Player = _players.get(peer_id)
+		if player != null:
+			player.apply_network_snapshot(player_state)
+	_apply_entity_snapshot(snapshot.get("entities", []))
+	_update_door_charge()
+
+
+func _observe_host_world() -> void:
+	# Clients only render enemy decisions. Their collision/AI must never mutate
+	# local gameplay before the host confirms the next snapshot.
+	for child in _entities.get_children():
+		if child is Slime or child is ElasticSlime or child is ShieldEnemy \
+				or child is Bat or child is Saw or child is Crumble:
+			child.set_physics_process(false)
+
+
+func _apply_entity_snapshot(states: Array) -> void:
+	var live: Dictionary = {}
+	for state: Dictionary in states:
+		var node_name := str(state.get("node", ""))
+		live[node_name] = true
+		for child: Node2D in _entities.get_children():
+			if str(child.name) != node_name:
+				continue
+			child.position = Vector2(float(state.get("x", child.position.x)),
+				float(state.get("y", child.position.y)))
+			child.visible = bool(state.get("visible", child.visible))
+			child.process_mode = Node.PROCESS_MODE_INHERIT
+			break
+	for child: Node2D in _entities.get_children():
+		if not (child is Player) and not live.has(str(child.name)):
+			child.visible = false
+			child.process_mode = Node.PROCESS_MODE_DISABLED
+
+
+func _on_network_world_event(event: Dictionary) -> void:
+	if not Session.is_client() or finished:
+		return
+	var payload: Dictionary = event.get("payload", {})
+	match str(event.get("kind", "")):
+		"GEM_TAKEN":
+			var node := _entities.get_node_or_null(NodePath(str(payload.get("node", ""))))
+			if node is Gem:
+				_collect_gem(node as Gem)
+		"ROOM_COMPLETED":
+			_finish_room()
+
+
+func _on_roster_changed(roster: Dictionary) -> void:
+	if not Session.is_active():
+		return
+	for peer_id: int in _players.keys():
+		if roster.has(peer_id):
+			continue
+		var player: Player = _players[peer_id]
+		player.queue_free()
+		_players.erase(peer_id)
+		_door_arrivals.erase(peer_id)
 
 
 ## Rebuild everything that can be interacted with. Terrain and collision are
 ## untouched — they never change.
 func restart() -> void:
 	finished = false
+	_door_arrivals = {}
+	_snapshot_time = 0.0
 	for child in _entities.get_children():
 		# Detach first so a dying gem or slime cannot fire one last signal.
 		_entities.remove_child(child)

@@ -21,14 +21,14 @@ const SQUASH := 0.16
 
 var direction := -1
 var speed_scale := 1.0
-var player: Player
+var players: Array[Player] = []
 var is_wall: Callable
 var is_ground: Callable
 
 var _sprite: Sprite2D
 var _time := 0.0
 var _squash := 0.0
-var _approached_from_above := true
+var _approached_from_above: Dictionary = {}
 
 
 func _ready() -> void:
@@ -54,11 +54,16 @@ func _physics_process(delta: float) -> void:
 	else:
 		position.x += direction * SPEED * speed_scale * delta
 
-	_check_player()
+	_check_players()
 
 
-func _check_player() -> void:
-	if player == null or not player.alive or player.frozen:
+func _check_players() -> void:
+	for player: Player in players:
+		_check_player(player)
+
+
+func _check_player(player: Player) -> void:
+	if not is_instance_valid(player) or not player.alive or player.frozen:
 		return
 
 	var delta_pos := player.global_position - global_position
@@ -67,10 +72,10 @@ func _check_player() -> void:
 
 	if not touching:
 		var feet := player.global_position.y + Player.HEIGHT * 0.5
-		_approached_from_above = feet <= global_position.y - TOP_OFFSET
+		_approached_from_above[player.peer_id] = feet <= global_position.y - TOP_OFFSET
 		return
 
-	if _approached_from_above:
+	if bool(_approached_from_above.get(player.peer_id, true)):
 		# spring_bounce rather than stomp: no chain, and it lives. The chain is
 		# the reward for a row of kills, and nothing died here.
 		player.spring_bounce()

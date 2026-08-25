@@ -20,6 +20,7 @@ func _ready() -> void:
 	# the book icon top-right, not a row buried in a list of six other things.
 	items = [
 		{"id": "play", "label": ""},
+		{"id": "multiplayer", "label": "MULTIPLAYER"},
 		{"id": "levels", "label": ""},
 		{"id": "saves", "label": ""},
 		{"id": "options", "label": ""},
@@ -35,7 +36,8 @@ func _ready() -> void:
 func refresh_labels() -> void:
 	footer = Lang.t("title.footer")
 	for item: Dictionary in items:
-		item["label"] = Lang.t("title." + str(item["id"]))
+		if str(item["id"]) != "multiplayer":
+			item["label"] = Lang.t("title." + str(item["id"]))
 
 	var cleared := Save.cleared_count()
 	_stats = ""
