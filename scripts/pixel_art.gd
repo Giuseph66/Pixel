@@ -391,24 +391,50 @@ const GRIDS := {
 		"#CCCCCC#",
 		"########",
 	],
-	"belt_a": [
-		"########",
-		"#222222#",
-		"#C22C22#",
-		"#2C22C2#",
-		"#C22C22#",
-		"#222222#",
-		"#222222#",
+	# Four phases of one belt tile, each a pixel further along than the last.
+	# The chevrons have a period of four pixels, so the fourth frame lands
+	# exactly back on the first and the run scrolls without a seam. Rows are
+	# lit plate, five rows of chevron, roller studs, base outline — and no side
+	# edges, because a belt is drawn as one strip and any vertical line would
+	# show up as a false joint every eight pixels.
+	"belt_0": [
+		"11111111",
+		"c222c222",
+		"2c222c22",
+		"22c222c2",
+		"2c222c22",
+		"c222c222",
+		"2fff2fff",
 		"########",
 	],
-	"belt_b": [
+	"belt_1": [
+		"11111111",
+		"2c222c22",
+		"22c222c2",
+		"222c222c",
+		"22c222c2",
+		"2c222c22",
+		"f2fff2ff",
 		"########",
-		"#222222#",
-		"#22C22C#",
-		"#C22C22#",
-		"#22C22C#",
-		"#222222#",
-		"#222222#",
+	],
+	"belt_2": [
+		"11111111",
+		"22c222c2",
+		"222c222c",
+		"c222c222",
+		"222c222c",
+		"22c222c2",
+		"ff2fff2f",
+		"########",
+	],
+	"belt_3": [
+		"11111111",
+		"222c222c",
+		"c222c222",
+		"2c222c22",
+		"c222c222",
+		"222c222c",
+		"fff2fff2",
 		"########",
 	],
 	# Risen: the same silhouette as a fixed spike, so the danger reads the same.
@@ -433,10 +459,47 @@ const GRIDS := {
 		"#112222#",
 		"#MMMMMM#",
 	],
+	# A blade that fills more than one tile is built from three pieces: the
+	# point on top, shaft in the middle, and the base plate at the bottom.
+	# 'spike_up' stays the whole thing at once, for the one-tile case and the
+	# codex entry.
+	"spike_tip": [
+		"...##...",
+		"..#w1#..",
+		"..#11#..",
+		".#1112#.",
+		".#1112#.",
+		".#1122#.",
+		".#1122#.",
+		".#1122#.",
+	],
+	"spike_shaft": [
+		".#1122#.",
+		".#w122#.",
+		".#1122#.",
+		".#1122#.",
+		".#1122#.",
+		".#w122#.",
+		".#1122#.",
+		".#1122#.",
+	],
+	"spike_base": [
+		".#1122#.",
+		".#1122#.",
+		".#w122#.",
+		".#1122#.",
+		".#1122#.",
+		".#1122#.",
+		"#112222#",
+		"#MMMMMM#",
+	],
 	# --- shielded and elastic enemies ---
+	# Same trick as the slime's walk: frame b drops one body row and shifts
+	# everything down into it, so the whole plate squashes on the beat instead
+	# of just the eyes flickering. Feet stay pinned to the bottom row in both.
 	"shield_a": [
+		"........",
 		"..####..",
-		".#1111#.",
 		"#w1111w#",
 		".#gggg#.",
 		"#gwggwg#",
@@ -445,14 +508,14 @@ const GRIDS := {
 		".######.",
 	],
 	"shield_b": [
+		"........",
+		"........",
 		"..####..",
-		".#1111#.",
 		"#w1111w#",
-		".#gggg#.",
 		"#ggwwgg#",
 		"#g#gg#g#",
 		"#GGGGGG#",
-		"..####..",
+		".######.",
 	],
 	"elastic_a": [
 		"........",
@@ -641,21 +704,35 @@ static func paint_platform(img: Image, tx: int, ty: int) -> void:
 		img.set_pixel(ox + x, oy + 2, Palette.OUTLINE)
 
 
-## Ice tile: similar to normal terrain but with a lighter palette to show slipperiness.
-## Edges show WHITE for the lit rim, body is CYAN_MID, with two fixed bright pixels.
+## Ice tile: flat frozen body with a hard frost crust on any face you can land
+## on. Built the same way ordinary terrain is — a solid fill plus a couple of
+## hash-placed marks — so it sits in the same art, and the cyan plus the bright
+## top are what tell you it is slippery before you step on it.
 static func paint_ice(img: Image, tx: int, ty: int, up: bool, down: bool,
 		left: bool, right: bool) -> void:
 	var ox := tx * TILE
 	var oy := ty * TILE
 
-	# Fill with lighter color (ice is brighter)
 	for y in TILE:
 		for x in TILE:
-			img.set_pixel(ox + x, oy + y, Palette.CYAN_MID)
+			img.set_pixel(ox + x, oy + y, Palette.CYAN_DARK)
 
-	# Two fixed bright pixels per tile (no randomness so it doesn't shimmer)
-	img.set_pixel(ox + 2, oy + 2, Palette.WHITE)
-	img.set_pixel(ox + 6, oy + 5, Palette.WHITE)
+	# Deterministic marks, same trick as paint_tile: texture that never
+	# shimmers between frames because it is derived from the tile position.
+	var h := absi((tx * 374761393) ^ (ty * 668265263))
+	img.set_pixel(ox + 1 + h % 5, oy + 2 + (h / 7) % 4, Palette.CYAN_MID)
+	img.set_pixel(ox + 2 + (h / 13) % 4, oy + 3 + (h / 31) % 4, Palette.CYAN_MID)
+
+	# Every third tile or so catches a glint: a small cross, bright in the
+	# middle. Sparse on purpose — a sparkle on every tile reads as noise.
+	if h % 3 == 0:
+		var cx := 2 + (h / 61) % 4
+		var cy := 3 + (h / 97) % 3
+		img.set_pixel(ox + cx, oy + cy, Palette.WHITE)
+		img.set_pixel(ox + cx - 1, oy + cy, Palette.CYAN_MID)
+		img.set_pixel(ox + cx + 1, oy + cy, Palette.CYAN_MID)
+		img.set_pixel(ox + cx, oy + cy - 1, Palette.CYAN_MID)
+		img.set_pixel(ox + cx, oy + cy + 1, Palette.CYAN_MID)
 
 	if not left:
 		for y in TILE:
@@ -667,10 +744,11 @@ static func paint_ice(img: Image, tx: int, ty: int, up: bool, down: bool,
 		for x in TILE:
 			img.set_pixel(ox + x, oy + TILE - 1, Palette.OUTLINE)
 	if not up:
-		# Bright rim on top of ice
+		# Frost crust: a hard white lip over a cyan band, brighter than the
+		# lit rim on plain terrain so the two never get confused mid-run.
 		for x in TILE:
 			img.set_pixel(ox + x, oy, Palette.WHITE)
-			img.set_pixel(ox + x, oy + 1, Palette.CYAN_MID)
+			img.set_pixel(ox + x, oy + 1, Palette.CYAN)
 		if not left:
 			img.set_pixel(ox, oy, Palette.OUTLINE)
 		if not right:

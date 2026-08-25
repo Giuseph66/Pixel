@@ -158,7 +158,7 @@ func _physics_process(delta: float) -> void:
 		refill_dash()
 		if not _was_on_floor:
 			_on_land()
-	elif _wall_dir != 0:
+	elif _wall_dir != 0 and wall_tile() != "~":
 		refill_dash()
 	_was_on_floor = is_on_floor()
 
@@ -394,7 +394,7 @@ func _update_sprite(input: float) -> void:
 			key = "player_jump"
 		elif velocity.y > 40.0:
 			key = "player_fall"
-	elif absf(velocity.x) > 12.0:
+	elif absf(input) > 0.01 and absf(velocity.x) > 12.0:
 		key = "player_run_a" if fmod(_anim * 9.0, 2.0) < 1.0 else "player_run_b"
 
 	if _dash > 0.0:
@@ -460,8 +460,20 @@ var gravity_scale := 1.0
 func ground_tile() -> String:
 	if not surface_at.is_valid() or not is_on_floor():
 		return "."
-	var tx := floori(global_position.x / TILE)
-	var ty := floori((global_position.y + HEIGHT * 0.5 + 2.0) / TILE)
+	# surface_at reads Level's local grid. The level sits below the HUD, so
+	# global_position samples roughly two rows too low and misses ~, > and <.
+	var tx := floori(position.x / TILE)
+	var ty := floori((position.y + HEIGHT * 0.5 + 2.0) / TILE)
+	return surface_at.call(tx, ty)
+
+
+## The tile at the side currently being clung to. Ice is climbable but cannot
+## restore a dash, so an ice wall stays a route constraint rather than a refill.
+func wall_tile() -> String:
+	if not surface_at.is_valid() or _wall_dir == 0:
+		return "."
+	var tx := floori((position.x + float(_wall_dir) * (WIDTH * 0.5 + 2.0)) / TILE)
+	var ty := floori(position.y / TILE)
 	return surface_at.call(tx, ty)
 
 

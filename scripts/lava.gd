@@ -41,7 +41,9 @@ func _physics_process(delta: float) -> void:
 
 	if player == null or not player.alive or player.frozen:
 		return
-	if player.global_position.y + Player.HEIGHT * 0.5 >= _surface:
+	# Lava and player share the Level's local space. Comparing this against the
+	# player's global position counted the HUD offset as lava overlap.
+	if player.position.y + Player.HEIGHT * 0.5 >= _surface:
 		player.kill()
 
 
@@ -56,8 +58,21 @@ func _draw() -> void:
 		return
 
 	draw_rect(Rect2(0.0, _surface, w, bottom - _surface), Palette.MAGENTA_DARK)
-	# Two bright lines on the crest, alternating: at a distance the movement is
-	# the only thing that reads, and a flat slab of colour does not move.
-	draw_rect(Rect2(0.0, _surface, w, 1.0), Palette.GOLD)
-	if fmod(_time, 0.25) < 0.125:
-		draw_rect(Rect2(0.0, _surface + 1.0, w, 1.0), Palette.WHITE)
+
+	# A travelling pixel crest makes the liquid read as hot and alive instead of
+	# a flat red rectangle. All marks stay on the eight-pixel grid of the room.
+	var phase := floori(_time * 10.0)
+	for x in range(0, int(w), 4):
+		var tile := x / 4
+		var lift := -1.0 if posmod(tile + phase, 5) == 0 else 0.0
+		draw_rect(Rect2(float(x), _surface + lift, 4.0, 2.0), Palette.MAGENTA)
+		if posmod(tile + phase * 2, 7) == 0:
+			draw_rect(Rect2(float(x + 1), _surface + lift, 2.0, 1.0), Palette.GOLD)
+
+	# Small bright bubbles drift toward the crest, then reappear deeper below.
+	for i in range(10):
+		var bubble_y := _surface + 4.0 + float(posmod(i * 11 - phase, 18))
+		var bubble_x := float(posmod(i * 47 + phase * 3, int(w)))
+		draw_rect(Rect2(bubble_x, bubble_y, 1.0, 1.0), Palette.MAGENTA)
+		if posmod(i + phase, 4) == 0:
+			draw_rect(Rect2(bubble_x + 1.0, bubble_y + 1.0, 1.0, 1.0), Palette.GOLD)

@@ -437,12 +437,17 @@ static func _level_21() -> PackedStringArray:
 	return bake(g)
 
 
-## Slippery ground from start to finish. No obstacles, only inertia.
+## A long sheet with pillars planted in it. Running into one costs nothing but
+## the hop over it, and that crash is the first time the ice says what it is.
+## Getting the gem on top is the second time: the pillar top is ordinary stone,
+## so you stop dead up there and start sliding again the moment you step off.
 static func _level_ice_first() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 10, 27, 40, 1, "~")          # ice surface, only top line
-	puts(g, [Vector2i(18, 26), Vector2i(30, 26), Vector2i(42, 26)], "o")
+	rect(g, 8, 27, 44, 1, "~")
+	for x in [20, 32, 44]:
+		rect(g, x, 23, 2, 4, "#")
+	puts(g, [Vector2i(20, 22), Vector2i(32, 22), Vector2i(44, 22)], "o")
 	put(g, 54, 20, "O")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
@@ -459,44 +464,80 @@ static func _level_ice_edge() -> PackedStringArray:
 		rect(g, x, 27, 10, 1, "~")
 		rect(g, x + 10, 27, 4, 3, ".")
 		rect(g, x + 10, 30, 4, 1, "^")
+	# The last plate has a blade on it. Its pen is the plate: the saw turns at
+	# both edges, so the question is arriving on ice you cannot brake on with
+	# somewhere left to stand.
+	put(g, 45, 26, "W")
 	puts(g, [Vector2i(14, 26), Vector2i(28, 26), Vector2i(42, 26)], "o")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
 	return bake(g)
 
 
-## Ice corridor ending in a tall wall — the wall is your brake.
+## Ice parkour crosses a spike trench, climbs the ice wall at the right, then
+## returns through the high platforms to the upper-left exit.
 static func _level_ice_wall() -> PackedStringArray:
 	var g := blank()
-	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 6, 15, 48, 1, "#")          # wall in the middle
-	rect(g, 8, 27, 44, 1, "~")          # ice below
-	puts(g, [Vector2i(24, 26), Vector2i(36, 26)], "o")
-	put(g, 4, 26, "P")
-	put(g, 48, 14, "X")
+	# Every terrain wall in this room is ice.
+	rect(g, 0, 27, 4, 5, "~")
+	rect(g, 54, 27, 6, 5, "~")
+	rect(g, 4, 30, 20, 1, "^")
+	rect(g, 26, 30, 28, 1, "^")
+
+	# Low route to the ice wall on the right.
+	rect(g, 10, 25, 2, 1, "~")
+	rect(g, 17, 23, 2, 1, "~")
+	rect(g, 23, 21, 2, 1, "~")
+	rect(g, 28, 19, 2, 1, "~")
+	rect(g, 38, 22, 2, 1, "~")
+	rect(g, 44, 20, 2, 1, "~")
+	rect(g, 48, 24, 2, 1, "~")
+	rect(g, 52, 23, 2, 1, "~")
+	rect(g, 56, 8, 4, 1, "~")
+	rect(g, 58, 9, 2, 7, "~")
+
+	# Return path after the wall, ending at the high-left portal.
+	rect(g, 49, 10, 2, 1, "~")
+	rect(g, 41, 10, 2, 1, "~")
+	rect(g, 33, 9, 2, 1, "~")
+	rect(g, 25, 9, 2, 1, "~")
+	rect(g, 17, 10, 2, 1, "~")
+	rect(g, 9, 10, 2, 1, "~")
+	rect(g, 2, 5, 6, 1, "~")
+	puts(g, [Vector2i(10, 9), Vector2i(26, 8), Vector2i(49, 23)], "o")
+	put(g, 2, 26, "P")
+	put(g, 5, 4, "X")
 	return bake(g)
 
 
-## Ice with walking slimes — the slimes move on ice too.
+## Three ice plates, with a slime before every commitment. Stomping clears one
+## threat, but the remaining momentum still has to clear the next spike pit.
 static func _level_ice_slime() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 10, 27, 40, 1, "~")
-	rect(g, 24, 25, 12, 1, "-")         # escape platform
-	puts(g, [Vector2i(18, 26), Vector2i(40, 26)], "o")
-	puts(g, [Vector2i(14, 26), Vector2i(26, 26), Vector2i(44, 26)], "S")
+	for plate in [Vector2i(8, 10), Vector2i(24, 10), Vector2i(40, 12)]:
+		rect(g, plate.x, 27, plate.y, 1, "~")
+	for pit in [Vector2i(18, 6), Vector2i(34, 6)]:
+		rect(g, pit.x, 27, pit.y, 3, ".")
+		rect(g, pit.x, 30, pit.y, 1, "^")
+	puts(g, [Vector2i(12, 26), Vector2i(28, 26), Vector2i(48, 26)], "o")
+	puts(g, [Vector2i(15, 26), Vector2i(31, 26), Vector2i(45, 26)], "S")
 	put(g, 4, 26, "P")
-	put(g, 54, 24, "X")
+	put(g, 54, 26, "X")
 	return bake(g)
 
 
-## Belt moves: three sections of moving ground alternating with calm.
+## The player is standing on the belt before they have touched a key. The floor
+## carries them, and the lesson lands in two seconds without a word of hint.
+## Short belts with long stretches of ordinary floor between them was the
+## earlier shape of this room, and it read as nothing happening at all.
 static func _level_belt_first() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	for x in [10, 26, 42]:
-		rect(g, x, 27, 6, 1, ">")
-	puts(g, [Vector2i(13, 26), Vector2i(29, 26), Vector2i(45, 26)], "o")
+	rect(g, 3, 27, 22, 1, ">")
+	rect(g, 30, 27, 22, 1, ">")
+	puts(g, [Vector2i(12, 26), Vector2i(27, 26), Vector2i(44, 26)], "o")
+	put(g, 8, 20, "O")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
 	return bake(g)
@@ -507,6 +548,9 @@ static func _level_belt_against() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
 	rect(g, 10, 27, 40, 1, "<")
+	# A blade on the belt. Jumping over it also costs you the push, which is
+	# the trade the whole room is about.
+	put(g, 40, 26, "W")
 	puts(g, [Vector2i(30, 26)], "o")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
@@ -521,6 +565,9 @@ static func _level_belt_launch() -> PackedStringArray:
 	rect(g, 24, 27, 6, 3, ".")           # the pit
 	rect(g, 24, 30, 6, 1, "^")
 	rect(g, 34, 27, 8, 1, ">")
+	# A bat over the pit, exactly where the belt throws you. Stomp it and the
+	# bounce finishes the crossing; miss and the belt has already committed you.
+	put(g, 26, 23, "B")
 	puts(g, [Vector2i(20, 24), Vector2i(40, 26)], "o")
 	put(g, 8, 20, "O")
 	put(g, 4, 26, "P")
@@ -528,19 +575,20 @@ static func _level_belt_launch() -> PackedStringArray:
 	return bake(g)
 
 
-## Belts crossing: alternating directions with slimes on top.
+## Belts against belts. Each stretch is eight tiles, which is long enough to
+## commit to before the next one argues with you; the four-tile version of this
+## room cancelled itself out before the player could feel either direction.
 static func _level_belt_mix() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	for x in [10, 18, 26, 34, 42]:
-		if (x / 8) % 2 == 0:
-			rect(g, x, 27, 4, 1, ">")
-		else:
-			rect(g, x, 27, 4, 1, "<")
-	puts(g, [Vector2i(16, 26), Vector2i(32, 26), Vector2i(48, 26)], "o")
+	var pushing_right := true
+	for x in [6, 14, 22, 30, 38, 46]:
+		rect(g, x, 27, 8, 1, ">" if pushing_right else "<")
+		pushing_right = not pushing_right
+	puts(g, [Vector2i(18, 26), Vector2i(34, 26), Vector2i(50, 26)], "o")
 	puts(g, [Vector2i(12, 26), Vector2i(28, 26)], "S")
 	put(g, 4, 26, "P")
-	put(g, 54, 26, "X")
+	put(g, 56, 26, "X")
 	return bake(g)
 
 
@@ -572,16 +620,27 @@ static func _level_retract_run() -> PackedStringArray:
 	return bake(g)
 
 
-## Timed block and spike: they dance together.
+## Timed block and spike: they dance together. The door sits on a shelf that
+## only the blocks reach, and 't' is solid exactly while 'T' is not — so the
+## climb is one jump per beat, taken on the blink. Miss it and you land in the
+## spike field, which keeps its own clock. Reading both is the whole room.
 static func _level_retract_drop() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 24, 20, 12, 1, "t")
-	for x in [26, 30, 34]:
-		put(g, x, 27, "z")
-	puts(g, [Vector2i(28, 26), Vector2i(32, 26)], "o")
+	# The climb. Every step hands you to the next one as it goes.
+	rect(g, 18, 24, 2, 1, "t")
+	rect(g, 24, 22, 2, 1, "T")
+	rect(g, 30, 20, 2, 1, "t")
+	rect(g, 36, 20, 2, 1, "T")
+	# The shelf, solid: once you are up, you are up.
+	rect(g, 42, 20, 8, 1, "#")
+	# What a missed beat costs. Kept out of the block columns, so a risen blade
+	# never grows into the platform someone is about to land on.
+	for x in [21, 27, 33, 39]:
+		put(g, x, 26, "z")
+	puts(g, [Vector2i(24, 21), Vector2i(36, 19)], "o")
 	put(g, 4, 26, "P")
-	put(g, 54, 26, "X")
+	put(g, 48, 19, "X")
 	return bake(g)
 
 
@@ -624,6 +683,9 @@ static func _level_orbit_gems() -> PackedStringArray:
 	rect(g, 28, 24, 4, 1, "#")
 	rect(g, 20, 25, 2, 1, "r")
 	rect(g, 38, 25, 2, 1, "r")
+	# It patrols the island between the two orbits — the one place you were
+	# counting on standing still.
+	put(g, 29, 21, "B")
 	puts(g, [Vector2i(20, 20), Vector2i(29, 22), Vector2i(38, 20)], "o")
 	put(g, 4, 26, "P")
 	put(g, 52, 26, "X")
@@ -653,10 +715,13 @@ static func _level_elastic_first() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
 	put(g, 22, 26, "e")
-	rect(g, 34, 19, 12, 2, "#")
-	puts(g, [Vector2i(14, 26), Vector2i(28, 26), Vector2i(38, 18)], "o")
+	# 96px above the floor: past what a jump plus a dash can reach on their own
+	# (roughly 80px, timed as tight as the engine allows), short of what the
+	# slime's bounce gives (~112px) — so the door is reachable, but only off it.
+	rect(g, 34, 15, 12, 2, "#")
+	puts(g, [Vector2i(14, 26), Vector2i(28, 26), Vector2i(38, 14)], "o")
 	put(g, 4, 26, "P")
-	put(g, 42, 18, "X")
+	put(g, 42, 14, "X")
 	return bake(g)
 
 
@@ -668,10 +733,12 @@ static func _level_elastic_timing() -> PackedStringArray:
 	rect(g, 14, 22, 2, 5, "#")
 	rect(g, 40, 22, 2, 5, "#")
 	put(g, 24, 26, "e")
-	rect(g, 30, 18, 12, 2, "#")
-	puts(g, [Vector2i(8, 26), Vector2i(20, 26), Vector2i(34, 17)], "o")
+	# Same 96px rule as elastic_first: clear of a jump-plus-dash (~80px), short
+	# of the slime's bounce (~112px).
+	rect(g, 30, 15, 12, 2, "#")
+	puts(g, [Vector2i(8, 26), Vector2i(20, 26), Vector2i(34, 14)], "o")
 	put(g, 4, 26, "P")
-	put(g, 38, 17, "X")
+	put(g, 38, 14, "X")
 	return bake(g)
 
 
@@ -746,7 +813,10 @@ static func _level_shield_drop() -> PackedStringArray:
 	put(g, 30, 26, "E")
 	rect(g, 44, 27, 8, 3, ".")
 	rect(g, 44, 30, 8, 1, "^")
-	puts(g, [Vector2i(24, 20), Vector2i(36, 20), Vector2i(30, 26)], "o")
+	# The third gem sits past the shield, not on top of it. It used to share a
+	# tile with the 'E', and puts() runs last, so the gem quietly deleted the
+	# only shield in the room the level is named after.
+	puts(g, [Vector2i(24, 20), Vector2i(36, 20), Vector2i(42, 26)], "o")
 	put(g, 4, 26, "P")
 	put(g, 55, 26, "X")
 	return bake(g)
@@ -761,6 +831,9 @@ static func _level_shield_pit() -> PackedStringArray:
 	rect(g, 16, 30, 28, 1, "^")
 	rect(g, 20, 24, 20, 1, "#")
 	put(g, 30, 23, "E")
+	# Shield on the bridge, bat over it: one thing you cannot walk into and one
+	# thing you cannot jump over, stacked on the same twenty tiles.
+	put(g, 30, 21, "B")
 	puts(g, [Vector2i(22, 23), Vector2i(38, 23), Vector2i(50, 26)], "o")
 	put(g, 10, 20, "O")
 	put(g, 4, 26, "P")
@@ -782,7 +855,7 @@ static func _level_lava_first() -> PackedStringArray:
 	rect(g, 24, 10, 12, 1, "-")
 	rect(g, 38, 7, 12, 2, "#")
 	puts(g, [Vector2i(14, 24), Vector2i(30, 15), Vector2i(14, 12)], "o")
-	put(g, 4, 28, "P")
+	put(g, 9, 24, "P")
 	put(g, 42, 6, "X")
 	return bake(g)
 
@@ -794,10 +867,14 @@ static func _level_lava_climb() -> PackedStringArray:
 	put(g, 30, 28, "A")
 	rect(g, 22, 6, 1, 22, "#")
 	rect(g, 27, 8, 1, 20, "#")
+	rect(g, 2, 25, 6, 1, "-")
 	rect(g, 8, 7, 15, 1, "#")
 	rect(g, 27, 5, 20, 1, "#")
+	# The last stretch to the door, with the lava still coming up the shaft
+	# behind you. Nowhere on this ledge is a place to wait it out.
+	put(g, 32, 3, "B")
 	puts(g, [Vector2i(24, 22), Vector2i(25, 14), Vector2i(34, 4)], "o")
-	put(g, 4, 28, "P")
+	put(g, 4, 24, "P")
 	put(g, 38, 4, "X")
 	return bake(g)
 
@@ -818,7 +895,7 @@ static func _level_lava_gems() -> PackedStringArray:
 	rect(g, 20, 7, 14, 2, "#")
 	puts(g, [Vector2i(10, 24), Vector2i(38, 21), Vector2i(10, 15)], "o")
 	put(g, 50, 12, "O")
-	put(g, 4, 28, "P")
+	put(g, 8, 24, "P")
 	put(g, 26, 6, "X")
 	return bake(g)
 
@@ -989,18 +1066,18 @@ static func all() -> Array:
 			"rows": _level_ice_edge(),
 		},
 		{
-			"id": "ice_wall",
-			"name": "level.ice_wall.name",
-			"hint": "level.ice_wall.hint",
-			"par": 34.0,
-			"rows": _level_ice_wall(),
-		},
-		{
 			"id": "ice_slime",
 			"name": "level.ice_slime.name",
 			"hint": "level.ice_slime.hint",
-			"par": 40.0,
+			"par": 50.0,
 			"rows": _level_ice_slime(),
+		},
+		{
+			"id": "ice_wall",
+			"name": "level.ice_wall.name",
+			"hint": "level.ice_wall.hint",
+			"par": 46.0,
+			"rows": _level_ice_wall(),
 		},
 		{
 			"id": "belt_first",

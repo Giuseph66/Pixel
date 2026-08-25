@@ -343,9 +343,20 @@ func _spawn_entities() -> void:
 					_entities.add_child(_lava)
 				"z", "Z":
 					var retract := RetractSpike.new()
-					retract.inverted = ch == "Z"
 					retract.speed_scale = intensity
 					retract.position = tile_center(tx, ty)
+					# A blade of one to three tiles, drawn from the room index
+					# and the tile: random across the level, identical on every
+					# attempt at it. Rolling this per rebuild would make a room
+					# you had already learned lie to you on the next death.
+					var air := 0
+					while air <= RetractSpike.MAX_HEIGHT and is_air(tx, ty - 1 - air):
+						air += 1
+					# Grow into open air only, and stop a tile short of any
+					# ceiling, so a risen blade never seals a corridor shut.
+					var cap := maxi(1, mini(air, RetractSpike.MAX_HEIGHT))
+					var tile_hash := absi((index * 8191) ^ (tx * 374761393) ^ (ty * 668265263))
+					retract.setup(ch == "Z", 1 + tile_hash % cap)
 					_entities.add_child(retract)
 				"X":
 					_door = ExitDoor.new()

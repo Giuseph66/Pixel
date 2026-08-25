@@ -269,8 +269,8 @@ const STRINGS := {
 	"level.ice_first.hint": "THE GROUND IS SLIPPERY. PLAN AHEAD",
 	"level.ice_edge.name": "SKATING EDGE",
 	"level.ice_edge.hint": "DRIFT BETWEEN FROZEN PLATES",
-	"level.ice_wall.name": "FROZEN BRAKE",
-	"level.ice_wall.hint": "USE THE WALL TO STOP",
+	"level.ice_wall.name": "ICE PARKOUR",
+	"level.ice_wall.hint": "CLIMB THE ICE. DASH OVER THE WALL",
 	"level.ice_slime.name": "SLIME ON ICE",
 	"level.ice_slime.hint": "THEY SLIDE TOO",
 
@@ -543,8 +543,8 @@ const STRINGS := {
 	"level.ice_first.hint": "O CHAO E ESCORREGADIO. PLANEJE ANTES",
 	"level.ice_edge.name": "BEIRA GELADA",
 	"level.ice_edge.hint": "DESLIZE ENTRE PLACAS CONGELADAS",
-	"level.ice_wall.name": "FREIO CONGELADO",
-	"level.ice_wall.hint": "USE A PAREDE PARA PARAR",
+	"level.ice_wall.name": "PARKOUR GELADO",
+	"level.ice_wall.hint": "SUBA PELO GELO. DASH POR CIMA DA PAREDE",
 	"level.ice_slime.name": "GOSMA NO GELO",
 	"level.ice_slime.hint": "ELAS ESCORREGAM TAMBEM",
 
@@ -817,8 +817,8 @@ const STRINGS := {
 	"level.ice_first.hint": "EL SUELO RESBALA. PLANIFICA ANTES",
 	"level.ice_edge.name": "BORDE HELADO",
 	"level.ice_edge.hint": "DESLIZA ENTRE PLACAS CONGELADAS",
-	"level.ice_wall.name": "FRENO CONGELADO",
-	"level.ice_wall.hint": "USA LA PARED PARA FRENAR",
+	"level.ice_wall.name": "PARKOUR HELADO",
+	"level.ice_wall.hint": "SUBE POR HIELO. DASH SOBRE LA PARED",
 	"level.ice_slime.name": "LIMO EN HIELO",
 	"level.ice_slime.hint": "ELLOS TAMBIEN RESBALAN",
 

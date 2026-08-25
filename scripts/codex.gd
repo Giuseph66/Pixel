@@ -48,7 +48,7 @@ const ENTRIES := [
 	{"id": "breakable", "kind": WORLD, "sprite": "breakable"},
 	{"id": "platform", "kind": WORLD, "sprite": "platform_icon"},
 	{"id": "ice", "kind": WORLD, "sprite": "ice"},
-	{"id": "belt", "kind": WORLD, "sprite": "belt_a"},
+	{"id": "belt", "kind": WORLD, "sprite": "belt_0"},
 	{"id": "retract", "kind": WORLD, "sprite": "spike_up"},
 	{"id": "orbit", "kind": WORLD, "sprite": "platform_icon"},
 	{"id": "lava", "kind": WORLD, "sprite": "spike_up"},
