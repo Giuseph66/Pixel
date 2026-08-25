@@ -195,7 +195,7 @@ func set_ready(ready: bool) -> void:
 		_set_participant_ready(1, ready)
 		return
 	if is_client():
-		request_ready.rpc_id(1, ready)
+		send_ready_state.rpc_id(1, ready)
 
 
 func update_lobby(changes: Dictionary) -> void:
@@ -354,7 +354,7 @@ func sync_config(host_config: Dictionary) -> void:
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_ready(ready: bool) -> void:
+func send_ready_state(ready: bool) -> void:
 	if not is_host() or state != State.LOBBY:
 		return
 	var peer_id := multiplayer.get_remote_sender_id()

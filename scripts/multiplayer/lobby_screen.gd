@@ -64,7 +64,7 @@ func _change(step: int) -> void:
 	var id := str(items[cursor]["id"])
 	if id == "mode":
 		var current := MODES.find(str(Session.config.get("mode", "story")))
-		var next_mode := MODES[wrapi(current + step, 0, MODES.size())]
+		var next_mode: String = MODES[wrapi(current + step, 0, MODES.size())]
 		var changes := {"mode": next_mode}
 		if next_mode == "sandbox" and Session.config.get("room_data", {}).is_empty():
 			var rooms := Sandbox.all()

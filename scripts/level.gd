@@ -302,17 +302,17 @@ func _spawn_entities() -> void:
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
 			var ch := tile_at(tx, ty)
-		match ch:
-			"o":
-				var gem := Gem.new()
-				gem.name = "gem_%d_%d" % [tx, ty]
-				gem.position = tile_center(tx, ty)
+			match ch:
+				"o":
+					var gem := Gem.new()
+					gem.name = "gem_%d_%d" % [tx, ty]
+					gem.position = tile_center(tx, ty)
 					gem.collected.connect(_on_gem_collected)
 					_entities.add_child(gem)
 					gems_total += 1
-			"O":
-				var gem := Gem.new()
-				gem.name = "secret_%d_%d" % [tx, ty]
+				"O":
+					var gem := Gem.new()
+					gem.name = "secret_%d_%d" % [tx, ty]
 					gem.secret = true
 					gem.position = tile_center(tx, ty)
 					gem.collected.connect(_on_gem_collected)
