@@ -18,7 +18,8 @@ extends RefCounted
 
 const STORE := "user://sandbox.json"
 const DROP_DIR := "user://rooms"
-const EXPORT_DIR := "user://export"
+## Where exports go when the system has no downloads folder to put them in.
+const EXPORT_FALLBACK := "user://export"
 const PACK_DIR := "res://rooms"
 const EXT := "pixelroom"
 
@@ -343,28 +344,36 @@ static func decode(code: String) -> String:
 	return raw.get_string_from_utf8()
 
 
-## Write one room next to the save file. Returns the path a human can open, or
-## an empty string if the disk said no.
+## Downloads, because that is where a room somebody sent you already is, and
+## the one folder a person can find without being told a path. Falls back to a
+## folder beside the save file where the system has no downloads directory —
+## the web build, mainly.
+static func export_dir() -> String:
+	var downloads := OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS)
+	if not downloads.is_empty() and DirAccess.dir_exists_absolute(downloads):
+		return downloads
+	DirAccess.make_dir_recursive_absolute(EXPORT_FALLBACK)
+	return EXPORT_FALLBACK
+
+
+## Write one room out. Returns the path a human can open, or an empty string if
+## the disk said no.
 static func export_room(room: Dictionary) -> String:
-	DirAccess.make_dir_recursive_absolute(EXPORT_DIR)
-	var path := "%s/%s.%s" % [EXPORT_DIR, _file_stem(room), EXT]
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		return ""
-	f.store_string(room_to_text(room))
-	f.close()
-	return ProjectSettings.globalize_path(path)
+	return _write(export_dir().path_join("%s.%s" % [_file_stem(room), EXT]),
+		room_to_text(room))
 
 
 static func export_all(rooms: Array) -> String:
 	if rooms.is_empty():
 		return ""
-	DirAccess.make_dir_recursive_absolute(EXPORT_DIR)
-	var path := "%s/pixel_pack.%s" % [EXPORT_DIR, EXT]
+	return _write(export_dir().path_join("pixel_pack.%s" % EXT), pack_to_text(rooms))
+
+
+static func _write(path: String, text: String) -> String:
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
 		return ""
-	f.store_string(pack_to_text(rooms))
+	f.store_string(text)
 	f.close()
 	return ProjectSettings.globalize_path(path)
 
@@ -379,22 +388,49 @@ static func _file_stem(room: Dictionary) -> String:
 	return safe if not safe.is_empty() else str(room.get("id", "room"))
 
 
-## Files waiting to be imported: anything dropped in user://rooms, plus loose
-## share files sitting next to the save. Returns [{path, label}].
+## Files waiting to be imported: whatever is in Downloads, anything dropped in
+## user://rooms, and loose share files sitting beside the save. Downloads comes
+## first because a room a friend sent lands there without the player doing
+## anything. Returns [{path, label}].
+##
+## Only user://rooms is read loosely enough to accept a bare .json. Downloads
+## is a folder full of everybody else's things — service account keys, exported
+## calendars, whiteboards — and scanning it for .json turned the import list
+## into sixteen files that are not rooms and one that is.
 static func drop_files() -> Array:
 	var out: Array = []
+	var seen := {}
 	DirAccess.make_dir_recursive_absolute(DROP_DIR)
-	for dir: String in [DROP_DIR, "user://", EXPORT_DIR]:
+
+	for dir: String in [export_dir(), DROP_DIR, "user://", EXPORT_FALLBACK]:
+		if seen.has(dir):
+			continue
+		seen[dir] = true
 		var da := DirAccess.open(dir)
 		if da == null:
 			continue
-		for file: String in da.get_files():
-			if not (file.ends_with("." + EXT) or file.ends_with(".json")):
+
+		var files := da.get_files()
+		files.sort()
+		for file: String in files:
+			var loose := dir == DROP_DIR and file.ends_with(".json")
+			if not (file.ends_with("." + EXT) or loose):
 				continue
-			if dir == "user://" and (file == "saves.json" or file == "sandbox.json"):
+			# The save and the shelf are not rooms, wherever they turn up.
+			if file == "saves.json" or file == "sandbox.json" or file == "save.json":
 				continue
-			out.append({"path": dir.path_join(file), "label": file.to_upper()})
+			# The same room can sit in two of these folders at once, so the
+			# label says which one this copy is in.
+			out.append({
+				"path": dir.path_join(file),
+				"label": "%s/%s" % [_folder_tag(dir), file.to_upper()],
+			})
 	return out
+
+
+static func _folder_tag(dir: String) -> String:
+	var tag := dir.trim_suffix("/").get_file()
+	return tag.to_upper() if not tag.is_empty() else "USER"
 
 
 static func read_file(path: String) -> Array:

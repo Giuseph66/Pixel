@@ -12,7 +12,7 @@ resultado.
 
 1. Crie a sala no modo **SANDBOX** do jogo.
 2. Na estante de salas, com ela selecionada, aperte **X**. O jogo escreve
-   `user://export/<nome>.pixelroom` e mostra o caminho completo na tela.
+   `<Downloads>/<nome>.pixelroom` e mostra o caminho completo na tela.
 3. Copie esse arquivo para esta pasta.
 4. Reabra o jogo. A sala aparece no fim de LEVELS.
 

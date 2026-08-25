@@ -16,7 +16,6 @@ than the running game: anything it can solve, a player can solve.
 
 Rooms 1-6 are known playable by hand, so they double as a test of the checker:
 if it cannot beat those, the checker is wrong, not the level.
-"""
 
 KNOWN LIMITATION — the search does not finish.
 
@@ -42,7 +41,7 @@ What this tool models: terrain, one way slabs, spikes, springs and the door.
 What it does not model: time. Timed blocks, retracting spikes, saws, moving
 platforms, elastic slimes and the rising tide are all invisible to it, so rooms
 built around them cannot be judged here even once the search is fixed.
-
+"""
 
 import json
 import os
@@ -313,6 +312,13 @@ def solve(grid, budget=500000):
     return ("UNREACHABLE" if expanded < budget else "TIMEOUT"), expanded
 
 
+# What level.gd treats as solid and as standable. This list used to be just
+# "#" and "-", which was written before ice, belts and conveyors existed and
+# quietly reported every spike in an ice room as floating.
+SOLID = ("#", "~", ">", "<")
+GROUND = SOLID + ("-",)
+
+
 def warnings(grid):
     """Entities placed with nothing holding them up."""
     out = []
@@ -321,18 +327,16 @@ def warnings(grid):
             c = grid[ty][tx]
             if c in ("J", "S", "^"):
                 below = grid[ty + 1][tx] if ty + 1 < ROWS else "#"
-                if below not in ("#", "-"):
+                if below not in GROUND:
                     out.append(f"    {c} at ({tx},{ty}) floats, nothing under it")
             elif c == "v":
                 above = grid[ty - 1][tx] if ty > 0 else "#"
-                if above not in ("#", "-"):
+                if above not in GROUND:
                     out.append(f"    v at ({tx},{ty}) floats, nothing over it")
             elif c == "X":
                 below = grid[ty + 1][tx] if ty + 1 < ROWS else "#"
-                if below not in ("#", "-"):
+                if below not in GROUND:
                     out.append(f"    X at ({tx},{ty}) has no floor to stand on")
-            elif c == "J":
-                pass
     # A spring firing into solid ground goes nowhere: check the 14 tiles above.
     for ty in range(ROWS):
         for tx in range(COLS):
@@ -341,7 +345,7 @@ def warnings(grid):
             for up in range(1, 15):
                 if ty - up < 0:
                     break
-                if grid[ty - up][tx] == "#":
+                if grid[ty - up][tx] in SOLID:
                     out.append(f"    J at ({tx},{ty}) fires into solid tile "
                                f"at ({tx},{ty - up})")
                     break

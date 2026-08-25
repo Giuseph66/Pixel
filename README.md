@@ -92,9 +92,9 @@ room large on the right, because a campaign name like GREED tells you nothing
 about what you are about to copy.
 
 Rooms are kept in `user://sandbox.json`. Exporting one writes a readable JSON
-file to `user://export/` **and** copies a `PIXEL1.…` share code to the
+file to your **Downloads folder** **and** copies a `PIXEL1.…` share code to the
 clipboard, so a room travels either as a file or as a paste. Importing takes
-both.
+both, and finds a room a friend sent you where it already is.
 
 Dropping an exported file into [`rooms/`](rooms/README.md) puts it on the
 official map: `Levels.all()` scans that folder at boot and appends what it

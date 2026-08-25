@@ -22,6 +22,8 @@ func _ready() -> void:
 	failures += await _check_play()
 	failures += _check_layout()
 	failures += _check_copy()
+	failures += await _check_input_guard()
+	failures += _check_wrap()
 
 	if failures == 0:
 		print("check_sandbox: all good")
@@ -350,6 +352,104 @@ func _check_copy() -> int:
 		bad += _fail("a duplicated room kept the original id")
 	if twin["rows"] != mine["rows"]:
 		bad += _fail("duplicating a room changed the grid")
+	return bad
+
+
+## The sandbox screens read keys two ways at once: overlays are event driven,
+## lists are polled through the input map so a gamepad works. Godot dispatches
+## events before _process, so a handler that switches into a polled mode leaves
+## that mode seeing the very same press as "just pressed" — one tap of space
+## walked two steps. The guard is what stops it, and this is what proves the
+## guard is armed rather than assuming it.
+func _check_input_guard() -> int:
+	var bad := 0
+
+	var shelf := SandboxScreen.new()
+	add_child(shelf)
+	await get_tree().process_frame
+
+	shelf._mode = shelf.MODE_SHARE
+	shelf._unhandled_input(_press(KEY_SPACE))
+	if shelf._mode != shelf.MODE_LIST:
+		bad += _fail("space did not close the share panel")
+	if not shelf._guard:
+		bad += _fail("leaving the share panel left the list unguarded")
+	shelf._process(0.016)
+	if shelf._guard:
+		bad += _fail("the shelf guard outlived the frame that set it")
+	shelf.queue_free()
+
+	var editor := EditorScreen.new()
+	editor.room = Sandbox.blank_room()
+	add_child(editor)
+	await get_tree().process_frame
+
+	editor._mode = editor.MODE_PALETTE
+	var before := Levels.bake(editor._grid)
+	editor._unhandled_input(_press(KEY_SPACE))
+	if editor._mode != editor.MODE_PAINT:
+		bad += _fail("space did not confirm the palette choice")
+	if not editor._guard:
+		bad += _fail("confirming a tile left the canvas unguarded")
+	editor._process(0.016)
+	# The press that picked the tile must never also paint with it.
+	if Levels.bake(editor._grid) != before:
+		bad += _fail("picking a tile in the palette painted it as well")
+	editor.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _press(key: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.pressed = true
+	event.keycode = key
+	return event
+
+
+## The share panel prints a filesystem path, which is the one string in the
+## game whose length nobody controls — a deep home directory plus a long room
+## name used to run off both edges of the panel. Wrapping is what holds it in,
+## so the wrapper gets checked rather than trusted.
+func _check_wrap() -> int:
+	var bad := 0
+	var width := 408.0
+
+	var cases := PackedStringArray([
+		"/home/somebody-with-a-very-long-name/.local/share/godot/app_userdata/pixel/export/parkour_gelado.pixelroom",
+		"/home/jesus/Downloads/parkour_gelado.pixelroom",
+		"SHORT",
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	])
+	for text: String in cases:
+		var lines := PixelFont.wrap(text.to_upper(), width, 1)
+		if lines.is_empty():
+			bad += _fail("wrapping '%s' produced nothing" % text.substr(0, 20))
+			continue
+		# Nothing may be dropped: the path has to still be the path.
+		if "".join(lines) != text.to_upper():
+			bad += _fail("wrapping changed '%s'" % text.substr(0, 20))
+		for line: String in lines:
+			var w := PixelFont.measure(line, 1).x
+			if w > width:
+				bad += _fail("a wrapped line is %d px wide, panel holds %d"
+					% [int(w), int(width)])
+
+	if PixelFont.wrap("SHORT", width, 1).size() != 1:
+		bad += _fail("a string that already fits got wrapped anyway")
+
+	# Downloads has to be somewhere the game can actually write.
+	var dir := Sandbox.export_dir()
+	if dir.is_empty() or not DirAccess.dir_exists_absolute(dir):
+		bad += _fail("the export folder '%s' does not exist" % dir)
+	print("check_sandbox: exports go to %s" % dir)
+
+	# Whatever is sitting in those folders right now, read the way the import
+	# panel would read it. Informational: what is on this machine is not
+	# something a test gets to have an opinion about.
+	for entry: Dictionary in Sandbox.drop_files():
+		var rooms := Sandbox.read_file(str(entry["path"]))
+		print("check_sandbox: importable %s -> %d room(s)" % [entry["label"], rooms.size()])
 	return bad
 
 

@@ -123,6 +123,39 @@ static func advance(scale: int = 1) -> int:
 
 ## Paint `text` onto `ci` with its top-left corner at `pos`.
 ## Runs of lit pixels on the same row are merged into a single draw_rect call.
+## Break `text` into lines that each fit inside `width`.
+##
+## Splits after spaces and after slashes. The slash matters more than it looks:
+## the longest strings this game ever puts on screen are file paths, and a path
+## has no spaces in it to break at, so without that rule a path is one line that
+## runs off both edges of its panel.
+static func wrap(text: String, width: float, scale: int = 1) -> PackedStringArray:
+	var out := PackedStringArray()
+	var per := float(advance(scale))
+	var fits := maxi(floori(width / per), 1)
+	if text.length() <= fits:
+		out.append(text)
+		return out
+
+	var line := ""
+	var mark := -1                  # last index in `line` a break is allowed at
+	for i in text.length():
+		var ch := text[i]
+		line += ch
+		if ch == " " or ch == "/":
+			mark = line.length()
+		if line.length() < fits:
+			continue
+		# Full. Cut at the last break point, or mid-word if there was none.
+		var cut := mark if mark > 0 else line.length()
+		out.append(line.substr(0, cut))
+		line = line.substr(cut)
+		mark = -1
+	if not line.is_empty():
+		out.append(line)
+	return out
+
+
 static func draw_text(ci: CanvasItem, text: String, pos: Vector2, color: Color, scale: int = 1) -> void:
 	var upper := text.to_upper()
 	var origin_x := pos.x

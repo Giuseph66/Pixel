@@ -70,6 +70,15 @@ var _stroke := false            # a paint stroke is open; one undo step per stro
 var _rect_anchor := Vector2i(-1, -1)
 
 var _repeat := {}               # action -> seconds until the next auto-move
+## A key event switched modes this frame, so the polled handlers sit it out.
+## Without this, confirming a tile in the palette with space also paints it:
+## _unhandled_input closes the popup, and _process, running later in the same
+## frame, still sees that same press as "just pressed" and paints with it.
+var _guard := false
+## Set once the screen has handed control back to main.gd. The transition takes
+## a few frames and this node keeps processing through them, so without it a
+## second press during the wipe fires the whole handoff twice.
+var _done := false
 var _toast := ""
 var _toast_time := 0.0
 
@@ -288,8 +297,10 @@ func _process(delta: float) -> void:
 	# The shortcuts share keys with the movement actions on purpose — S is
 	# p_down, Z is p_accept — so a held Ctrl silences the polled ones and
 	# CTRL+S saves instead of saving and walking a tile down.
-	if _mode == MODE_PAINT and not Input.is_key_pressed(KEY_CTRL):
+	if _mode == MODE_PAINT and not _guard and not _done \
+			and not Input.is_key_pressed(KEY_CTRL):
 		_process_paint(delta)
+	_guard = false
 	queue_redraw()
 
 
@@ -298,12 +309,16 @@ func _process(delta: float) -> void:
 ## for free.
 func _repeat_pressed(action: String, delta: float) -> bool:
 	if not Input.is_action_pressed(action):
-		_repeat[action] = 0.0
+		_repeat.erase(action)
 		return false
 	if Input.is_action_just_pressed(action):
 		_repeat[action] = REPEAT_DELAY
 		return true
-	var left := float(_repeat.get(action, REPEAT_DELAY)) - delta
+	# Held since before this screen existed — the press that started it belongs
+	# to whatever menu opened the editor, not to the cursor.
+	if not _repeat.has(action):
+		return false
+	var left := float(_repeat[action]) - delta
 	if left <= 0.0:
 		_repeat[action] = REPEAT_RATE
 		return true
@@ -328,10 +343,12 @@ func _process_paint(delta: float) -> void:
 	if Input.is_action_just_pressed("p_accept"):
 		_begin_stroke()
 		_apply_at(cursor, brush)
-	elif Input.is_action_pressed("p_accept") and tool == TOOL_BRUSH:
-		_paint_at(cursor, brush)
-	elif Input.is_action_just_released("p_accept"):
+	elif not Input.is_action_pressed("p_accept"):
 		_stroke = false
+	elif _stroke and tool == TOOL_BRUSH:
+		# Dragging a line only continues a stroke that started here. A button
+		# still held from the menu that opened the editor is not a stroke.
+		_paint_at(cursor, brush)
 
 
 func _begin_stroke() -> void:
@@ -362,8 +379,13 @@ func _paint_at(at: Vector2i, ch: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _done:
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
+		var before := _mode
 		_key(event as InputEventKey)
+		if _mode != before:
+			_guard = true
 	elif event is InputEventMouseButton:
 		_mouse_button(event as InputEventMouseButton)
 	elif event is InputEventMouseMotion and _mode == MODE_PAINT:
@@ -496,6 +518,7 @@ func _playtest() -> void:
 		Audio.play("menu_back")
 		return
 	_save(false)
+	_done = true
 	test_requested.emit()
 
 
@@ -530,8 +553,10 @@ func _exit_key(event: InputEventKey) -> void:
 	match event.keycode:
 		KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_Z, KEY_S:
 			_save(false)
+			_done = true
 			closed.emit()
 		KEY_D:
+			_done = true
 			closed.emit()
 		KEY_ESCAPE, KEY_X:
 			_mode = MODE_PAINT
@@ -825,8 +850,11 @@ func _draw_bar() -> void:
 
 	# The brush: its own picture plus its name. The picture is what the eye
 	# finds, the name is what settles which of two similar tiles this is.
-	var swatch := Rect2(158.0, 1.0, 12.0, 12.0)
-	_draw_swatch(swatch, brush, false, false, 1.0)
+	#
+	# Drawn bare rather than in a framed cell. The bar ends one pixel above the
+	# room, so a bordered box down here reads as a tile sitting on the ceiling
+	# of the level rather than as part of the bar.
+	_draw_brush_icon(Vector2(160.0, 3.0))
 	PixelFont.draw_text(self, _fit(TilePalette.name_of(brush), right - 176.0),
 		Vector2(176, 4), TilePalette.group_color(TilePalette.group_of(brush)), 1)
 
@@ -837,6 +865,19 @@ func _draw_bar() -> void:
 	if _dirty:
 		title += "*"
 	PixelFont.draw_text(self, _fit(title, 108.0), Vector2(4, 4), Palette.WHITE, 1)
+
+
+func _draw_brush_icon(at: Vector2) -> void:
+	if brush == ".":
+		draw_rect(Rect2(at.x, at.y + 3.0, 8, 2), Palette.GREY_DARK)
+		return
+	var tex := TilePalette.icon(brush)
+	var size := Vector2(tex.get_width(), tex.get_height())
+	if brush == "v":
+		draw_texture_rect(tex, Rect2(at + size, -size), false)
+	else:
+		draw_texture(tex, at)
+	_draw_mark(Rect2(at, size), brush, 0.0)
 
 
 ## Cut `text` to whatever fits in `width`. The font is fixed pitch, so this is
@@ -872,7 +913,10 @@ func _draw_swatch(rect: Rect2, ch: String, selected: bool, hovered: bool,
 	var size := Vector2(tex.get_width(), tex.get_height()) * icon_scale
 	var pos := (rect.position + (rect.size - size) * 0.5).floor()
 	if ch == "v":
-		draw_texture_rect(tex, Rect2(pos.x, pos.y + size.y, size.x, -size.y), false)
+		# A half turn, the same one Spike makes to hang from a ceiling. Turning
+		# it on the vertical axis alone put the lit edge on the wrong side and
+		# left the palette disagreeing with the room about the same tile.
+		draw_texture_rect(tex, Rect2(pos + size, -size), false)
 	else:
 		draw_texture_rect(tex, Rect2(pos, size), false)
 

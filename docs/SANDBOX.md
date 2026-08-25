@@ -196,9 +196,14 @@ Limite de 64 salas por usuário, em `user://sandbox.json`.
 Exportar faz as duas coisas de uma vez, porque são os dois jeitos que as pessoas
 realmente passam uma sala adiante:
 
-**Arquivo.** `user://export/<nome>.pixelroom`, JSON legível e indentado, com
-`rows` como uma linha de texto por linha da sala. O caminho absoluto aparece na
-tela. Dá para mandar por e-mail, commitar no repositório ou colar aqui no chat.
+**Arquivo.** Vai para a **pasta Downloads da máquina** — `~/Downloads` no
+Linux, o equivalente em cada sistema — porque é onde um arquivo que alguém te
+mandou já está, e a única pasta que uma pessoa acha sem precisar de instrução.
+Onde o sistema não tem pasta de downloads (build web), cai em `user://export/`.
+
+JSON legível e indentado, com `rows` como uma linha de texto por linha da sala.
+O caminho absoluto aparece na tela, quebrado em várias linhas se for longo. Dá
+para mandar por e-mail, commitar no repositório ou colar aqui no chat.
 
 **Código.** O mesmo JSON, deflatado e em base64, atrás do prefixo `PIXEL1.`,
 copiado direto para a área de transferência. Serve para colar numa conversa. O
@@ -206,9 +211,17 @@ prefixo é parte do payload de propósito: um código copiado pela metade falha
 alto em vez de decodificar em lixo.
 
 Importar (`I`) aceita os dois: "colar da área de transferência" ou qualquer
-arquivo encontrado em `user://rooms/`, `user://` e `user://export/`. Cada sala
-importada ganha um `id` novo, então importar o mesmo arquivo duas vezes dá duas
-salas em vez de sobrescrever a primeira.
+arquivo encontrado em Downloads, `user://rooms/`, `user://` e `user://export/`.
+Cada entrada é marcada com a pasta em que está (`DOWNLOADS/SALA.PIXELROOM`),
+porque a mesma sala costuma existir em duas delas ao mesmo tempo.
+
+Só `user://rooms/` aceita `.json` solto; nas outras a varredura exige
+`.pixelroom`. Downloads é pasta de todo mundo — chave de service account,
+calendário exportado, whiteboard — e varrer `.json` ali enchia a lista de
+importação com dezesseis arquivos que não eram salas e um que era.
+
+Cada sala importada ganha um `id` novo, então importar o mesmo arquivo duas
+vezes dá duas salas em vez de sobrescrever a primeira.
 
 ### Para o jogo do seu amigo
 

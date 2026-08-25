@@ -476,34 +476,38 @@ static func _level_ice_edge() -> PackedStringArray:
 
 ## Ice parkour crosses a spike trench, climbs the ice wall at the right, then
 ## returns through the high platforms to the upper-left exit.
-static func _level_ice_wall() -> PackedStringArray:
+## Built in the sandbox editor and brought back in, which is why it is the one
+## room in here with no plain ground anywhere: the shell, the ledges and the
+## walls are all ice. Nothing holds, and the floor between the two landings is
+## fifty tiles of spike.
+static func _level_ice_parkour() -> PackedStringArray:
 	var g := blank()
-	# Platforms are ice; the right climb wall stays normal.
-	rect(g, 0, 27, 4, 5, "~")
-	rect(g, 54, 27, 6, 5, "~")
-	rect(g, 4, 30, 20, 1, "^")
-	rect(g, 26, 30, 28, 1, "^")
+	# The shell. The right wall is the only surface left that grips.
+	rect(g, 0, 0, COLS, 1, "~")
+	rect(g, 0, ROWS - 1, COLS, 1, "~")
+	rect(g, 0, 0, 1, ROWS, "~")
 
-	# Low route to the ice wall on the right.
-	rect(g, 10, 25, 2, 1, "~")
-	rect(g, 17, 23, 2, 1, "~")
-	rect(g, 23, 21, 2, 1, "~")
-	rect(g, 28, 19, 2, 1, "~")
-	rect(g, 38, 22, 2, 1, "~")
-	rect(g, 44, 20, 2, 1, "~")
-	rect(g, 48, 24, 2, 1, "~")
-	rect(g, 52, 23, 2, 1, "~")
-	rect(g, 58, 9, 2, 7, "#")
+	# Two landings with the pit between them.
+	rect(g, 0, 27, 4, 4, "~")
+	rect(g, 54, 27, 6, 4, "~")
+	rect(g, 4, 30, 50, 1, "^")
 
-	# Return path after the wall, ending at the high-left portal.
-	rect(g, 49, 10, 2, 1, "~")
-	rect(g, 41, 10, 2, 1, "~")
-	rect(g, 33, 9, 2, 1, "~")
-	rect(g, 25, 9, 2, 1, "~")
-	rect(g, 17, 10, 2, 1, "~")
-	rect(g, 9, 10, 2, 1, "~")
-	rect(g, 2, 5, 6, 1, "~")
-	puts(g, [Vector2i(10, 9), Vector2i(26, 8), Vector2i(49, 23)], "o")
+	# The shelf the door stands on, back above the spawn.
+	rect(g, 0, 5, 8, 1, "~")
+
+	# The climb: (column, row, width), roughly in the order they are taken.
+	for ledge: Vector3i in [
+		Vector3i(9, 25, 3), Vector3i(17, 23, 3), Vector3i(48, 24, 3),
+		Vector3i(38, 22, 3), Vector3i(28, 19, 3), Vector3i(13, 10, 3),
+		Vector3i(3, 9, 2), Vector3i(24, 9, 3), Vector3i(33, 9, 3),
+		Vector3i(41, 10, 3), Vector3i(50, 10, 1),
+	]:
+		rect(g, ledge.x, ledge.y, ledge.z, 1, "~")
+
+	# The one column tall enough to catch a fall on the right-hand side.
+	rect(g, 51, 21, 2, 3, "~")
+
+	puts(g, [Vector2i(4, 8), Vector2i(26, 8), Vector2i(49, 23)], "o")
 	put(g, 2, 26, "P")
 	put(g, 3, 4, "X")
 	return bake(g)
@@ -832,7 +836,7 @@ static func _level_shield_pit() -> PackedStringArray:
 	put(g, 30, 23, "E")
 	# Shield on the bridge, bat over it: one thing you cannot walk into and one
 	# thing you cannot jump over, stacked on the same twenty tiles.
-sda	put(g, 30, 21, "B")
+	put(g, 30, 21, "B")
 	puts(g, [Vector2i(22, 23), Vector2i(38, 23), Vector2i(50, 26)], "o")
 	put(g, 10, 20, "O")
 	put(g, 4, 26, "P")
@@ -1081,11 +1085,13 @@ static func _campaign() -> Array:
 			"rows": _level_ice_slime(),
 		},
 		{
-			"id": "ice_wall",
-			"name": "level.ice_wall.name",
-			"hint": "level.ice_wall.hint",
+			# A different room in this slot, so it takes a new id rather than
+			# inheriting the best times somebody set on the old one.
+			"id": "ice_parkour",
+			"name": "level.ice_parkour.name",
+			"hint": "level.ice_parkour.hint",
 			"par": 46.0,
-			"rows": _level_ice_wall(),
+			"rows": _level_ice_parkour(),
 		},
 		{
 			"id": "belt_first",

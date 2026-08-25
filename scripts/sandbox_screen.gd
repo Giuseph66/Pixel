@@ -39,11 +39,25 @@ var _scroll := 0
 var _mode := MODE_LIST
 var _time := 0.0
 
-var _share_lines: PackedStringArray = PackedStringArray()
+## [{text, accent}] — accent marks the lines that are the path itself, which
+## the panel colours apart from the sentences around them.
+var _share_lines: Array = []
 var _import_items: Array = []
 var _import_cursor := 0
 var _toast := ""
 var _toast_time := 0.0
+
+## A key event switched modes this frame, so the polled handlers sit it out.
+##
+## This screen reads keys two ways: the overlays are event driven, the lists
+## are polled through the input map so a gamepad works. Godot dispatches events
+## before _process, so one press of space used to walk two steps at once —
+## confirm the delete, and then, in the same frame, the list underneath saw
+## that same press as "just pressed" and opened whatever the cursor was on.
+var _guard := false
+## Set once the screen has handed control back to main.gd. The wipe takes a few
+## frames and this node keeps processing through them.
+var _done := false
 
 # Where a new room comes from.
 var _source_cursor := 0
@@ -76,11 +90,13 @@ func _process(delta: float) -> void:
 	_time += delta
 	if _toast_time > 0.0:
 		_toast_time = maxf(_toast_time - delta, 0.0)
-	match _mode:
-		MODE_LIST:
-			_handle_list()
-		MODE_PICK:
-			_handle_pick()
+	if not _guard and not _done:
+		match _mode:
+			MODE_LIST:
+				_handle_list()
+			MODE_PICK:
+				_handle_pick()
+	_guard = false
 	queue_redraw()
 
 
@@ -112,15 +128,26 @@ func _accept() -> void:
 		# An unfinishable room opens in the editor instead of failing to start:
 		# the fix is always one tile away.
 		_toast_key("sandbox.err.unplayable")
+		_done = true
 		edit_room.emit(_room_index())
 		return
+	_done = true
 	play_room.emit(_room_index())
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _done:
+		return
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	var key := event as InputEventKey
+	var before := _mode
+	_dispatch(key)
+	if _mode != before:
+		_guard = true
+
+
+func _dispatch(key: InputEventKey) -> void:
 	match _mode:
 		MODE_DELETE:
 			_delete_key(key)
@@ -144,6 +171,7 @@ func _list_key(key: InputEventKey) -> void:
 		KEY_E:
 			if cursor > 0:
 				Audio.play("menu_select")
+				_done = true
 				edit_room.emit(_room_index())
 		KEY_C:
 			if cursor > 0:
@@ -168,6 +196,7 @@ func _list_key(key: InputEventKey) -> void:
 			_open_import()
 		KEY_ESCAPE, KEY_BACKSPACE:
 			Audio.play("menu_back")
+			_done = true
 			cancelled.emit()
 
 
@@ -206,6 +235,7 @@ func _choose_source() -> void:
 	Audio.play("menu_select")
 	match str(_source_items[_source_cursor]["id"]):
 		"blank":
+			_done = true
 			new_room.emit(Sandbox.blank_room())
 		"story":
 			_open_pick(_campaign_entries(), Lang.t("pick.story_title"))
@@ -267,6 +297,7 @@ func _handle_pick() -> void:
 		Audio.play("menu_move")
 	elif Input.is_action_just_pressed("p_accept"):
 		Audio.play("menu_select")
+		_done = true
 		new_room.emit((_pick_rooms[_pick_cursor] as Dictionary)["room"])
 
 	_pick_scroll = clampi(_pick_scroll, _pick_cursor - PICK_ROWS + 1, _pick_cursor)
@@ -292,20 +323,24 @@ func _delete_key(key: InputEventKey) -> void:
 ## Export writes a file *and* puts a share code on the clipboard, because the
 ## two ways people actually pass a room around are "send the file" and "paste
 ## it into a chat".
+## Width the share panel has for text, and the width its lines are wrapped to.
+const SHARE_PANEL := 432.0
+const SHARE_TEXT := SHARE_PANEL - 24.0
+
+
 func _share(room: Dictionary) -> void:
 	var path := Sandbox.export_room(room)
 	var code := Sandbox.encode(room)
 	DisplayServer.clipboard_set(code)
 
-	_share_lines = PackedStringArray([
-		Lang.t("share.file"),
-		path if not path.is_empty() else Lang.t("share.failed"),
-		"",
-		Lang.tf("share.code", [code.length()]),
-		"",
-		Lang.t("share.campaign"),
-		Lang.t("share.campaign2"),
-	])
+	_share_lines = []
+	_share_say(Lang.t("share.file"))
+	_share_path(path)
+	_share_say("")
+	_share_say(Lang.tf("share.code", [code.length()]))
+	_share_say("")
+	_share_say(Lang.t("share.campaign"))
+	_share_say(Lang.t("share.campaign2"))
 	_mode = MODE_SHARE
 	Audio.play("menu_select")
 
@@ -316,15 +351,31 @@ func _share_all() -> void:
 		_toast_key("sandbox.empty")
 		return
 	var path := Sandbox.export_all(rooms)
-	_share_lines = PackedStringArray([
-		Lang.tf("share.pack", [rooms.size()]),
-		path if not path.is_empty() else Lang.t("share.failed"),
-		"",
-		Lang.t("share.campaign"),
-		Lang.t("share.campaign2"),
-	])
+
+	_share_lines = []
+	_share_say(Lang.tf("share.pack", [rooms.size()]))
+	_share_path(path)
+	_share_say("")
+	_share_say(Lang.t("share.campaign"))
+	_share_say(Lang.t("share.campaign2"))
 	_mode = MODE_SHARE
 	Audio.play("menu_select")
+
+
+func _share_say(text: String) -> void:
+	for line: String in PixelFont.wrap(text, SHARE_TEXT, 1):
+		_share_lines.append({"text": line, "accent": false})
+
+
+## A path is the one line here that has no length anybody controls: a deep home
+## directory and a long room name together ran off both edges of the panel.
+## Wrapped, it takes as many lines as it needs and the panel grows to hold them.
+func _share_path(path: String) -> void:
+	if path.is_empty():
+		_share_lines.append({"text": Lang.t("share.failed"), "accent": true})
+		return
+	for line: String in PixelFont.wrap(path.to_upper(), SHARE_TEXT, 1):
+		_share_lines.append({"text": line, "accent": true})
 
 
 # --------------------------------------------------------------- import ---
@@ -502,7 +553,8 @@ func _draw_import() -> void:
 	for i in _import_items.size():
 		var y := panel.position.y + 34.0 + i * 14.0
 		var selected := i == _import_cursor
-		PixelFont.draw_text(self, str(_import_items[i]["label"]),
+		# A filename is as long as somebody made it; the panel is not.
+		PixelFont.draw_text(self, _clip(str(_import_items[i]["label"]), 292.0),
 			Vector2(panel.position.x + 24.0, y),
 			Palette.WHITE if selected else Palette.GREY_DARK, 1)
 		if selected:
@@ -516,7 +568,7 @@ func _draw_import() -> void:
 func _draw_share() -> void:
 	_dim()
 	var height := 46.0 + _share_lines.size() * 12.0
-	var panel := Rect2(24, roundf((SCREEN.y - height) * 0.5), 432, height)
+	var panel := Rect2(24, roundf((SCREEN.y - height) * 0.5), SHARE_PANEL, height)
 	Util.draw_panel(self, panel, Palette.BG_SOFT, Palette.FRAME)
 	var cx := panel.position.x + panel.size.x * 0.5
 
@@ -524,14 +576,13 @@ func _draw_share() -> void:
 		panel.position.y + 10.0, Palette.WHITE, 2)
 
 	for i in _share_lines.size():
-		var line := _share_lines[i]
-		if line.is_empty():
+		var line: Dictionary = _share_lines[i]
+		var text := str(line["text"])
+		if text.is_empty():
 			continue
-		# Paths are long and mixed case; the font is uppercase, so they are
-		# folded rather than clipped.
-		PixelFont.draw_text_centered(self, line.to_upper(), cx,
+		PixelFont.draw_text_centered(self, text, cx,
 			panel.position.y + 32.0 + i * 12.0,
-			Palette.CYAN if i == 1 else Palette.GREY, 1)
+			Palette.CYAN if bool(line["accent"]) else Palette.GREY, 1)
 
 	PixelFont.draw_text_centered(self, Lang.t("share.footer"), cx,
 		panel.position.y + panel.size.y - 14.0, Palette.GREY_DARK, 1)
