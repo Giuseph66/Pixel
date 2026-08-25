@@ -61,6 +61,7 @@ const ENTRIES := [
 	{"id": "phase", "kind": WORLD, "sprite": "phase_block"},
 	{"id": "portal", "kind": WORLD, "sprite": "portal_a"},
 	{"id": "laser", "kind": WORLD, "sprite": "laser_idle"},
+	{"id": "ferrybat", "kind": CREATURE, "sprite": "ferry_a"},
 ]
 
 ## Which entry a level tile reveals, for the pass that runs when a room builds.
@@ -99,6 +100,7 @@ const BY_TILE := {
 	"q": "portal",
 	"Q": "portal",
 	"L": "laser",
+	"F": "ferrybat",
 }
 
 

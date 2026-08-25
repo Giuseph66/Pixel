@@ -29,6 +29,7 @@ func _ready() -> void:
 	failures += await _check_phase()
 	failures += await _check_portal()
 	failures += await _check_laser()
+	failures += await _check_ferry()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -848,6 +849,60 @@ func _check_laser() -> int:
 
 func _always_open(_tx: int, _ty: int) -> bool:
 	return false
+
+
+## Step 17. A player resting on top has to register as "carrying" through
+## the real physics path (get_last_slide_collision(), not an Area2D guess),
+## and once the deadline runs out the body has to actually let go and, later,
+## clean itself up.
+func _check_ferry() -> int:
+	var bad := 0
+
+	var ferry := FerryBat.new()
+	ferry.position = Vector2(200, 100)
+	add_child(ferry)
+	await get_tree().process_frame
+	ferry._time = 0.0    # deterministic phase, so the drift below is not a coin flip
+
+	var player := Player.new()
+	player.position = Vector2(200, 70)          # falls onto it under gravity
+	add_child(player)
+	ferry.players = [player]           # Level normally wires this up; here it is manual
+
+	var carrying := false
+	for i in 40:
+		await get_tree().physics_frame
+		if ferry._carrying:
+			carrying = true
+			break
+	if not carrying:
+		bad += _fail("a player standing on a ferry bat was never marked as carried")
+
+	ferry._carry = 0.01
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	if ferry._state != FerryBat.State.DIVE:
+		bad += _fail("a ferry bat did not dive once its deadline ran out")
+	if ferry.collision_layer != 0:
+		bad += _fail("a diving ferry bat is still solid under whoever was riding it")
+
+	# AnimatableBody2D reconciles position with the physics server on its own
+	# schedule, so a single oversized delta fed to _physics_process by hand
+	# does not stick the way it does for a plain Node2D — real ticks it is,
+	# enough of them to clear DIVE_DISTANCE at DIVE_SPEED plus some slack.
+	var dive_frames := ceili((FerryBat.DIVE_DISTANCE / FerryBat.DIVE_SPEED) * 60.0) + 10
+	for i in dive_frames:
+		if not is_instance_valid(ferry):
+			break
+		await get_tree().physics_frame
+	if is_instance_valid(ferry):
+		bad += _fail("a ferry bat did not clean itself up after diving clear")
+
+	player.queue_free()
+	if is_instance_valid(ferry):
+		ferry.queue_free()
+	await get_tree().process_frame
+	return bad
 
 
 func _check_campaign() -> int:

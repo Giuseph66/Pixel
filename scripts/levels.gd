@@ -1394,6 +1394,66 @@ static func _level_laser_gate() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 17 — morcego transportador. 'F' patrols and carries whoever stands on
+## it, and drops out from under them CARRY_TIME after they board — see
+## ferry_bat.gd. Its sides and underside stay lethal the whole time; only the
+## top is ever a ride.
+
+## A gap nothing jumps, and one bat that crosses it. Nothing else in the room.
+static func _level_ferry_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 18, 24, 24, 7, ".")
+	put(g, 30, 20, "F")
+	put(g, 30, 16, "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 26, "X")
+	return bake(g)
+
+
+## Two bats, patrols wide enough to overlap in the middle. Crossing means
+## jumping from one to the other rather than riding either one the whole way.
+static func _level_ferry_hop() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 22, 32, 9, ".")
+	put(g, 22, 20, "F")
+	put(g, 38, 20, "F")
+	puts(g, [Vector2i(30, 14), Vector2i(20, 26), Vector2i(46, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## A gap wide enough that the first bat's deadline runs out before it gets
+## you all the way across — the second one is what finishes the crossing, not
+## a second attempt at the first.
+static func _level_ferry_dive() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 22, 38, 9, ".")
+	put(g, 22, 20, "F")
+	put(g, 42, 20, "F")
+	puts(g, [Vector2i(32, 14), Vector2i(20, 26), Vector2i(48, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## The same crossing, over spikes instead of a harmless drop. Missing the
+## ride here is not an inconvenience.
+static func _level_ferry_spike() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 16, 27, 28, 3, ".")
+	rect(g, 16, 30, 28, 1, "^")
+	put(g, 30, 20, "F")
+	puts(g, [Vector2i(30, 16), Vector2i(20, 26), Vector2i(44, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1919,6 +1979,34 @@ static func _campaign() -> Array:
 			"hint": "level.laser_gate.hint",
 			"par": 50.0,
 			"rows": _level_laser_gate(),
+		},
+		{
+			"id": "ferry_first",
+			"name": "level.ferry_first.name",
+			"hint": "level.ferry_first.hint",
+			"par": 32.0,
+			"rows": _level_ferry_first(),
+		},
+		{
+			"id": "ferry_hop",
+			"name": "level.ferry_hop.name",
+			"hint": "level.ferry_hop.hint",
+			"par": 48.0,
+			"rows": _level_ferry_hop(),
+		},
+		{
+			"id": "ferry_dive",
+			"name": "level.ferry_dive.name",
+			"hint": "level.ferry_dive.hint",
+			"par": 52.0,
+			"rows": _level_ferry_dive(),
+		},
+		{
+			"id": "ferry_spike",
+			"name": "level.ferry_spike.name",
+			"hint": "level.ferry_spike.hint",
+			"par": 56.0,
+			"rows": _level_ferry_spike(),
 		},
 	]
 

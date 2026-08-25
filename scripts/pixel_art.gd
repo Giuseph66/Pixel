@@ -641,6 +641,40 @@ const GRIDS := {
 		".######.",
 		"........",
 	],
+	# Step 17 — ferry bat. Two tiles wide, with a gold strip along the back
+	# that reads as "you can stand here" the way the plain bat never needed
+	# to. ferry_dive is the wings-closed silhouette it drops into when the
+	# deadline runs out.
+	"ferry_a": [
+		"yyyyyyyyyyyyyyyy",
+		"................",
+		"..#p......p#....",
+		".#pp......pp#...",
+		"..#pppppppp#....",
+		"...#w####w#.....",
+		"....########....",
+		"................",
+	],
+	"ferry_b": [
+		"yyyyyyyyyyyyyyyy",
+		"................",
+		"...#p......p#...",
+		"....#p....p#....",
+		"..#pp########pp#",
+		"...#wwwwwwww#...",
+		"....########....",
+		"................",
+	],
+	"ferry_dive": [
+		"................",
+		"................",
+		".....######.....",
+		"....#pppppp#....",
+		"....#pwwwwp#....",
+		"....#pppppp#....",
+		".....######.....",
+		"................",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

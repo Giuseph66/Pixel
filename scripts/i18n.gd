@@ -432,6 +432,18 @@ const STRINGS := {
 	"level.laser_gate.name": "GATED BEAM",
 	"level.laser_gate.hint": "THE SWITCH BUYS A FEW SAFE SECONDS",
 
+	"codex.ferrybat.name": "FERRY BAT",
+	"codex.ferrybat.text": "RIDE THE TOP. IT DIVES WHEN IT IS DONE WITH YOU",
+
+	"level.ferry_first.name": "THE CROSSING",
+	"level.ferry_first.hint": "NOTHING BUT THE BAT GETS YOU OVER THIS",
+	"level.ferry_hop.name": "TRANSFER",
+	"level.ferry_hop.hint": "TWO ROUTES CROSS. SWITCH BATS MID-AIR",
+	"level.ferry_dive.name": "THE DIVE",
+	"level.ferry_dive.hint": "ONE RIDE IS NOT ENOUGH TO CROSS THIS",
+	"level.ferry_spike.name": "OVER THE SPIKES",
+	"level.ferry_spike.hint": "MISSING THE RIDE COSTS MORE THAN TIME HERE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -598,6 +610,8 @@ const STRINGS := {
 	"pal.portal_b.note": "NEEDS ITS PAIR SOMEWHERE IN THE ROOM",
 	"pal.laser.name": "LASER",
 	"pal.laser.note": "MOUNTS ON A WALL. FIRES AWAY FROM IT",
+	"pal.ferrybat.name": "FERRY BAT",
+	"pal.ferrybat.note": "RIDE THE TOP. IT DIVES AFTER A FEW SECONDS",
 },
 
 "pt": {
@@ -956,6 +970,18 @@ const STRINGS := {
 	"level.laser_gate.name": "FEIXE COM PORTA",
 	"level.laser_gate.hint": "O INTERRUPTOR COMPRA UNS SEGUNDOS SEGUROS",
 
+	"codex.ferrybat.name": "MORCEGO BALSA",
+	"codex.ferrybat.text": "SUBA NO TOPO. ELE MERGULHA QUANDO CANSA",
+
+	"level.ferry_first.name": "A TRAVESSIA",
+	"level.ferry_first.hint": "SO O MORCEGO ATRAVESSA ISSO",
+	"level.ferry_hop.name": "BALDEACAO",
+	"level.ferry_hop.hint": "DUAS ROTAS SE CRUZAM. TROQUE DE MORCEGO NO AR",
+	"level.ferry_dive.name": "O MERGULHO",
+	"level.ferry_dive.hint": "UMA CARONA SO NAO ATRAVESSA ISSO",
+	"level.ferry_spike.name": "SOBRE OS ESPINHOS",
+	"level.ferry_spike.hint": "PERDER A CARONA CUSTA MAIS QUE TEMPO AQUI",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1122,6 +1148,8 @@ const STRINGS := {
 	"pal.portal_b.note": "PRECISA DO PAR EM ALGUM LUGAR DA SALA",
 	"pal.laser.name": "LASER",
 	"pal.laser.note": "GRUDA NUMA PAREDE. DISPARA PARA LONGE DELA",
+	"pal.ferrybat.name": "MORCEGO BALSA",
+	"pal.ferrybat.note": "SUBA NO TOPO. MERGULHA APOS ALGUNS SEGUNDOS",
 },
 
 "es": {
@@ -1480,6 +1508,18 @@ const STRINGS := {
 	"level.laser_gate.name": "HAZ CON PUERTA",
 	"level.laser_gate.hint": "EL INTERRUPTOR COMPRA UNOS SEGUNDOS SEGUROS",
 
+	"codex.ferrybat.name": "MURCIELAGO BALSA",
+	"codex.ferrybat.text": "SUBE ENCIMA. SE ZAMBULLE CUANDO SE CANSA",
+
+	"level.ferry_first.name": "LA TRAVESIA",
+	"level.ferry_first.hint": "SOLO EL MURCIELAGO CRUZA ESTO",
+	"level.ferry_hop.name": "TRASBORDO",
+	"level.ferry_hop.hint": "DOS RUTAS SE CRUZAN. CAMBIA DE MURCIELAGO EN EL AIRE",
+	"level.ferry_dive.name": "LA ZAMBULLIDA",
+	"level.ferry_dive.hint": "UN SOLO VIAJE NO CRUZA ESTO",
+	"level.ferry_spike.name": "SOBRE LOS PINCHOS",
+	"level.ferry_spike.hint": "PERDER EL VIAJE CUESTA MAS QUE TIEMPO AQUI",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1646,5 +1686,7 @@ const STRINGS := {
 	"pal.portal_b.note": "NECESITA SU PAR EN ALGUN LUGAR DE LA SALA",
 	"pal.laser.name": "LASER",
 	"pal.laser.note": "SE MONTA EN UN MURO. DISPARA LEJOS DE EL",
+	"pal.ferrybat.name": "MURCIELAGO BALSA",
+	"pal.ferrybat.note": "SUBE ENCIMA. SE ZAMBULLE TRAS UNOS SEGUNDOS",
 },
 }

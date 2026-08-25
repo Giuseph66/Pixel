@@ -10,10 +10,11 @@ extends RefCounted
 ## and a half — so pits stop at five tiles, steps at three, and the walkway is
 ## never interrupted by anything a jump cannot cross.
 ##
-## _wind() is the one deliberate exception: wind slows a fall instead of
-## stopping it, which buys enough hang time to cross a wider gap than a jump
-## alone reaches. It must stay the only exception — a second one means this
-## rule needs rewriting, not another carve-out next to it.
+## Two segments are deliberate exceptions, and only two: _wind() (a column
+## slows the fall enough to cross a wider gap than a jump reaches) and
+## _ferrybat() (the crossing is guaranteed by a creature that is always there,
+## not by proving a jump can make it). Two is still administrable — a third
+## exception means this rule needs rewriting, not another carve-out next to it.
 ##
 ## Rooms are pure functions of (run seed, depth): the same run always produces
 ## the same rooms, so a restart after a death is the room you just died in.
@@ -65,6 +66,7 @@ const UNLOCK := {
 	"wind": 8,
 	"phase": 11,
 	"laser": 14,
+	"ferrybat": 13,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -99,6 +101,7 @@ const THREAT := {
 	"wind": 3.0,
 	"phase": 1.0,
 	"laser": 5.0,
+	"ferrybat": 4.5,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -217,6 +220,7 @@ const WIDTHS := {
 	"wind": 9,
 	"phase": 9,
 	"laser": 10,
+	"ferrybat": 12,
 }
 
 
@@ -252,6 +256,7 @@ const TASTE := {
 	"wind": 1.8,
 	"phase": 1.5,
 	"laser": 1.8,
+	"ferrybat": 1.7,
 }
 
 
@@ -470,6 +475,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _phase(g, rng, x, room, spots)
 		"laser":
 			return _laser(g, rng, x, room, spots)
+		"ferrybat":
+			return _ferrybat(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -901,6 +908,25 @@ static func _laser(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 	Levels.put(g, x + 2, STAND - 2, "L")
 	Levels.rect(g, x + w - 2, STAND - 4, 1, 4, "#")
 	spots.append(Vector2i(x + w / 2, STAND - 5))
+	return w
+
+
+## A gap wider than _pit() ever opens, crossed by a single bat instead of a
+## jump — the second exception the note at the top of the file promised there
+## would not be, except that a transport that is guaranteed to be there beats
+## proving a jump can cross it, the same way _wind() does. The bat's own
+## timer is not a concern here: the gap is short enough that one ride covers
+## it well inside CARRY_TIME.
+static func _ferrybat(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var pw := 8
+	var w := pw + 4
+	if w > room:
+		return _flat(g, rng, x, room, spots)
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	Levels.put(g, x + 2 + pw / 2, FLOOR - 4, "F")
+	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 7))
 	return w
 
 

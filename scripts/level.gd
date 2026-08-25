@@ -468,6 +468,11 @@ func _spawn_entities() -> void:
 					phase.position = tile_center(tx, ty)
 					_entities.add_child(phase)
 					_phase_blocks.append(phase)
+				"F":
+					var ferry := FerryBat.new()
+					ferry.speed_scale = intensity
+					ferry.position = tile_center(tx, ty)
+					_entities.add_child(ferry)
 				"L":
 					var laser := Laser.new()
 					laser.speed_scale = intensity
@@ -551,6 +556,8 @@ func _discover_contents() -> void:
 			(child as ElasticSlime).players = get_players()
 		elif child is ShieldEnemy:
 			(child as ShieldEnemy).players = get_players()
+		elif child is FerryBat:
+			(child as FerryBat).players = get_players()
 	if _lava != null:
 		_lava.players = get_players()
 	if Session.is_client():

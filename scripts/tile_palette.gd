@@ -61,6 +61,7 @@ const ENTRIES := [
 	{"char": "W", "group": CREATURE, "sprite": "saw_a", "unique": false, "run": false},
 	{"char": "e", "group": CREATURE, "sprite": "elastic_a", "unique": false, "run": false},
 	{"char": "E", "group": CREATURE, "sprite": "shield_a", "unique": false, "run": false},
+	{"char": "F", "group": CREATURE, "sprite": "ferry_a", "unique": false, "run": false},
 
 	{"char": "o", "group": ITEM, "sprite": "gem", "unique": false, "run": false},
 	{"char": "O", "group": ITEM, "sprite": "gem_secret", "unique": false, "run": false},
@@ -98,6 +99,7 @@ const KEYS := {
 	"p": "phase",
 	"q": "portal_a", "Q": "portal_b",
 	"L": "laser",
+	"F": "ferrybat",
 }
 
 ## Painted over the icon where two tiles share a sprite. Three of the moving
