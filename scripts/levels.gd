@@ -478,7 +478,7 @@ static func _level_ice_edge() -> PackedStringArray:
 ## returns through the high platforms to the upper-left exit.
 static func _level_ice_wall() -> PackedStringArray:
 	var g := blank()
-	# Every terrain wall in this room is ice.
+	# Platforms are ice; the right climb wall stays normal.
 	rect(g, 0, 27, 4, 5, "~")
 	rect(g, 54, 27, 6, 5, "~")
 	rect(g, 4, 30, 20, 1, "^")
@@ -493,8 +493,7 @@ static func _level_ice_wall() -> PackedStringArray:
 	rect(g, 44, 20, 2, 1, "~")
 	rect(g, 48, 24, 2, 1, "~")
 	rect(g, 52, 23, 2, 1, "~")
-	rect(g, 56, 8, 4, 1, "~")
-	rect(g, 58, 9, 2, 7, "~")
+	rect(g, 58, 9, 2, 7, "#")
 
 	# Return path after the wall, ending at the high-left portal.
 	rect(g, 49, 10, 2, 1, "~")
@@ -506,7 +505,7 @@ static func _level_ice_wall() -> PackedStringArray:
 	rect(g, 2, 5, 6, 1, "~")
 	puts(g, [Vector2i(10, 9), Vector2i(26, 8), Vector2i(49, 23)], "o")
 	put(g, 2, 26, "P")
-	put(g, 5, 4, "X")
+	put(g, 3, 4, "X")
 	return bake(g)
 
 
