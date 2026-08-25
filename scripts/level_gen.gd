@@ -63,6 +63,7 @@ const UNLOCK := {
 	"shield": 10,
 	"switch": 12,
 	"wind": 8,
+	"phase": 11,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -95,6 +96,7 @@ const THREAT := {
 	"shield": 4.0,
 	"switch": 2.0,
 	"wind": 3.0,
+	"phase": 1.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -211,6 +213,7 @@ const WIDTHS := {
 	"shield": 8,
 	"switch": 10,
 	"wind": 9,
+	"phase": 9,
 }
 
 
@@ -244,6 +247,7 @@ const TASTE := {
 	"shield": 1.6,
 	"switch": 1.4,
 	"wind": 1.8,
+	"phase": 1.5,
 }
 
 
@@ -458,6 +462,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _switch(g, rng, x, room, spots)
 		"wind":
 			return _wind(g, rng, x, room, d, spots)
+		"phase":
+			return _phase(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -864,6 +870,18 @@ static func _wind(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: fl
 	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
 	Levels.rect(g, x + 2 + pw / 2, FLOOR - 8, 1, 11, "u")
 	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 9))
+	return w
+
+
+## A two-tile phase wall over plain floor. STAND - 3 leaves a four-tile-tall
+## wall with its top three short of the ceiling a jump would need to clear it
+## — going over is always possible, so a generated phase wall is a shortcut
+## for the dash, never a gate the run depends on.
+static func _phase(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(9, 11), room)
+	Levels.rect(g, x + w / 2, STAND - 3, 2, 4, "p")
+	spots.append(Vector2i(x + w / 2, STAND - 5))
 	return w
 
 

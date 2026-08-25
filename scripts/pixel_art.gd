@@ -573,6 +573,19 @@ const GRIDS := {
 		"........",
 		"........",
 	],
+	# Step 14 — phase block. Purple hatch on a dotted border: solid enough to
+	# read as a wall, patterned enough to read as not a real one. Level dims it
+	# further (modulate.a) while it is actually passable.
+	"phase_block": [
+		"#.#.#.#.",
+		".p.p.p.#",
+		"#.p.p.p.",
+		".p.p.p.#",
+		"#.p.p.p.",
+		".p.p.p.#",
+		"#.p.p.p.",
+		".#.#.#.#",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

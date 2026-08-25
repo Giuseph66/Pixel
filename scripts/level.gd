@@ -37,6 +37,11 @@ var best_combo := 0
 var switch_state := false
 var _gates: Array = []
 var _switches: Array = []
+## Step 14 — phase blocks. A block is intangible while anyone in the room is
+## mid-dash, so this tracks who currently is rather than trusting a single
+## player's state in a mode where more than one can exist.
+var _phase_blocks: Array = []
+var _dashing: Dictionary = {}
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
@@ -328,6 +333,8 @@ func _spawn_entities() -> void:
 	switch_state = false
 	_gates = []
 	_switches = []
+	_phase_blocks = []
+	_dashing = {}
 
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
@@ -412,6 +419,11 @@ func _spawn_entities() -> void:
 					shield.is_ground = Callable(self, "is_ground")
 					shield.squashed.connect(_on_slime_squashed)
 					_entities.add_child(shield)
+				"p":
+					var phase := PhaseBlock.new()
+					phase.position = tile_center(tx, ty)
+					_entities.add_child(phase)
+					_phase_blocks.append(phase)
 				"i":
 					var pad := SwitchPad.new()
 					pad.position = tile_center(tx, ty)
@@ -595,6 +607,7 @@ func _spawn_player(peer_id: int) -> void:
 	player.pounded.connect(_on_player_pounded)
 	player.combo_changed.connect(_on_combo_changed.bind(player))
 	player.combo_ended.connect(_on_combo_ended)
+	player.dash_changed.connect(_on_player_dash_changed.bind(player))
 	_entities.add_child(player)
 	_players[peer_id] = player
 	if peer_id == Session.local_peer_id() or _player == null:
@@ -709,6 +722,47 @@ func toggle_switch() -> void:
 		pad.refresh(switch_state)
 
 
+## A block is intangible for as long as anyone is dashing, and turns solid
+## again the instant nobody is — not when this one player's dash ends, since a
+## second player could still be inside it.
+func _on_player_dash_changed(active: bool, player: Player) -> void:
+	if active:
+		_dashing[player.peer_id] = true
+	else:
+		_dashing.erase(player.peer_id)
+
+	var anyone_dashing := not _dashing.is_empty()
+	for block: PhaseBlock in _phase_blocks:
+		block.set_solid(not anyone_dashing)
+	if not anyone_dashing:
+		for other: Player in get_players():
+			_eject_from_phase(other)
+
+
+## The dash ended inside a block. Push along whatever direction the player was
+## still moving until they clear every block, at most 32 steps — if that is
+## not enough the room's geometry is wrong, and getting stuck forever is worse
+## than a death with an obvious cause.
+func _eject_from_phase(player: Player) -> void:
+	if not player.alive or _phase_blocks.is_empty():
+		return
+	var dir := player.velocity.normalized()
+	if dir.length_squared() < 0.01:
+		dir = Vector2(player.facing, 0)
+	for step in 32:
+		if not _overlaps_any_phase(player.global_position):
+			return
+		player.global_position += dir * 2.0
+	player.kill()
+
+
+func _overlaps_any_phase(pos: Vector2) -> bool:
+	for block: PhaseBlock in _phase_blocks:
+		if block.contains(pos):
+			return true
+	return false
+
+
 func _on_block_broken(at: Vector2) -> void:
 	Audio.play_varied("break")
 	fx.emit(fx.to_local(at), 12, Palette.GOLD, 95.0, Vector2.ZERO, TAU, 0.45, 260.0)
@@ -771,6 +825,7 @@ func _on_player_died(player: Player) -> void:
 		return
 	deaths += 1
 	_door_arrivals.erase(player.peer_id)
+	_on_player_dash_changed(false, player)
 	if _door != null:
 		_door.reset_player(player.peer_id)
 	if not Session.is_active() or Session.is_host():

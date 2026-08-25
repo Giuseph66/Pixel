@@ -26,6 +26,7 @@ func _ready() -> void:
 	failures += _check_mirror()
 	failures += await _check_switch()
 	failures += await _check_wind()
+	failures += await _check_phase()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -664,6 +665,60 @@ func _collect_winds(node: Node, out: Array) -> void:
 		out.append(node)
 	for child in node.get_children():
 		_collect_winds(child, out)
+
+
+## Step 14. Confirms the block actually answers to the same signal the player
+## fires, and that clearing the dash makes it solid again without crashing
+## the ejection pass on a player who is nowhere near it.
+func _check_phase() -> int:
+	var bad := 0
+
+	var g := Levels.blank()
+	Levels.rect(g, 0, 27, Levels.COLS, 5, "#")
+	# One tile, not a whole wall — a wall is deliberately one PhaseBlock per
+	# grid cell (matching GateBlock's per-tile shape), so a multi-tile wall
+	# would fail this "exactly one" check for a reason that has nothing to do
+	# with the toggle this test actually cares about.
+	Levels.put(g, 30, 24, "p")
+	Levels.put(g, 4, 26, "P")
+	Levels.put(g, 54, 26, "X")
+	var room := Sandbox.normalise({"rows": Levels.bake(g)})
+
+	var level := Level.new()
+	level.setup(0, Sandbox.to_level_data(room))
+	add_child(level)
+	await get_tree().process_frame
+
+	var blocks: Array = []
+	_collect_phase_blocks(level, blocks)
+	if blocks.size() != 1:
+		bad += _fail("expected 1 PhaseBlock, found %d" % blocks.size())
+		level.queue_free()
+		await get_tree().process_frame
+		return bad
+
+	var block: PhaseBlock = blocks[0]
+	if not block.solid:
+		bad += _fail("a phase block starts intangible")
+
+	var player := level.get_player()
+	level._on_player_dash_changed(true, player)
+	if block.solid:
+		bad += _fail("the block stayed solid while the player was dashing")
+	level._on_player_dash_changed(false, player)
+	if not block.solid:
+		bad += _fail("the block stayed intangible after the dash ended")
+
+	level.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _collect_phase_blocks(node: Node, out: Array) -> void:
+	if node is PhaseBlock:
+		out.append(node)
+	for child in node.get_children():
+		_collect_phase_blocks(child, out)
 
 
 func _check_campaign() -> int:

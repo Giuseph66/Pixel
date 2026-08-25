@@ -392,6 +392,20 @@ const STRINGS := {
 	"level.wind_spike.name": "AIR CURRENT",
 	"level.wind_spike.hint": "IT FORGIVES MOST OF THE FALL. NOT ALL OF IT",
 
+	"codex.phase.name": "PHASE BLOCK",
+	"codex.phase.text": "SOLID, EXCEPT TO A DASH. THREE TILES IS THE LIMIT",
+
+	"level.phase_first.name": "PASS THROUGH",
+	"level.phase_first.hint": "THE DASH GOES RIGHT THROUGH IT",
+	"level.phase_choice.name": "TWO DOORS",
+	"level.phase_choice.hint": "OVER THE TOP, OR STRAIGHT THROUGH",
+	"level.phase_crystal.name": "THE CHAIN",
+	"level.phase_crystal.hint": "EACH CRYSTAL BUYS THE NEXT WALL",
+	"level.phase_trap.name": "CAUGHT INSIDE",
+	"level.phase_trap.hint": "THE DASH BARELY REACHES THE OTHER SIDE",
+	"level.phase_gems.name": "TUCKED AWAY",
+	"level.phase_gems.hint": "ONE GEM SITS BEHIND THE WALL ITSELF",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -550,6 +564,8 @@ const STRINGS := {
 	"pal.wind_up.note": "A COLUMN. SLOWS A FALL, NEVER STOPS IT",
 	"pal.wind_side.name": "WIND (SIDE)",
 	"pal.wind_side.note": "A BAND. ALWAYS PUSHES LEFT",
+	"pal.phase.name": "PHASE BLOCK",
+	"pal.phase.note": "SOLID, EXCEPT TO A DASH. 3 TILES THICK, AT MOST",
 },
 
 "pt": {
@@ -868,6 +884,20 @@ const STRINGS := {
 	"level.wind_spike.name": "CORRENTE DE AR",
 	"level.wind_spike.hint": "ELE PERDOA QUASE TODA A QUEDA. NAO TODA",
 
+	"codex.phase.name": "BLOCO DE FASE",
+	"codex.phase.text": "SOLIDO, MENOS PARA O DASH. TRES TILES E O LIMITE",
+
+	"level.phase_first.name": "ATRAVESSE",
+	"level.phase_first.hint": "O DASH PASSA DIRETO POR ELE",
+	"level.phase_choice.name": "DUAS PORTAS",
+	"level.phase_choice.hint": "POR CIMA, OU DIRETO POR DENTRO",
+	"level.phase_crystal.name": "A CADEIA",
+	"level.phase_crystal.hint": "CADA CRISTAL PAGA A PROXIMA PAREDE",
+	"level.phase_trap.name": "PRESO DENTRO",
+	"level.phase_trap.hint": "O DASH MAL ALCANCA O OUTRO LADO",
+	"level.phase_gems.name": "ESCONDIDA",
+	"level.phase_gems.hint": "UMA GEMA FICA DENTRO DA PROPRIA PAREDE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1026,6 +1056,8 @@ const STRINGS := {
 	"pal.wind_up.note": "UMA COLUNA. SEGURA A QUEDA, NUNCA PARA",
 	"pal.wind_side.name": "VENTO (LADO)",
 	"pal.wind_side.note": "UMA FAIXA. SEMPRE EMPURRA PARA A ESQUERDA",
+	"pal.phase.name": "BLOCO DE FASE",
+	"pal.phase.note": "SOLIDO, MENOS PARA O DASH. NO MAXIMO 3 TILES",
 },
 
 "es": {
@@ -1344,6 +1376,20 @@ const STRINGS := {
 	"level.wind_spike.name": "CORRIENTE DE AIRE",
 	"level.wind_spike.hint": "PERDONA CASI TODA LA CAIDA. NO TODA",
 
+	"codex.phase.name": "BLOQUE DE FASE",
+	"codex.phase.text": "SOLIDO, SALVO PARA EL DASH. TRES TILES ES EL LIMITE",
+
+	"level.phase_first.name": "ATRAVIESA",
+	"level.phase_first.hint": "EL DASH PASA DIRECTO POR EL",
+	"level.phase_choice.name": "DOS PUERTAS",
+	"level.phase_choice.hint": "POR ARRIBA, O DIRECTO POR DENTRO",
+	"level.phase_crystal.name": "LA CADENA",
+	"level.phase_crystal.hint": "CADA CRISTAL PAGA EL SIGUIENTE MURO",
+	"level.phase_trap.name": "ATRAPADO DENTRO",
+	"level.phase_trap.hint": "EL DASH APENAS ALCANZA EL OTRO LADO",
+	"level.phase_gems.name": "ESCONDIDA",
+	"level.phase_gems.hint": "UNA GEMA ESTA DENTRO DEL PROPIO MURO",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1502,5 +1548,7 @@ const STRINGS := {
 	"pal.wind_up.note": "UNA COLUMNA. FRENA LA CAIDA, NUNCA PARA",
 	"pal.wind_side.name": "VIENTO (LADO)",
 	"pal.wind_side.note": "UNA FRANJA. SIEMPRE EMPUJA A LA IZQUIERDA",
+	"pal.phase.name": "BLOQUE DE FASE",
+	"pal.phase.note": "SOLIDO, SALVO PARA EL DASH. 3 TILES COMO MAXIMO",
 },
 }

@@ -16,6 +16,9 @@ signal combo_changed(count: int, verb: int)
 ## reads this to cash in the score — combo_changed alone cannot tell "grew"
 ## from "about to end" apart.
 signal combo_ended(final_count: int)
+## Step 14 — phase blocks. Emitted the instant a dash starts and the instant
+## it ends, so Level never has to poll is_dashing() to know when to react.
+signal dash_changed(active: bool)
 
 ## POUND is listed because the design does — a pound always resolves by
 ## touching the ground, which is the same instant the combo resets, so it is
@@ -321,6 +324,10 @@ func is_pounding() -> bool:
 	return _pound == 2
 
 
+func is_dashing() -> bool:
+	return _dash > 0.0
+
+
 ## Mark one verb used this time in the air. A repeat (dash chained off a wall
 ## touch, say) is not a new count — the point is variety, not spam.
 func _add_verb(verb: int) -> void:
@@ -362,6 +369,7 @@ func _try_dash(input: float, controls: Dictionary) -> void:
 
 	_found("dash")
 	_add_verb(Verb.DASH)
+	dash_changed.emit(true)
 	has_dash = false
 	_dash = DASH_TIME
 	_lock = DASH_TIME
@@ -385,6 +393,7 @@ func _tick_dash(delta: float) -> void:
 		if _dash_dir.y < 0.0:
 			velocity.y = maxf(velocity.y, JUMP_VELOCITY * 0.5)
 		_dash_cool = DASH_COOLDOWN
+		dash_changed.emit(false)
 
 
 ## Give the charge back. Ground, walls, stomps, springs and crystals all do.

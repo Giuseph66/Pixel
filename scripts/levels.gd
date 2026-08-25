@@ -1154,6 +1154,85 @@ static func _level_wind_spike() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 14 — bloco de fase. Solid, except for the 0.14s a dash is in the air —
+## DASH_TIME * DASH_SPEED covers about four tiles, so three tiles is the
+## thickest one of these should ever be built.
+
+## A wall, a floor on both sides. The room is one question: does the dash
+## really go through that?
+static func _level_phase_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 30, 20, 2, 7, "p")
+	puts(g, [Vector2i(20, 26), Vector2i(40, 26), Vector2i(48, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## A bridge over the top, or two phase walls straight through — the floor
+## between them refills the dash for free, so the short way costs nothing but
+## the nerve to take it.
+static func _level_phase_choice() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 16, 20, 2, 7, "p")
+	rect(g, 34, 20, 2, 7, "p")
+	rect(g, 8, 13, 2, 14, "#")
+	rect(g, 48, 13, 2, 14, "#")
+	rect(g, 10, 10, 40, 1, "-")
+	puts(g, [Vector2i(24, 26), Vector2i(44, 26), Vector2i(28, 8)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## One continuous pit under three phase walls. There is no ground to touch
+## between them — only the crystals give the dash back, and there are two of
+## them for three walls.
+static func _level_phase_crystal() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 27, 36, 3, ".")
+	rect(g, 12, 30, 36, 1, "^")
+	rect(g, 14, 20, 2, 7, "p")
+	put(g, 18, 23, "d")
+	rect(g, 25, 20, 2, 7, "p")
+	put(g, 29, 23, "d")
+	rect(g, 36, 20, 2, 7, "p")
+	puts(g, [Vector2i(21, 22), Vector2i(48, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Three tiles — the limit — and barely anywhere to land. Failing here just
+## means bumping into a wall; the room's only job is to say how far is too far.
+static func _level_phase_trap() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 30, 20, 3, 7, "p")
+	puts(g, [Vector2i(20, 26), Vector2i(44, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## A gem sealed in a nook with no other way in. The wall around it never
+## moves; only the phase panel set into one side of it ever does.
+static func _level_phase_gems() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 30, 19, 8, 9, "#")
+	rect(g, 32, 22, 4, 4, ".")
+	rect(g, 30, 22, 2, 4, "p")
+	put(g, 34, 25, "o")
+	puts(g, [Vector2i(16, 26), Vector2i(46, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1581,6 +1660,41 @@ static func _campaign() -> Array:
 			"hint": "level.wind_spike.hint",
 			"par": 50.0,
 			"rows": _level_wind_spike(),
+		},
+		{
+			"id": "phase_first",
+			"name": "level.phase_first.name",
+			"hint": "level.phase_first.hint",
+			"par": 22.0,
+			"rows": _level_phase_first(),
+		},
+		{
+			"id": "phase_choice",
+			"name": "level.phase_choice.name",
+			"hint": "level.phase_choice.hint",
+			"par": 40.0,
+			"rows": _level_phase_choice(),
+		},
+		{
+			"id": "phase_crystal",
+			"name": "level.phase_crystal.name",
+			"hint": "level.phase_crystal.hint",
+			"par": 48.0,
+			"rows": _level_phase_crystal(),
+		},
+		{
+			"id": "phase_trap",
+			"name": "level.phase_trap.name",
+			"hint": "level.phase_trap.hint",
+			"par": 44.0,
+			"rows": _level_phase_trap(),
+		},
+		{
+			"id": "phase_gems",
+			"name": "level.phase_gems.name",
+			"hint": "level.phase_gems.hint",
+			"par": 50.0,
+			"rows": _level_phase_gems(),
 		},
 	]
 
