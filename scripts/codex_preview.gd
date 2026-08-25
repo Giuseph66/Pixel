@@ -26,6 +26,8 @@ static func draw(ci: CanvasItem, id: String, rect: Rect2, t: float) -> bool:
 		"stomp": _stomp(ci, rect, cx, floor_y, t)
 		"dash": _dash(ci, rect, cx, floor_y, t)
 		"pound": _pound(ci, rect, cx, floor_y, t)
+		"combo": _combo(ci, rect, cx, floor_y, t)
+		"charge": _charge(ci, rect, cx, floor_y, t)
 
 		"slime": _patrol(ci, rect, cx, floor_y, t, "slime_a", "slime_b", 0.45)
 		"bat": _bat(ci, rect, cx, floor_y, t)
@@ -51,20 +53,21 @@ static func draw(ci: CanvasItem, id: String, rect: Rect2, t: float) -> bool:
 ## One sprite, centred, optionally mirrored, faded or squashed. Mirroring goes
 ## through draw_set_transform because draw_texture_rect has no flip of its own.
 static func _spr(ci: CanvasItem, name: String, center: Vector2, scale: float = SCALE,
-		flip := false, alpha := 1.0, squash := Vector2.ONE) -> void:
+		flip := false, alpha := 1.0, squash := Vector2.ONE, tint := Color.WHITE) -> void:
 	var tex := PixelArt.tex(name)
 	var size := Vector2(tex.get_width(), tex.get_height()) * scale * squash
 	ci.draw_set_transform(Vector2(roundf(center.x), roundf(center.y)), 0.0,
 		Vector2(-1.0 if flip else 1.0, 1.0))
-	ci.draw_texture_rect(tex, Rect2(-size * 0.5, size), false, Color(1.0, 1.0, 1.0, alpha))
+	ci.draw_texture_rect(tex, Rect2(-size * 0.5, size), false, Color(tint.r, tint.g, tint.b, alpha))
 	ci.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## Sprite standing on the floor line rather than centred on a point.
 static func _stand(ci: CanvasItem, name: String, x: float, floor_y: float,
-		scale: float = SCALE, flip := false, alpha := 1.0) -> void:
+		scale: float = SCALE, flip := false, alpha := 1.0, tint := Color.WHITE) -> void:
 	var tex := PixelArt.tex(name)
-	_spr(ci, name, Vector2(x, floor_y - tex.get_height() * scale * 0.5), scale, flip, alpha)
+	_spr(ci, name, Vector2(x, floor_y - tex.get_height() * scale * 0.5), scale, flip, alpha,
+		Vector2.ONE, tint)
 
 
 ## A burst timed to one instant in the loop rather than accumulated frame by
@@ -240,6 +243,80 @@ static func _pound(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: fl
 		var sink_y := lerpf(block_y - 6.0, rect.end.y - 9.0, fall)
 		var alpha := 0.8 * (1.0 - clampf((fall - 0.72) / 0.28, 0.0, 1.0))
 		_spr(ci, "player_fall", Vector2(cx, sink_y), SCALE, false, alpha)
+
+
+## Three distinct aerial verbs chained before landing — dash, wall, stomp —
+## same as level.gd's own _on_combo_changed() popup, same colour grading
+## (cyan under 4, gold from 4, this preview never gets there so it never
+## needs white). The landing burst is the score cashing in, level.gd's
+## _on_combo_ended().
+static func _combo(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
+	_ground(ci, rect, floor_y)
+	var wall_x := cx + 40.0
+	var land_x := cx - 24.0
+	var u := _cycle(t, 3.2)
+
+	if u < 0.22:
+		# Verb 1 — dash in from the left, low over the ground.
+		var p := u / 0.22
+		var x := lerpf(rect.position.x + 14.0, wall_x - 6.0, p)
+		for i in 3:
+			var lag := clampf(p - 0.12 * float(i + 1), 0.0, 1.0)
+			_stand(ci, "player_jump", lerpf(rect.position.x + 14.0, wall_x - 6.0, lag),
+				floor_y - 18.0, SCALE, false, 0.3 - 0.07 * float(i))
+		_stand(ci, "player_jump", x, floor_y - 18.0)
+		if p > 0.92:
+			PixelFont.draw_text_centered(ci, "X1", wall_x, floor_y - 60.0, Palette.CYAN, 2)
+	elif u < 0.5:
+		# Verb 2 — a beat clinging the wall it dashed into.
+		var p := (u - 0.22) / 0.28
+		var y := lerpf(floor_y - 40.0, floor_y - 14.0, p)
+		_spr(ci, "player_wall", Vector2(wall_x, y), SCALE, true)
+		if p < 0.2:
+			PixelFont.draw_text_centered(ci, "X2", wall_x, floor_y - 60.0, Palette.CYAN,
+				2 if p > 0.02 else 1)
+	elif u < 0.82:
+		# Verb 3 — kicks off the wall onto a slime below.
+		var p := (u - 0.5) / 0.32
+		var slime_y := floor_y - 8.0 * SCALE * 0.5
+		_stand(ci, "slime_a" if fmod(t * 5.0, 2.0) < 1.0 else "slime_b", land_x, floor_y)
+		if p < 0.55:
+			_spr(ci, "player_fall", Vector2(lerpf(wall_x, land_x, p / 0.55),
+				lerpf(floor_y - 14.0, slime_y - 16.0, p / 0.55)))
+		else:
+			var q := (p - 0.55) / 0.45
+			_spr(ci, "player_jump", Vector2(land_x, lerpf(slime_y - 16.0, floor_y - 30.0, q)))
+			if q < 0.2:
+				PixelFont.draw_text_centered(ci, "X3", land_x, floor_y - 60.0, Palette.CYAN,
+					2 if q > 0.02 else 1)
+	else:
+		# Landing — the chain ends, the score cashes in.
+		var p := (u - 0.82) / 0.18
+		_stand(ci, "player_idle", land_x, floor_y)
+		_burst(ci, Vector2(land_x, floor_y - 4.0), p * 0.58, 0.4, 10, Palette.GOLD, 65.0, 180.0,
+			1.0, -PI * 0.5, TAU)
+
+
+## Held on the ground, the sprite pulling toward gold exactly the way
+## player.gd's own _update_sprite() lerps it — then a taller arc than a plain
+## jump, the reward for the hold.
+static func _charge(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
+	_ground(ci, rect, floor_y)
+	var u := _cycle(t, 2.2)
+	if u < 0.38:
+		var p := u / 0.38
+		var tint := Color.WHITE.lerp(Palette.GOLD, p * 0.7)
+		_stand(ci, "player_idle", cx, floor_y, SCALE, false, 1.0, tint)
+		if p > 0.9:
+			_burst(ci, Vector2(cx, floor_y - 5.0), (p - 0.9) * 3.8, 0.3, 6, Palette.GOLD, 26.0,
+				90.0, 1.0, -PI * 0.5, PI)
+	else:
+		var p := (u - 0.38) / 0.62
+		var h := sin(p * PI) * 58.0
+		_stand(ci, "player_jump" if p < 0.5 else "player_fall", cx, floor_y - h)
+		if p < 0.06:
+			_burst(ci, Vector2(cx, floor_y - 5.0), p * 5.0, 0.3, 8, Palette.GOLD, 60.0, 180.0,
+				1.0, -PI * 0.5, TAU)
 
 
 # ----------------------------------------------------------------- creatures ---
