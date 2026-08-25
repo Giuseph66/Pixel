@@ -11,7 +11,7 @@ extends Node2D
 ## across two lines rather than clipped, because a name like "CUIDADO COM O
 ## VÃO" is wider than any single line a 100px card can hold.
 
-signal picked(index: int)
+signal picked(index: int, remix: bool)
 signal cancelled
 
 const SCREEN := Vector2(480, 270)
@@ -38,6 +38,10 @@ var cursor := 0
 var _scroll := 0
 var _levels: Array = []
 var _time := 0.0
+## Step 11 — the same 47 rooms, mirrored and faster, once the campaign is
+## finished. Its own toggle rather than a fourth PlaySelectScreen panel: this
+## screen already exists to browse rooms, and remix is still just rooms.
+var remix := false
 
 
 func _ready() -> void:
@@ -76,14 +80,24 @@ func _handle_input() -> void:
 		return
 
 	if Input.is_action_just_pressed("p_accept"):
-		if Save.is_unlocked(cursor):
+		if remix or Save.is_unlocked(cursor):
 			Audio.play("menu_select")
-			picked.emit(cursor)
+			picked.emit(cursor, remix)
 		else:
 			Audio.play("menu_back")
+	elif Input.is_action_just_pressed("p_restart"):
+		_toggle_remix()
 	elif Input.is_action_just_pressed("p_cancel"):
 		Audio.play("menu_back")
 		cancelled.emit()
+
+
+func _toggle_remix() -> void:
+	if not Save.remix_unlocked():
+		Audio.play("menu_back")
+		return
+	remix = not remix
+	Audio.play("menu_select")
 
 
 func _card_rect(i: int) -> Rect2:
@@ -110,8 +124,9 @@ func _follow_cursor() -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, SCREEN.x, SCREEN.y), Palette.BG)
-	PixelFont.draw_text_centered_shadow(self, Lang.t("select.title"), SCREEN.x * 0.5, 22.0,
-		Palette.WHITE, Palette.MAGENTA_DARK, 2)
+	var title := Lang.t("remix.title") if remix else Lang.t("select.title")
+	PixelFont.draw_text_centered_shadow(self, title, SCREEN.x * 0.5, 22.0,
+		Palette.PURPLE if remix else Palette.WHITE, Palette.MAGENTA_DARK, 2)
 
 	_follow_cursor()
 	for i in _levels.size():
@@ -123,7 +138,10 @@ func _draw() -> void:
 	_draw_scroll_marks()
 
 	PixelFont.draw_text_centered(self, Lang.t("select.footer"),
-		SCREEN.x * 0.5, SCREEN.y - 14.0, Palette.GREY_DARK, 1)
+		SCREEN.x * 0.5, SCREEN.y - 20.0, Palette.GREY_DARK, 1)
+	var remix_hint := Lang.t("remix.toggle") if Save.remix_unlocked() else Lang.t("remix.locked")
+	PixelFont.draw_text_centered(self, remix_hint, SCREEN.x * 0.5, SCREEN.y - 11.0,
+		Palette.PURPLE if Save.remix_unlocked() else Palette.GREY_DARK, 1)
 
 
 ## Small arrows down the right edge, so a screenful never looks like the whole
@@ -141,8 +159,8 @@ func _draw_scroll_marks() -> void:
 
 func _draw_card(i: int) -> void:
 	var rect := _card_rect(i)
-	var unlocked := Save.is_unlocked(i)
-	var cleared := Save.is_cleared(i)
+	var unlocked := true if remix else Save.is_unlocked(i)
+	var cleared := Save.is_cleared_remix(i) if remix else Save.is_cleared(i)
 	var selected := i == cursor
 	var blink := fmod(_time, 0.8) < 0.4
 
@@ -173,7 +191,10 @@ func _draw_card(i: int) -> void:
 		PixelFont.draw_text(self, "*", rect.position + Vector2(rect.size.x - 13.0, PAD),
 			Palette.GOLD, 2)
 
-	_draw_medal_dots(rect, Save.medals(i), Save.has_secret(i))
+	# Remix has no secret-gem or medal history worth its own dots yet, and
+	# borrowing the campaign's would show wins from a room this is not.
+	_draw_medal_dots(rect, Save.medals_remix(i) if remix else Save.medals(i),
+		false if remix else Save.has_secret(i))
 
 	var data: Dictionary = _levels[i]
 	var lines := _wrap(Lang.t(data["name"]), NAME_CHARS, NAME_LINES)
@@ -182,12 +203,15 @@ func _draw_card(i: int) -> void:
 			origin + Vector2(0, ROW_NAME + line_index * ROW_LINE),
 			Palette.WHITE if selected else Palette.GREY, 1)
 
-	var best := Save.best_time(i)
-	var under_par := best > 0.0 and best <= float(data["par"])
+	var best := Save.best_time_remix(i) if remix else Save.best_time(i)
+	var par := float(data["par"]) * (0.8 if remix else 1.0)
+	var under_par := best > 0.0 and best <= par
 	PixelFont.draw_text(self, Lang.t("select.time") + Util.format_time(best),
 		origin + Vector2(0, ROW_TIME), Palette.GOLD if under_par else Palette.GREY_DARK, 1)
 
-	var taken := Save.best_gems(i)
+	var taken := Save.best_gems_remix(i) if remix else Save.best_gems(i)
+	# Mirroring never touches the gem character, so the count is the same
+	# either way and there is no reason to pay for the mirror to get it.
 	var total := _count_gems(data["rows"])
 	var all_gems := total > 0 and taken >= total
 	PixelFont.draw_text(self, Lang.tf("select.gems", [taken, total]),

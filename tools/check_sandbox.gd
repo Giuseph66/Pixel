@@ -23,6 +23,7 @@ func _ready() -> void:
 	failures += _check_layout()
 	failures += _check_copy()
 	failures += await _check_input_guard()
+	failures += _check_mirror()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -451,6 +452,74 @@ func _check_wrap() -> int:
 		var rooms := Sandbox.read_file(str(entry["path"]))
 		print("check_sandbox: importable %s -> %d room(s)" % [entry["label"], rooms.size()])
 	return bad
+
+
+## Step 11. Mirroring shifts 'X' one column left to compensate for the door's
+## own rendering offset — see Levels.mirror(). That shift silently corrupts a
+## room if the target column was not empty air, so every campaign room gets
+## checked here rather than trusted from the one hand-verified example.
+func _check_mirror() -> int:
+	var bad := 0
+	var rooms := Levels.all()
+
+	for room: Dictionary in rooms:
+		var id: String = room.get("id", "?")
+		var rows: PackedStringArray = room["rows"]
+		var mirrored := Levels.mirror(rows)
+
+		if mirrored.size() != Levels.ROWS:
+			bad += _fail("mirror('%s') returned %d rows" % [id, mirrored.size()])
+			continue
+		for row: String in mirrored:
+			if row.length() != Levels.COLS:
+				bad += _fail("mirror('%s') produced a %d-wide row" % [id, row.length()])
+				break
+
+		# Multiset of characters has to survive, except the pairs mirror() is
+		# explicitly allowed to swap into each other ('>' <-> '<'). Everything
+		# else changing count means the door shift overwrote real terrain.
+		var before := _counts(rows)
+		var after := _counts(mirrored)
+		var pooled := {}
+		for ch: String in before:
+			pooled[ch] = true
+		for ch: String in after:
+			pooled[ch] = true
+		var seen := {}
+		for ch: String in pooled:
+			if seen.has(ch):
+				continue
+			var partner: String = Levels.MIRROR_PAIRS.get(ch, ch)
+			seen[ch] = true
+			seen[partner] = true
+			var before_sum := int(before.get(ch, 0)) + (int(before.get(partner, 0)) if partner != ch else 0)
+			var after_sum := int(after.get(ch, 0)) + (int(after.get(partner, 0)) if partner != ch else 0)
+			if before_sum != after_sum:
+				bad += _fail("mirror('%s') changed how many '%s'/'%s' tiles exist"
+					% [id, ch, partner])
+
+		var doors := 0
+		for row: String in mirrored:
+			doors += row.count("X")
+		if doors != 1:
+			bad += _fail("mirror('%s') has %d doors, expected 1" % [id, doors])
+
+		var spawns := 0
+		for row: String in mirrored:
+			spawns += row.count("P")
+		if spawns != 1:
+			bad += _fail("mirror('%s') has %d spawns, expected 1" % [id, spawns])
+
+	return bad
+
+
+func _counts(rows: PackedStringArray) -> Dictionary:
+	var out := {}
+	for row: String in rows:
+		for i in row.length():
+			var ch := row[i]
+			out[ch] = int(out.get(ch, 0)) + 1
+	return out
 
 
 func _check_campaign() -> int:

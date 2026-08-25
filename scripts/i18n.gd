@@ -173,6 +173,10 @@ const STRINGS := {
 	"select.title": "SELECT A ROOM",
 	"select.footer": "SPACE TO PLAY, ESC TO GO BACK",
 	"select.locked": "LOCKED",
+	"remix.title": "REMIX",
+	"remix.toggle": "R: REMIX, MIRRORED AND FASTER",
+	"remix.locked": "FINISH THE CAMPAIGN TO UNLOCK REMIX",
+	"remix.best": "REMIX BEST",
 	"select.time": "TIME ",
 	"select.gems": "GEMS %d/%d",
 
@@ -609,6 +613,10 @@ const STRINGS := {
 	"select.title": "ESCOLHA UMA SALA",
 	"select.footer": "ESPACO PARA JOGAR, ESC PARA VOLTAR",
 	"select.locked": "TRANCADA",
+	"remix.title": "REMIX",
+	"remix.toggle": "R: REMIX, ESPELHADO E MAIS RAPIDO",
+	"remix.locked": "TERMINE A CAMPANHA PARA DESTRAVAR O REMIX",
+	"remix.best": "MELHOR NO REMIX",
 	"select.time": "TEMPO ",
 	"select.gems": "GEMAS %d/%d",
 
@@ -1045,6 +1053,10 @@ const STRINGS := {
 	"select.title": "ELIGE UNA SALA",
 	"select.footer": "ESPACIO PARA JUGAR, ESC PARA VOLVER",
 	"select.locked": "BLOQUEADA",
+	"remix.title": "REMIX",
+	"remix.toggle": "R: REMIX, EN ESPEJO Y MAS RAPIDO",
+	"remix.locked": "TERMINA LA CAMPANA PARA DESBLOQUEAR EL REMIX",
+	"remix.best": "MEJOR EN REMIX",
 	"select.time": "TIEMPO ",
 	"select.gems": "GEMAS %d/%d",
 

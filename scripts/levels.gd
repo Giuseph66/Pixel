@@ -72,6 +72,40 @@ static func puts(grid: Array, points: Array, ch: String) -> void:
 		put(grid, p.x, p.y, ch)
 
 
+## Step 11 — remix. Only tiles whose meaning depends on which way they face
+## need an entry: everything else reads the same from either side.
+const MIRROR_PAIRS := {">": "<", "<": ">"}
+
+
+## A horizontal flip of the whole room. Row order is untouched; each row is
+## reversed and run through MIRROR_PAIRS so a belt still pushes the way its
+## picture points.
+##
+## The door needs one more correction after the reversal. 'X' is drawn offset
+## +TILE*0.5 from its own tile (level.gd centres a 12px sprite so it hangs over
+## the tile to its right and the one above). A plain reversal moves the tile
+## but not which side the sprite hangs off, so the frame ends up floating a
+## tile short of the terrain it was built against. Nudging the reversed X one
+## column further left is what puts it back in the corridor it was built for.
+static func mirror(rows: PackedStringArray) -> PackedStringArray:
+	var out := PackedStringArray()
+	for row: String in rows:
+		var line := ""
+		for i in range(row.length() - 1, -1, -1):
+			var ch := row[i]
+			line += String(MIRROR_PAIRS.get(ch, ch))
+		out.append(line)
+
+	for y in out.size():
+		var x := out[y].find("X")
+		if x > 0:
+			var line := out[y]
+			line[x] = "."
+			line[x - 1] = "X"
+			out[y] = line
+	return out
+
+
 static func bake(grid: Array) -> PackedStringArray:
 	var out := PackedStringArray()
 	for row: Array in grid:

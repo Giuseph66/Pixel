@@ -274,6 +274,63 @@ func can_pound() -> bool:
 	return pound_index >= 0 and is_unlocked(pound_index)
 
 
+# ------------------------------------------------------------------ remix ---
+
+## Every room mirrored and sped up, open once the campaign is finished. It has
+## its own progress, entirely separate from the campaign's.
+func remix_unlocked() -> bool:
+	return cleared_count() >= Levels.count()
+
+
+func is_cleared_remix(index: int) -> bool:
+	return bool(data["remix"]["cleared"].get(_key(index), false))
+
+
+func best_time_remix(index: int) -> float:
+	return float(data["remix"]["best_times"].get(_key(index), 0.0))
+
+
+func best_gems_remix(index: int) -> int:
+	return int(data["remix"]["gems"].get(_key(index), 0))
+
+
+func medals_remix(index: int) -> int:
+	return int(data["remix"]["medals"].get(_key(index), 0))
+
+
+## Same shape as record_clear(), on the remix namespace. There is no unlock
+## counter to advance here — every remix room is open the moment the mode is.
+func record_clear_remix(index: int, time: float, gems: int, total_gems: int,
+		deaths: int, par: float) -> bool:
+	if not tracking:
+		return false
+	var key := _key(index)
+	var remix: Dictionary = data["remix"]
+	var record := false
+
+	data["used"] = true
+	remix["cleared"][key] = true
+	var previous := best_time_remix(index)
+	if previous <= 0.0 or time < previous:
+		remix["best_times"][key] = time
+		record = previous > 0.0
+	if gems > best_gems_remix(index):
+		remix["gems"][key] = gems
+
+	var earned := 0
+	if par > 0.0 and time <= par:
+		earned |= MEDAL_TIME
+	if total_gems > 0 and gems >= total_gems:
+		earned |= MEDAL_GEMS
+	if deaths == 0:
+		earned |= MEDAL_CLEAN
+	remix["medals"][key] = medals_remix(index) | earned
+	last_awarded = earned & ~medals_remix(index)
+
+	save_game()
+	return record
+
+
 # --------------------------------------------------------------- discovery ---
 
 func knows(entry: String) -> bool:

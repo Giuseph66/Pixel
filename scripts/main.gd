@@ -12,6 +12,8 @@ var _busy := false
 # Endless run state. `_endless` is what every screen branches on; the rest is
 # the running tally shown in the summary once the run ends.
 var _endless := false
+## Step 11 — same 47 rooms, mirrored and 1.35x faster, own save namespace.
+var _remix := false
 var _run_seed := 0
 var _depth := 0
 var _run_time := 0.0
@@ -211,6 +213,10 @@ func _show_select() -> void:
 	_set_screen(screen)
 
 
+func _on_room_picked(index: int, remix: bool) -> void:
+	_go(func(): _start_room(index, remix))
+
+
 func _show_codex() -> void:
 	_clear_all()
 	var screen := CodexScreen.new()
@@ -315,6 +321,7 @@ func _start_network_game(config: Dictionary) -> void:
 	if mode == "endless":
 		_endless = true
 		_sandbox = false
+		_remix = false
 		_run_seed = int(config.get("seed", 0))
 		if _run_seed == 0:
 			_run_seed = randi()
@@ -429,6 +436,7 @@ func _on_editor_test() -> void:
 func _start_sandbox() -> void:
 	_endless = false
 	_sandbox = true
+	_remix = false
 	_current = _sandbox_index
 	_build_room(0, Sandbox.to_level_data(_sandbox_room))
 
@@ -474,17 +482,22 @@ func _on_options_chosen(id: String) -> void:
 	_go(_show_title)
 
 
-func _on_room_picked(index: int) -> void:
-	_go(func(): _start_room(index))
-
-
 # ---------------------------------------------------------------- gameplay ---
 
-func _start_room(index: int) -> void:
+func _start_room(index: int, remix: bool = false) -> void:
 	_endless = false
 	_sandbox = false
+	_remix = remix
 	_current = index
-	_build_room(index, _levels[index])
+	var data: Dictionary = (_levels[index] as Dictionary).duplicate()
+	if remix:
+		# duplicate() is load-bearing: without it this mirrors the shared
+		# dictionary in _levels in place, and every campaign room after this
+		# one boots up already flipped.
+		data["rows"] = Levels.mirror(data["rows"])
+		data["intensity"] = 1.35
+		data["par"] = float(data.get("par", 0.0)) * 0.8
+	_build_room(index, data)
 
 
 # --------------------------------------------------------------- endless ---
@@ -494,6 +507,7 @@ func _start_room(index: int) -> void:
 func _start_run() -> void:
 	_endless = true
 	_sandbox = false
+	_remix = false
 	_run_seed = randi()
 	_depth = 0
 	_run_time = 0.0
@@ -543,8 +557,8 @@ func _build_room(index: int, data: Dictionary) -> void:
 		_level.dash_unlocked = bool(_sandbox_room.get("dash", true))
 		_level.pound_unlocked = bool(_sandbox_room.get("pound", true))
 	else:
-		_level.dash_unlocked = Session.is_active() or _endless or Save.can_dash()
-		_level.pound_unlocked = Session.is_active() or _endless or Save.can_pound()
+		_level.dash_unlocked = Session.is_active() or _endless or _remix or Save.can_dash()
+		_level.pound_unlocked = Session.is_active() or _endless or _remix or Save.can_pound()
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)
 	add_child(_level)
@@ -586,13 +600,22 @@ func _on_room_completed(time: float, gems: int, total: int, score: int, best_com
 		_on_endless_room_completed(time, gems, total, score, best_combo)
 		return
 
-	var record := Save.record_clear(_current, time, gems, _levels.size(),
-		total, _level.deaths, float(_levels[_current].get("par", 0.0)))
-	var best := Save.best_time(_current)
+	var current_par := float(_levels[_current].get("par", 0.0)) * (0.8 if _remix else 1.0)
+	var record: bool
+	var best: float
+	var held: int
+	if _remix:
+		record = Save.record_clear_remix(_current, time, gems, total, _level.deaths, current_par)
+		best = Save.best_time_remix(_current)
+		held = Save.medals_remix(_current)
+	else:
+		record = Save.record_clear(_current, time, gems, _levels.size(),
+			total, _level.deaths, current_par)
+		best = Save.best_time(_current)
+		held = Save.medals(_current)
 	var deaths := _level.deaths
 	await get_tree().create_timer(0.45).timeout
 	var earned := Save.last_awarded
-	var held := Save.medals(_current)
 	_go(func(): _show_results(time, best, record, gems, total, deaths, held, earned))
 
 
@@ -654,13 +677,22 @@ func _show_results(time: float, best: float, record: bool, gems: int, total: int
 	screen.gems = gems
 	screen.gems_total = total
 	screen.deaths = deaths
-	screen.par = float(data["par"])
+	screen.par = float(data["par"]) * (0.8 if _remix else 1.0)
 	screen.medals = medals
 	screen.new_medals = new_medals
+	if _remix:
+		screen.best_label = Lang.t("remix.best")
 
 	if _current + 1 < _levels.size():
 		screen.items = [
 			{"id": "next", "label": Lang.t("results.next")},
+			{"id": "retry", "label": Lang.t("results.retry")},
+			{"id": "levels", "label": Lang.t("results.rooms")},
+		]
+	elif _remix:
+		# The remix has no ending ceremony of its own: the last room just
+		# loops back to picking one, same as any room in the middle of it.
+		screen.items = [
 			{"id": "retry", "label": Lang.t("results.retry")},
 			{"id": "levels", "label": Lang.t("results.rooms")},
 		]
@@ -678,7 +710,8 @@ func _on_results_chosen(id: String) -> void:
 	match id:
 		"next":
 			var index := _current + 1
-			_go(func(): _start_room(index))
+			var remix := _remix
+			_go(func(): _start_room(index, remix))
 		"continue":
 			_commit_room()
 			_go(_next_endless_room)
@@ -698,8 +731,10 @@ func _on_results_chosen(id: String) -> void:
 				_go(_next_endless_room)
 			else:
 				var index := _current
-				_go(func(): _start_room(index))
+				var remix := _remix
+				_go(func(): _start_room(index, remix))
 		"levels":
+			_remix = false
 			_go(_show_select)
 		"ending":
 			_go(_show_ending)
