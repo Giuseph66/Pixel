@@ -16,6 +16,7 @@ func _ready() -> void:
 	list_top = 112.0
 	footer = Lang.t("pause.footer")
 	show_codex_button = true
+	show_options_button = true
 	items = [
 		{"id": "resume", "label": Lang.t("pause.resume")},
 		{"id": "restart", "label": Lang.t("pause.restart")},

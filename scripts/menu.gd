@@ -25,20 +25,25 @@ var opaque := true              # false lets the paused game show through
 var list_top := 150.0
 var list_width := 260.0         # backdrop width behind the (non-opaque) list
 var line_height := 20.0
+var item_scale := ITEM_SCALE
 
 ## Set by TitleScreen and PauseMenu: draws the book icon top-right and lets
 ## p_codex emit chosen("codex") from anywhere on the screen, not just from a
 ## row in the list. Screens where the book makes no sense (options, results,
 ## a room-select grid with its own layout) leave this off.
 var show_codex_button := false
+## A compact settings shortcut used where the full "OPCOES" row wastes space.
+var show_options_button := false
 
 var _time := 0.0
 var _codex_icon: Texture2D
+var _options_icon: Texture2D
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_codex_icon = PixelArt.tex("icon_book")
+	_options_icon = PixelArt.tex("icon_gear")
 
 
 func _process(delta: float) -> void:
@@ -48,6 +53,10 @@ func _process(delta: float) -> void:
 
 
 func _handle_input() -> void:
+	if show_options_button and Input.is_action_just_pressed("p_options"):
+		Audio.play("menu_select")
+		chosen.emit("options")
+		return
 	if show_codex_button and Input.is_action_just_pressed("p_codex"):
 		Audio.play("menu_select")
 		chosen.emit("codex")
@@ -120,6 +129,8 @@ func _draw() -> void:
 
 	if show_codex_button:
 		_draw_codex_button()
+	if show_options_button:
+		_draw_options_button()
 
 
 func _list_left() -> float:
@@ -140,14 +151,14 @@ func _draw_item(i: int) -> void:
 		label += "  " + value
 
 	var color := Palette.WHITE if selected else Palette.GREY_DARK
-	PixelFont.draw_text_centered(self, label, SCREEN.x * 0.5, y, color, ITEM_SCALE)
+	PixelFont.draw_text_centered(self, label, SCREEN.x * 0.5, y, color, item_scale)
 
 	if selected:
-		var size := PixelFont.measure(label, ITEM_SCALE)
+		var size := PixelFont.measure(label, item_scale)
 		# The marker breathes so the eye finds it instantly.
 		var nudge := 0.0 if fmod(_time, 0.7) < 0.35 else 1.0
 		var x := SCREEN.x * 0.5 - size.x * 0.5 - CURSOR_GAP - nudge
-		PixelFont.draw_text(self, ">", Vector2(roundf(x), y), Palette.MAGENTA, ITEM_SCALE)
+		PixelFont.draw_text(self, ">", Vector2(roundf(x), y), Palette.MAGENTA, item_scale)
 
 
 ## Book icon, top-right, with the shortcut key under it and a pulsing dot
@@ -171,6 +182,31 @@ func _draw_codex_button() -> void:
 	Util.draw_panel(self, cap, Palette.BG_SOFT, Palette.GREY_DARK)
 	PixelFont.draw_text_centered(self, "C", cap.position.x + cap.size.x * 0.5,
 		cap.position.y + 2.0, Palette.WHITE, 1)
+
+
+func _options_rect() -> Rect2:
+	return Rect2(8.0, 5.0, 24.0, 24.0)
+
+
+func _draw_options_button() -> void:
+	var rect := _options_rect()
+	var hover := roundf(sin(_time * 2.2))
+	draw_texture_rect(_options_icon, Rect2(rect.position + Vector2(0.0, hover), rect.size), false)
+	var cap := Rect2(rect.position.x + 7.0, rect.position.y + rect.size.y + 3.0, 10.0, 10.0)
+	Util.draw_panel(self, cap, Palette.BG_SOFT, Palette.GREY_DARK)
+	PixelFont.draw_text_centered(self, "O", cap.position.x + cap.size.x * 0.5,
+		cap.position.y + 2.0, Palette.WHITE, 1)
+
+
+func _input(event: InputEvent) -> void:
+	if not show_options_button or not (event is InputEventMouseButton):
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	if _options_rect().grow(4.0).has_point(event.position):
+		Audio.play("menu_select")
+		chosen.emit("options")
+		get_viewport().set_input_as_handled()
 
 
 ## A faint moving field of dots, so no screen is ever dead flat.

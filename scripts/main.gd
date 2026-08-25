@@ -89,10 +89,11 @@ func _setup_input() -> void:
 	_action("p_down", [KEY_DOWN, KEY_S], [JOY_BUTTON_DPAD_DOWN], JOY_AXIS_LEFT_Y, 1.0)
 	_action("p_jump", [KEY_SPACE, KEY_Z, KEY_K, KEY_UP, KEY_W], [JOY_BUTTON_A])
 	_action("p_accept", [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER, KEY_Z], [JOY_BUTTON_A])
-	_action("p_cancel", [KEY_ESCAPE, KEY_X, KEY_BACKSPACE], [JOY_BUTTON_B])
+	_action("p_cancel", [KEY_ESCAPE, KEY_X], [JOY_BUTTON_B])
 	_action("p_dash", [KEY_SHIFT, KEY_C, KEY_J], [JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_X])
 	_action("p_restart", [KEY_R], [JOY_BUTTON_Y])
 	_action("p_pause", [KEY_ESCAPE, KEY_P], [JOY_BUTTON_START])
+	_action("p_options", [KEY_O])
 	# Only ever read on a menu screen (title, pause), never in a live room, so
 	# reusing the C key p_dash already owns causes no real conflict.
 	_action("p_codex", [KEY_C, KEY_TAB], [JOY_BUTTON_LEFT_SHOULDER])
@@ -589,7 +590,11 @@ func _on_room_completed(time: float, gems: int, total: int, score: int, best_com
 	if Session.is_active():
 		await get_tree().create_timer(0.45).timeout
 		if Session.is_host():
-			Session.return_to_lobby()
+			var next_level := _current + 1
+			if str(Session.config.get("mode", "")) == "story" and next_level < _levels.size():
+				Session.advance_story(next_level)
+			else:
+				Session.return_to_lobby()
 		return
 	if _sandbox:
 		var deaths := _level.deaths
@@ -802,6 +807,22 @@ func _on_pause_chosen(id: String) -> void:
 			if _pause != null:
 				_pause.visible = false
 			add_child(book)
+		"options":
+			var options := OptionsScreen.new()
+			options.opaque = false
+			options.chosen.connect(func(id: String):
+				if options.apply(id):
+					return
+				options.queue_free()
+				if _pause != null:
+					_pause.visible = true)
+			options.cancelled.connect(func():
+				options.queue_free()
+				if _pause != null:
+					_pause.visible = true)
+			if _pause != null:
+				_pause.visible = false
+			add_child(options)
 		"restart":
 			_close_pause()
 			_restart_room()

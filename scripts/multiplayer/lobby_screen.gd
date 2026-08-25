@@ -8,11 +8,12 @@ var message := ""
 
 func _ready() -> void:
 	super()
-	title = "SALA"
+	title = "LOBBY LAN"
 	footer = "TODOS PRONTOS PARA INICIAR"
 	allow_cancel = true
-	list_top = 164.0
-	line_height = 18.0
+	list_top = 154.0
+	line_height = 15.0
+	item_scale = 1
 	Session.roster_changed.connect(_refresh)
 	Session.config_changed.connect(_on_config_changed)
 	Session.join_failed.connect(_on_error)
@@ -123,15 +124,20 @@ func _mode_label(mode: String) -> String:
 
 
 func draw_header() -> void:
-	var code := str(Session.config.get("room_code", "LAN"))
-	PixelFont.draw_text_centered(self, "CODIGO LAN: " + code, SCREEN.x * 0.5, 56.0, Palette.CYAN, 1)
-	PixelFont.draw_text_centered(self, "%d/%d JOGADORES" % [Session.participants.size(), int(Session.config.get("max_players", 0))], SCREEN.x * 0.5, 70.0, Palette.GREY, 1)
+	var room_name := str(Session.config.get("room_name", "SALA"))
+	PixelFont.draw_text_centered(self, "SALA: " + room_name, SCREEN.x * 0.5, 58.0, Palette.CYAN, 1)
+	PixelFont.draw_text_centered(self, "%d/%d JOGADORES" % [Session.participants.size(), int(Session.config.get("max_players", 0))], SCREEN.x * 0.5, 72.0, Palette.GREY, 1)
+	var peer_ids: Array = Session.participants.keys()
+	peer_ids.sort()
 	var y := 88.0
-	for peer_id: int in Session.participants.keys():
+	for peer_id: int in peer_ids:
 		var participant: Dictionary = Session.participants[peer_id]
-		var marker := "HOST" if peer_id == 1 else ""
+		var marker := " [HOST]" if peer_id == 1 else ""
 		var ready := "PRONTO" if bool(participant.get("ready", false)) else "AGUARDA"
-		PixelFont.draw_text_centered(self, "%s %s %s" % [str(participant.get("name", "PLAYER")), marker, ready], SCREEN.x * 0.5, y, Palette.WHITE if peer_id == Session.local_peer_id() else Palette.GREY, 1)
+		var color := Player.player_color(int(participant.get("color", 0)))
+		if peer_id != Session.local_peer_id():
+			color = color.lerp(Palette.GREY, 0.35)
+		PixelFont.draw_text_centered(self, "%s%s - %s" % [str(participant.get("name", "PLAYER")), marker, ready], SCREEN.x * 0.5, y, color, 1)
 		y += 12.0
 	if not message.is_empty():
-		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 146.0, Palette.MAGENTA, 1)
+		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 138.0, Palette.MAGENTA, 1)

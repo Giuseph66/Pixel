@@ -5,12 +5,13 @@ signal created
 
 const MODES := ["story", "endless", "competitive", "sandbox"]
 
-var player_name := "HOST"
+var player_name := "JOGADOR"
 var room_name := "SALA"
 var password := ""
 var max_players := 4
 var mode_index := 0
 var level_index := 0
+var color_index := 0
 var port := SessionManager.DEFAULT_PORT
 var message := ""
 var _editing := ""
@@ -20,18 +21,20 @@ var _input_cooldown := 0.0
 func _ready() -> void:
 	super()
 	title = "CRIAR SALA"
-	footer = "ESQ/DIR ALTERA  ESPACO EDITA"
+	footer = "CIMA/BAIXO SELECIONA  ESQ/DIR MUDA  ESPACO EDITA"
 	allow_cancel = true
 	list_top = 70.0
-	line_height = 18.0
+	line_height = 16.0
+	item_scale = 1
 	items = [
-		{"id": "name", "label": "NOME", "value": player_name},
-		{"id": "room", "label": "SALA", "value": room_name},
+		{"id": "name", "label": "SEU NOME", "value": player_name},
+		{"id": "room", "label": "NOME DA SALA", "value": room_name},
+		{"id": "color", "label": "SUA COR", "value": "AZUL"},
 		{"id": "mode", "label": "MODO", "value": "HISTORIA"},
-		{"id": "level", "label": "SALA INICIAL", "value": "01"},
-		{"id": "capacity", "label": "CAPACIDADE", "value": str(max_players)},
-		{"id": "password", "label": "SENHA", "value": "SEM SENHA"},
-		{"id": "create", "label": "CRIAR"},
+		{"id": "level", "label": "FASE INICIAL", "value": "01"},
+		{"id": "capacity", "label": "MAX JOGADORES", "value": str(max_players)},
+		{"id": "password", "label": "SENHA DA SALA", "value": "SEM SENHA"},
+		{"id": "create", "label": "CRIAR SALA"},
 		{"id": "back", "label": "VOLTAR"},
 	]
 	_refresh()
@@ -84,7 +87,7 @@ func _activate() -> void:
 		"name", "room", "password":
 			_editing = id
 		"create":
-			Session.local_profile = {"name": player_name, "color": 0}
+			Session.local_profile = {"name": player_name, "color": color_index}
 			var room_data: Dictionary = {}
 			if MODES[mode_index] == "sandbox":
 				var rooms := Sandbox.all()
@@ -96,6 +99,7 @@ func _activate() -> void:
 				"max_players": max_players,
 				"port": port,
 				"password_required": not password.is_empty(),
+				"room_data": room_data,
 			}, password)
 			if err == OK:
 				created.emit()
@@ -110,6 +114,8 @@ func _change(step: int) -> void:
 	var id := str(items[cursor]["id"])
 	if id == "mode":
 		mode_index = wrapi(mode_index + step, 0, MODES.size())
+	elif id == "color":
+		color_index = wrapi(color_index + step, 0, Player.PLAYER_COLORS.size())
 	elif id == "level":
 		level_index = wrapi(level_index + step, 0, Levels.count())
 	elif id == "capacity":
@@ -136,6 +142,7 @@ func _set_text(id: String, value: String) -> void:
 func _refresh() -> void:
 	set_item_value("name", player_name + ("_" if _editing == "name" else ""))
 	set_item_value("room", room_name + ("_" if _editing == "room" else ""))
+	set_item_value("color", Player.player_color_name(color_index))
 	set_item_value("mode", ["HISTORIA", "INFINITO", "CORRIDA", "SANDBOX"][mode_index])
 	set_item_value("level", "%02d" % (level_index + 1))
 	set_item_value("capacity", str(max_players))
@@ -146,3 +153,20 @@ func _refresh() -> void:
 func draw_header() -> void:
 	if not message.is_empty():
 		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 52.0, Palette.MAGENTA, 1)
+
+
+func _draw_item(i: int) -> void:
+	var item: Dictionary = items[i]
+	var y := list_top + i * line_height
+	var selected := i == cursor
+	var label := str(item["label"])
+	var value := str(item.get("value", ""))
+	var color := Palette.WHITE if selected else Palette.GREY
+	if selected:
+		draw_rect(Rect2(70.0, y - 2.0, 340.0, 13.0), Palette.BG_SOFT)
+		PixelFont.draw_text(self, ">", Vector2(58.0, y), Palette.MAGENTA, 1)
+	PixelFont.draw_text(self, label, Vector2(82.0, y), color, 1)
+	if not value.is_empty():
+		var size := PixelFont.measure(value, 1)
+		var value_color := Player.player_color(color_index) if str(item["id"]) == "color" else color
+		PixelFont.draw_text(self, value, Vector2(398.0 - size.x, y), value_color, 1)

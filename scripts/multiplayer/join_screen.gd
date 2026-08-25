@@ -3,10 +3,11 @@ extends Menu
 
 signal joined
 
-var player_name := "PLAYER"
+var player_name := "JOGADOR"
 var address := "127.0.0.1"
 var port := SessionManager.DEFAULT_PORT
 var password := ""
+var color_index := 1
 var message := ""
 var _editing := ""
 var _input_cooldown := 0.0
@@ -15,16 +16,18 @@ var _input_cooldown := 0.0
 func _ready() -> void:
 	super()
 	title = "ENTRAR NA SALA"
-	footer = "IP PARA LAN  ESC VOLTA"
+	footer = "CIMA/BAIXO SELECIONA  ESQ/DIR MUDA  ESPACO EDITA"
 	allow_cancel = true
 	list_top = 78.0
-	line_height = 20.0
+	line_height = 18.0
+	item_scale = 1
 	items = [
-		{"id": "name", "label": "NOME", "value": player_name},
-		{"id": "address", "label": "IP", "value": address},
+		{"id": "name", "label": "SEU NOME", "value": player_name},
+		{"id": "address", "label": "IP DO HOST", "value": address},
 		{"id": "port", "label": "PORTA", "value": str(port)},
-		{"id": "password", "label": "SENHA", "value": "SEM SENHA"},
-		{"id": "join", "label": "CONECTAR"},
+		{"id": "color", "label": "SUA COR", "value": "ROSA"},
+		{"id": "password", "label": "SENHA DA SALA", "value": "SEM SENHA"},
+		{"id": "join", "label": "ENTRAR"},
 		{"id": "back", "label": "VOLTAR"},
 	]
 	Session.state_changed.connect(_on_session_state)
@@ -87,7 +90,7 @@ func _activate() -> void:
 			_editing = id
 		"join":
 			message = "CONECTANDO..."
-			Session.join_lan(address, port, {"name": player_name, "color": 1}, password)
+			Session.join_lan(address, port, {"name": player_name, "color": color_index}, password)
 		"back":
 			cancelled.emit()
 	_refresh()
@@ -96,6 +99,8 @@ func _activate() -> void:
 func _change(step: int) -> void:
 	if str(items[cursor]["id"]) == "port":
 		port = clampi(port + step, 1024, 65535)
+	elif str(items[cursor]["id"]) == "color":
+		color_index = wrapi(color_index + step, 0, Player.PLAYER_COLORS.size())
 	_refresh()
 
 
@@ -119,6 +124,7 @@ func _refresh() -> void:
 	set_item_value("name", player_name + ("_" if _editing == "name" else ""))
 	set_item_value("address", address + ("_" if _editing == "address" else ""))
 	set_item_value("port", str(port))
+	set_item_value("color", Player.player_color_name(color_index))
 	set_item_value("password", "*".repeat(password.length()) + ("_" if _editing == "password" else "") if not password.is_empty() else "SEM SENHA")
 	queue_redraw()
 
@@ -141,3 +147,20 @@ func _on_join_failed(reason: String) -> void:
 func draw_header() -> void:
 	if not message.is_empty():
 		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 56.0, Palette.MAGENTA, 1)
+
+
+func _draw_item(i: int) -> void:
+	var item: Dictionary = items[i]
+	var y := list_top + i * line_height
+	var selected := i == cursor
+	var label := str(item["label"])
+	var value := str(item.get("value", ""))
+	var color := Palette.WHITE if selected else Palette.GREY
+	if selected:
+		draw_rect(Rect2(70.0, y - 2.0, 340.0, 13.0), Palette.BG_SOFT)
+		PixelFont.draw_text(self, ">", Vector2(58.0, y), Palette.MAGENTA, 1)
+	PixelFont.draw_text(self, label, Vector2(82.0, y), color, 1)
+	if not value.is_empty():
+		var size := PixelFont.measure(value, 1)
+		var value_color := Player.player_color(color_index) if str(item["id"]) == "color" else color
+		PixelFont.draw_text(self, value, Vector2(398.0 - size.x, y), value_color, 1)

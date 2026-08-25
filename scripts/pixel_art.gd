@@ -402,6 +402,22 @@ const GRIDS := {
 		"YyyyyyyYyyyyyyY",
 		".YYYYYYYYYYYYY.",
 	],
+	# Compact control icon used by title and pause. The teeth deliberately stay
+	# square so it reads as a gear at native pixel scale rather than a flower.
+	"icon_gear": [
+		"..##....##..",
+		"..##....##..",
+		"##11####11##",
+		"##11111111##",
+		"..11####11..",
+		"..1##bb##1..",
+		"..1##bb##1..",
+		"..11####11..",
+		"##11111111##",
+		"##11####11##",
+		"..##....##..",
+		"..##....##..",
+	],
 	# --- ice, conveyors, retracting spikes ---
 	"ice": [
 		"########",

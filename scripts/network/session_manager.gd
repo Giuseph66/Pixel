@@ -12,6 +12,7 @@ signal join_failed(reason: String)
 signal game_start_requested(config: Dictionary)
 signal snapshot_received(snapshot: Dictionary)
 signal world_event_received(event: Dictionary)
+signal client_state_received(peer_id: int, snapshot: Dictionary)
 signal lobby_requested
 signal host_left
 
@@ -151,6 +152,16 @@ func return_to_lobby() -> void:
 	lobby_requested.emit()
 
 
+func advance_story(next_level_index: int) -> bool:
+	if not is_host() or state != State.PLAYING or str(config.get("mode", "")) != "story":
+		return false
+	config["level_index"] = maxi(0, next_level_index)
+	_set_state(State.LOADING)
+	game_started.rpc(config)
+	game_start_requested.emit(config.duplicate(true))
+	return true
+
+
 @rpc("authority", "call_remote", "reliable")
 func game_returned(host_config: Dictionary, host_participants: Dictionary) -> void:
 	if not is_client():
@@ -169,6 +180,13 @@ func send_input(frame: Dictionary) -> void:
 		_store_input(1, frame)
 	else:
 		receive_input.rpc_id(1, frame)
+
+
+## Clients own their immediate movement. The host trusts this state, resolves
+## shared world interactions from it, then relays it to the other screens.
+func publish_client_state(snapshot: Dictionary) -> void:
+	if is_client() and state == State.PLAYING:
+		receive_client_state.rpc_id(1, snapshot)
 
 
 func input_for(peer_id: int) -> Dictionary:
@@ -365,7 +383,7 @@ func send_ready_state(ready: bool) -> void:
 
 @rpc("authority", "call_remote", "reliable")
 func game_started(host_config: Dictionary) -> void:
-	if not is_client() or state != State.LOBBY:
+	if not is_client() or (state != State.LOBBY and state != State.PLAYING):
 		return
 	config = host_config.duplicate(true)
 	_set_state(State.LOADING)
@@ -380,6 +398,16 @@ func receive_input(frame: Dictionary) -> void:
 	if not participants.has(peer_id):
 		return
 	_store_input(peer_id, frame)
+
+
+@rpc("any_peer", "call_remote", "unreliable_ordered", 3)
+func receive_client_state(snapshot: Dictionary) -> void:
+	if not is_host() or state != State.PLAYING:
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if not participants.has(peer_id):
+		return
+	client_state_received.emit(peer_id, snapshot.duplicate(true))
 
 
 func _on_peer_connected(peer_id: int) -> void:

@@ -14,6 +14,7 @@ func _ready() -> void:
 	title = ""
 	list_top = 146.0
 	show_codex_button = true
+	show_options_button = true
 
 	# Story vs. endless is a choice inside PLAY now (see play_select_screen.gd)
 	# rather than its own row; audio and language live in OPTIONS; the codex is
@@ -23,7 +24,6 @@ func _ready() -> void:
 		{"id": "multiplayer", "label": "MULTIPLAYER"},
 		{"id": "levels", "label": ""},
 		{"id": "saves", "label": ""},
-		{"id": "options", "label": ""},
 	]
 	if OS.get_name() != "Web":
 		items.append({"id": "quit", "label": ""})
