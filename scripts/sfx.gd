@@ -144,6 +144,12 @@ static func library() -> Dictionary:
 			tone(520.0, 0.03, Wave.PULSE, 0.22, 1.0, 0.001, 0.015),
 			tone(340.0, 0.05, Wave.PULSE, 0.2, 1.0, 0.001, 0.03),
 		])),
+		# A quick upward sweep, unlike the dash's downward one — arriving reads
+		# differently from leaving even with the same two-tone shape.
+		"portal": to_stream(concat([
+			tone(240.0, 0.04, Wave.PULSE, 0.22, 1.0, 0.001, 0.02),
+			tone(560.0, 0.08, Wave.PULSE, 0.24, 1.4, 0.001, 0.05),
+		])),
 		"door": to_stream(concat([
 			tone(note_freq(69), 0.09, Wave.SQUARE, 0.24, 1.0, 0.002, 0.03),
 			tone(note_freq(76), 0.09, Wave.SQUARE, 0.24, 1.0, 0.002, 0.03),

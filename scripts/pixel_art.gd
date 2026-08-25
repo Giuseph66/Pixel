@@ -586,6 +586,28 @@ const GRIDS := {
 		"#.p.p.p.",
 		".#.#.#.#",
 	],
+	# Step 15 — portals. Same ring, cyan for one end and purple for the other —
+	# the colour is the only thing that says which tile belongs to which pair.
+	"portal_a": [
+		"........",
+		"..cccc..",
+		".c....c.",
+		"c......c",
+		"c......c",
+		".c....c.",
+		"..cccc..",
+		"........",
+	],
+	"portal_b": [
+		"........",
+		"..pppp..",
+		".p....p.",
+		"p......p",
+		"p......p",
+		".p....p.",
+		"..pppp..",
+		"........",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

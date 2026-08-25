@@ -328,6 +328,24 @@ func is_dashing() -> bool:
 	return _dash > 0.0
 
 
+## Step 15 — portals. Speed carries through unchanged; only the heading is
+## replaced with whatever the exit portal is aimed at. A dash still in
+## progress keeps landing on this new heading too, since otherwise it would
+## finish travelling toward a direction the exit never pointed at.
+func redirect(new_velocity: Vector2) -> void:
+	velocity = new_velocity
+	if _dash > 0.0:
+		_dash_dir = new_velocity.normalized() if new_velocity != Vector2.ZERO else _dash_dir
+
+
+## A ground pound crossing a portal has nothing sensible to become — it is a
+## fixed downward drop, and the exit may not even be pointed down. Cancelling
+## it is simpler than inventing a portal-flavoured pound.
+func cancel_pound() -> void:
+	_pound = 0
+	_pound_hang = 0.0
+
+
 ## Mark one verb used this time in the air. A repeat (dash chained off a wall
 ## touch, say) is not a new count — the point is variety, not spam.
 func _add_verb(verb: int) -> void:

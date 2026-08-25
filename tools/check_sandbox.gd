@@ -27,6 +27,7 @@ func _ready() -> void:
 	failures += await _check_switch()
 	failures += await _check_wind()
 	failures += await _check_phase()
+	failures += await _check_portal()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -719,6 +720,71 @@ func _collect_phase_blocks(node: Node, out: Array) -> void:
 		out.append(node)
 	for child in node.get_children():
 		_collect_phase_blocks(child, out)
+
+
+## Step 15. Confirms the pair actually links (Level._discover_contents()
+## walks the whole grid before wiring twins, which is easy to get backwards),
+## and that stepping into one really does move a player to the other with
+## speed kept and heading replaced by the exit's own facing.
+func _check_portal() -> int:
+	var bad := 0
+
+	var g := Levels.blank()
+	Levels.rect(g, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(g, 30, 1, 2, 26, "#")
+	Levels.put(g, 29, 26, "q")
+	Levels.put(g, 32, 26, "Q")
+	Levels.put(g, 4, 26, "P")
+	Levels.put(g, 54, 26, "X")
+	var room := Sandbox.normalise({"rows": Levels.bake(g)})
+
+	var level := Level.new()
+	level.setup(0, Sandbox.to_level_data(room))
+	add_child(level)
+	await get_tree().process_frame
+
+	var portals: Array = []
+	_collect_portals(level, portals)
+	if portals.size() != 2:
+		bad += _fail("expected 2 Portal nodes, found %d" % portals.size())
+	else:
+		var a: Portal = portals[0]
+		var b: Portal = portals[1]
+		if a.twin != b or b.twin != a:
+			bad += _fail("the portal pair did not link to each other")
+
+		var player := level.get_player()
+		var entry: Portal = a if a.facing == Vector2.LEFT else b
+		var exit_portal: Portal = b if entry == a else a
+		player.global_position = entry.global_position
+		player.velocity = Vector2(160.0, -40.0)
+
+		# Captured the instant the teleport is seen, before this player's own
+		# next physics step has a chance to bend the exit's heading back
+		# toward gravity and air friction.
+		var teleported := false
+		var seen_velocity := Vector2.ZERO
+		for i in 10:
+			await get_tree().physics_frame
+			if not teleported and player.global_position.distance_to(exit_portal.global_position) < 16.0:
+				teleported = true
+				seen_velocity = player.velocity
+
+		if not teleported:
+			bad += _fail("entering a portal did not move the player to its twin")
+		elif not seen_velocity.normalized().is_equal_approx(exit_portal.facing):
+			bad += _fail("the exit did not replace heading with its own facing")
+
+	level.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _collect_portals(node: Node, out: Array) -> void:
+	if node is Portal:
+		out.append(node)
+	for child in node.get_children():
+		_collect_portals(child, out)
 
 
 func _check_campaign() -> int:

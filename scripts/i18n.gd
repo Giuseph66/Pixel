@@ -406,6 +406,20 @@ const STRINGS := {
 	"level.phase_gems.name": "TUCKED AWAY",
 	"level.phase_gems.hint": "ONE GEM SITS BEHIND THE WALL ITSELF",
 
+	"codex.portal.name": "PORTAL",
+	"codex.portal.text": "SPEED AND HEADING SURVIVE THE TRIP. ONE PAIR PER ROOM",
+
+	"level.portal_first.name": "PASSAGE",
+	"level.portal_first.hint": "IT COMES OUT THE OTHER SIDE",
+	"level.portal_fall.name": "LONG FALL",
+	"level.portal_fall.hint": "THE FALL BUILDS THE SPEED THE EXIT NEEDS",
+	"level.portal_turn.name": "TURN",
+	"level.portal_turn.hint": "THE RUN COMES OUT AS A CLIMB",
+	"level.portal_gem.name": "BOOST",
+	"level.portal_gem.hint": "THE EXIT THROWS AS HARD AS THE ENTRY FELL",
+	"level.portal_saw.name": "RISK",
+	"level.portal_saw.hint": "THE BLADE SHARES THE DOORWAY",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -566,6 +580,10 @@ const STRINGS := {
 	"pal.wind_side.note": "A BAND. ALWAYS PUSHES LEFT",
 	"pal.phase.name": "PHASE BLOCK",
 	"pal.phase.note": "SOLID, EXCEPT TO A DASH. 3 TILES THICK, AT MOST",
+	"pal.portal_a.name": "PORTAL (A)",
+	"pal.portal_a.note": "NEEDS ITS PAIR SOMEWHERE IN THE ROOM",
+	"pal.portal_b.name": "PORTAL (B)",
+	"pal.portal_b.note": "NEEDS ITS PAIR SOMEWHERE IN THE ROOM",
 },
 
 "pt": {
@@ -898,6 +916,20 @@ const STRINGS := {
 	"level.phase_gems.name": "ESCONDIDA",
 	"level.phase_gems.hint": "UMA GEMA FICA DENTRO DA PROPRIA PAREDE",
 
+	"codex.portal.name": "PORTAL",
+	"codex.portal.text": "VELOCIDADE E DIRECAO SOBREVIVEM. UM PAR POR SALA",
+
+	"level.portal_first.name": "PASSAGEM",
+	"level.portal_first.hint": "SAI DO OUTRO LADO",
+	"level.portal_fall.name": "QUEDA LONGA",
+	"level.portal_fall.hint": "A QUEDA CONSTROI A VELOCIDADE QUE A SAIDA USA",
+	"level.portal_turn.name": "CURVA",
+	"level.portal_turn.hint": "A CORRIDA VIRA SUBIDA",
+	"level.portal_gem.name": "IMPULSO",
+	"level.portal_gem.hint": "A SAIDA LANCA TAO FORTE QUANTO A ENTRADA CAIU",
+	"level.portal_saw.name": "RISCO",
+	"level.portal_saw.hint": "A LAMINA DIVIDE A PORTA COM VOCE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1058,6 +1090,10 @@ const STRINGS := {
 	"pal.wind_side.note": "UMA FAIXA. SEMPRE EMPURRA PARA A ESQUERDA",
 	"pal.phase.name": "BLOCO DE FASE",
 	"pal.phase.note": "SOLIDO, MENOS PARA O DASH. NO MAXIMO 3 TILES",
+	"pal.portal_a.name": "PORTAL (A)",
+	"pal.portal_a.note": "PRECISA DO PAR EM ALGUM LUGAR DA SALA",
+	"pal.portal_b.name": "PORTAL (B)",
+	"pal.portal_b.note": "PRECISA DO PAR EM ALGUM LUGAR DA SALA",
 },
 
 "es": {
@@ -1390,6 +1426,20 @@ const STRINGS := {
 	"level.phase_gems.name": "ESCONDIDA",
 	"level.phase_gems.hint": "UNA GEMA ESTA DENTRO DEL PROPIO MURO",
 
+	"codex.portal.name": "PORTAL",
+	"codex.portal.text": "VELOCIDAD Y RUMBO SOBREVIVEN. UN PAR POR SALA",
+
+	"level.portal_first.name": "PASAJE",
+	"level.portal_first.hint": "SALE POR EL OTRO LADO",
+	"level.portal_fall.name": "CAIDA LARGA",
+	"level.portal_fall.hint": "LA CAIDA CONSTRUYE LA VELOCIDAD QUE USA LA SALIDA",
+	"level.portal_turn.name": "GIRO",
+	"level.portal_turn.hint": "LA CARRERA SE VUELVE SUBIDA",
+	"level.portal_gem.name": "IMPULSO",
+	"level.portal_gem.hint": "LA SALIDA LANZA TAN FUERTE COMO CAYO LA ENTRADA",
+	"level.portal_saw.name": "RIESGO",
+	"level.portal_saw.hint": "LA HOJA COMPARTE LA PUERTA CONTIGO",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1550,5 +1600,9 @@ const STRINGS := {
 	"pal.wind_side.note": "UNA FRANJA. SIEMPRE EMPUJA A LA IZQUIERDA",
 	"pal.phase.name": "BLOQUE DE FASE",
 	"pal.phase.note": "SOLIDO, SALVO PARA EL DASH. 3 TILES COMO MAXIMO",
+	"pal.portal_a.name": "PORTAL (A)",
+	"pal.portal_a.note": "NECESITA SU PAR EN ALGUN LUGAR DE LA SALA",
+	"pal.portal_b.name": "PORTAL (B)",
+	"pal.portal_b.note": "NECESITA SU PAR EN ALGUN LUGAR DE LA SALA",
 },
 }

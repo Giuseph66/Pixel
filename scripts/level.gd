@@ -42,6 +42,11 @@ var _switches: Array = []
 ## player's state in a mode where more than one can exist.
 var _phase_blocks: Array = []
 var _dashing: Dictionary = {}
+## Step 15 — portals. One pair per room; linked after the whole grid is
+## walked, since whichever one the scan reaches second does not exist yet
+## when the first is created.
+var _portal_a: Portal = null
+var _portal_b: Portal = null
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
@@ -191,6 +196,23 @@ func is_ground(tx: int, ty: int) -> bool:
 	return is_solid(tx, ty) or ch == "-"
 
 
+## Which way a portal launches whoever exits it. Inferred from whichever
+## neighbour is solid: horizontal first, since a portal set into the side of a
+## wall (the common case — it is usually stood on a normal floor too, which
+## would otherwise always win a vertical check) means "cross the wall",
+## and only a portal with nothing beside it falls back to reading up or down.
+func _portal_facing(tx: int, ty: int) -> Vector2:
+	if is_solid(tx - 1, ty):
+		return Vector2.RIGHT
+	if is_solid(tx + 1, ty):
+		return Vector2.LEFT
+	if is_solid(tx, ty + 1):
+		return Vector2.UP
+	if is_solid(tx, ty - 1):
+		return Vector2.DOWN
+	return Vector2.RIGHT
+
+
 ## What is_solid() cannot see: a gate reads the room's live switch state
 ## instead of the grid, since the grid never changes after the room is baked.
 ## Ground AI (Slime, Saw, ElasticSlime, ShieldEnemy) reads this instead of
@@ -335,6 +357,8 @@ func _spawn_entities() -> void:
 	_switches = []
 	_phase_blocks = []
 	_dashing = {}
+	_portal_a = null
+	_portal_b = null
 
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
@@ -424,6 +448,15 @@ func _spawn_entities() -> void:
 					phase.position = tile_center(tx, ty)
 					_entities.add_child(phase)
 					_phase_blocks.append(phase)
+				"q", "Q":
+					var portal := Portal.new()
+					portal.setup(_portal_facing(tx, ty))
+					portal.position = tile_center(tx, ty)
+					_entities.add_child(portal)
+					if ch == "q":
+						_portal_a = portal
+					else:
+						_portal_b = portal
 				"i":
 					var pad := SwitchPad.new()
 					pad.position = tile_center(tx, ty)
@@ -495,6 +528,14 @@ func _discover_contents() -> void:
 		_lava.players = get_players()
 	if Session.is_client():
 		_observe_host_world()
+
+	if _portal_a != null and _portal_b != null:
+		_portal_a.twin = _portal_b
+		_portal_b.twin = _portal_a
+	elif _portal_a != null or _portal_b != null:
+		# A portal with no twin is a dead tile that looks live — that has to
+		# fail loudly during development, not sit quietly in a shipped room.
+		push_error("Level: room %s has a 'q' or 'Q' with no matching pair" % str(data.get("id", index)))
 
 	_update_door_charge()
 

@@ -76,6 +76,8 @@ const ENTRIES := [
 	{"char": "u", "group": TERRAIN, "sprite": "wind_up", "unique": false, "run": true},
 	{"char": "U", "group": TERRAIN, "sprite": "wind_side", "unique": false, "run": true},
 	{"char": "p", "group": TERRAIN, "sprite": "phase_block", "unique": false, "run": false},
+	{"char": "q", "group": TERRAIN, "sprite": "portal_a", "unique": true, "run": false},
+	{"char": "Q", "group": TERRAIN, "sprite": "portal_b", "unique": true, "run": false},
 ]
 
 ## Character -> i18n suffix. The name and the one-line note under the palette
@@ -92,6 +94,7 @@ const KEYS := {
 	"i": "switch", "g": "gate_solid", "G": "gate_open",
 	"u": "wind_up", "U": "wind_side",
 	"p": "phase",
+	"q": "portal_a", "Q": "portal_b",
 }
 
 ## Painted over the icon where two tiles share a sprite. Three of the moving

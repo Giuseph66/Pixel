@@ -1233,6 +1233,95 @@ static func _level_phase_gems() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 15 — portais. 'q' and 'Q' are one pair; speed carries through and
+## heading becomes whichever way the exit is aimed — see
+## Level._portal_facing(). Only one pair per room, on purpose: a second pair
+## needs a way to say which entrance matches which exit, and this game has no
+## grammar for that.
+
+## A wall from ceiling to floor. The pair is the only way across, both ends
+## facing the same way, so the crossing reads as a straight walk with a wall
+## in the middle of it.
+static func _level_portal_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 30, 1, 2, 26, "#")
+	put(g, 29, 26, "q")
+	put(g, 32, 26, "Q")
+	puts(g, [Vector2i(20, 26), Vector2i(40, 26), Vector2i(50, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A floor portal at the bottom of a shaft, and its twin on a ledge partway up
+## the same shaft. Falling in builds speed the fall alone never would have let
+## you keep — the twin launches you back up with all of it.
+static func _level_portal_fall() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 24, 4, 2, 22, "#")
+	rect(g, 38, 4, 2, 22, "#")
+	rect(g, 26, 8, 10, 1, "-")
+	put(g, 30, 26, "q")
+	put(g, 30, 7, "Q")
+	puts(g, [Vector2i(30, 6), Vector2i(20, 26), Vector2i(46, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The entrance sits in a wall, the exit sits on a ledge. Speed carries over
+## unchanged; only the direction changes, and a horizontal run becomes a
+## vertical launch because that is the only thing the exit is aimed at.
+static func _level_portal_turn() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 28, 20, 2, 7, "#")
+	put(g, 27, 26, "q")
+	rect(g, 38, 6, 16, 1, "#")
+	put(g, 40, 5, "Q")
+	puts(g, [Vector2i(48, 4), Vector2i(20, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 5, "X")
+	return bake(g)
+
+
+## Both ends of the pair face up. Entering the floor portal with a run's worth
+## of speed comes out of the ledge portal with the same speed, straight up —
+## enough to clear a gem no jump alone reaches.
+static func _level_portal_gem() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 20, 4, 2, 22, "#")
+	rect(g, 34, 4, 2, 22, "#")
+	put(g, 26, 26, "q")
+	rect(g, 22, 8, 10, 1, "-")
+	put(g, 26, 7, "Q")
+	put(g, 26, 3, "o")
+	puts(g, [Vector2i(14, 26), Vector2i(44, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## The entrance sits inside a saw's own pen. Timing the crossing is timing the
+## blade, not the portal.
+static func _level_portal_saw() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 26, 25, 1, 2, "#")
+	rect(g, 34, 25, 1, 2, "#")
+	put(g, 30, 26, "W")
+	put(g, 27, 26, "q")
+	rect(g, 44, 20, 2, 7, "#")
+	put(g, 45, 26, "Q")
+	puts(g, [Vector2i(20, 26), Vector2i(50, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1695,6 +1784,41 @@ static func _campaign() -> Array:
 			"hint": "level.phase_gems.hint",
 			"par": 50.0,
 			"rows": _level_phase_gems(),
+		},
+		{
+			"id": "portal_first",
+			"name": "level.portal_first.name",
+			"hint": "level.portal_first.hint",
+			"par": 26.0,
+			"rows": _level_portal_first(),
+		},
+		{
+			"id": "portal_fall",
+			"name": "level.portal_fall.name",
+			"hint": "level.portal_fall.hint",
+			"par": 40.0,
+			"rows": _level_portal_fall(),
+		},
+		{
+			"id": "portal_turn",
+			"name": "level.portal_turn.name",
+			"hint": "level.portal_turn.hint",
+			"par": 44.0,
+			"rows": _level_portal_turn(),
+		},
+		{
+			"id": "portal_gem",
+			"name": "level.portal_gem.name",
+			"hint": "level.portal_gem.hint",
+			"par": 55.0,
+			"rows": _level_portal_gem(),
+		},
+		{
+			"id": "portal_saw",
+			"name": "level.portal_saw.name",
+			"hint": "level.portal_saw.hint",
+			"par": 50.0,
+			"rows": _level_portal_saw(),
 		},
 	]
 
