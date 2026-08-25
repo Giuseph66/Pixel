@@ -767,6 +767,20 @@ func _draw_entity(origin: Vector2, tx: int, ty: int, ch: String) -> void:
 		_draw_mark(Rect2(cell, Vector2(TILE, TILE)), ch, 1.0)
 
 
+## A texture rotated a half turn, filling exactly [top_left, top_left+size] —
+## the same 180 degrees Spike itself uses to hang from a ceiling. This used to
+## be a Rect2 built with a negated size, which reads as "the engine will
+## normalise this", but draw_texture_rect does not: it drew the flipped
+## texture into empty space, nowhere near the intended tile — the exact
+## failure the sandbox editor's tile tray shipped with. draw_set_transform is
+## the one way to rotate a draw call the engine actually guarantees.
+func _draw_texture_turned(tex: Texture2D, top_left: Vector2, size: Vector2,
+		tint: Color = Color.WHITE) -> void:
+	draw_set_transform(top_left + size, PI)
+	draw_texture_rect(tex, Rect2(Vector2.ZERO, size), false, tint)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
 ## One sprite centred in a tile. Turning it over is a half turn, not a mirror:
 ## that is what Spike does to hang itself from a ceiling, and a vertical flip
 ## alone put the highlight on the wrong side.
@@ -776,7 +790,7 @@ func _blit(tex: Texture2D, cell: Vector2, turned: bool = false,
 	var pos := (cell + (Vector2(TILE, TILE) - size) * 0.5).floor()
 	var tint := Color(1, 1, 1, alpha)
 	if turned:
-		draw_texture_rect(tex, Rect2(pos + size, -size), false, tint)
+		_draw_texture_turned(tex, pos, size, tint)
 	else:
 		draw_texture_rect(tex, Rect2(pos, size), false, tint)
 
@@ -878,7 +892,7 @@ func _draw_brush_icon(at: Vector2) -> void:
 	var tex := TilePalette.icon(brush)
 	var size := Vector2(tex.get_width(), tex.get_height())
 	if brush == "v":
-		draw_texture_rect(tex, Rect2(at + size, -size), false)
+		_draw_texture_turned(tex, at, size)
 	else:
 		draw_texture(tex, at)
 	_draw_mark(Rect2(at, size), brush, 0.0)
@@ -920,7 +934,7 @@ func _draw_swatch(rect: Rect2, ch: String, selected: bool, hovered: bool,
 		# A half turn, the same one Spike makes to hang from a ceiling. Turning
 		# it on the vertical axis alone put the lit edge on the wrong side and
 		# left the palette disagreeing with the room about the same tile.
-		draw_texture_rect(tex, Rect2(pos + size, -size), false)
+		_draw_texture_turned(tex, pos, size)
 	else:
 		draw_texture_rect(tex, Rect2(pos, size), false)
 

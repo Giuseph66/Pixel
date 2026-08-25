@@ -1139,18 +1139,26 @@ static func _level_wind_cross() -> PackedStringArray:
 	return bake(g)
 
 
-## A column standing directly over a spiked pit. Ride it and the crossing is
-## generous; drift off it and the pit is exactly as unforgiving as ever.
+## A column standing directly over a spiked pit, starting right at the takeoff
+## edge. Ride it and the crossing is generous; drift off it and the pit is
+## exactly as unforgiving as ever.
+##
+## The column used to start eight tiles into the pit instead of at its edge —
+## out of jump range even before the wind could do anything, which made the
+## room the "impossible" one this same plan flagged as never having been
+## played by a human. A run-and-jump physics simulation (not a real playtest,
+## but the numbers this game's jump is built from) puts the generous limit of
+## a running jump through a floor-to-ceiling column at 27-31 tiles; the pit
+## here is 20, for real margin rather than a room that is merely "solvable".
 static func _level_wind_spike() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 18, 27, 24, 3, ".")
-	rect(g, 18, 30, 24, 1, "^")
-	rect(g, 26, 10, 2, 17, "u")
-	rect(g, 44, 20, 8, 1, "-")
-	puts(g, [Vector2i(29, 8), Vector2i(48, 19)], "o")
+	rect(g, 18, 27, 20, 3, ".")
+	rect(g, 18, 30, 20, 1, "^")
+	rect(g, 19, 3, 5, 24, "u")
+	puts(g, [Vector2i(21, 6), Vector2i(30, 25)], "o")
 	put(g, 4, 26, "P")
-	put(g, 54, 26, "X")
+	put(g, 44, 26, "X")
 	return bake(g)
 
 
