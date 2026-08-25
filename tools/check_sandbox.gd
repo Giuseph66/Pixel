@@ -780,6 +780,24 @@ func _check_portal() -> int:
 
 	level.queue_free()
 	await get_tree().process_frame
+
+	# Regression: a portal standing on a one-way slab used to fall all the way
+	# through to the RIGHT default, because is_solid() alone does not count
+	# "-" as ground. portal_fall and portal_gem both stand their exit on one.
+	var g2 := Levels.blank()
+	Levels.rect(g2, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(g2, 10, 10, 4, 1, "-")
+	Levels.put(g2, 4, 26, "P")
+	Levels.put(g2, 54, 26, "X")
+	var room2 := Sandbox.normalise({"rows": Levels.bake(g2)})
+	var level2 := Level.new()
+	level2.setup(0, Sandbox.to_level_data(room2))
+	add_child(level2)
+	await get_tree().process_frame
+	if level2._portal_facing(11, 9) != Vector2.UP:
+		bad += _fail("a portal standing on a one-way slab did not face up")
+	level2.queue_free()
+	await get_tree().process_frame
 	return bad
 
 

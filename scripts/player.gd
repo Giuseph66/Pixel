@@ -116,14 +116,28 @@ var _charge_particle_t := 0.0
 var sprite: Sprite2D
 var fx: Fx
 
-## Multiplayer keeps the movement code shared with offline. The host gives a
-## remote player an input provider; clients simulate only their own player and
-## interpolate the rest from snapshots.
+## Multiplayer keeps the movement code shared with offline. A client runs its
+## own player immediately; the host trusts that snapshot and relays it to the
+## other peers, which interpolate remote players.
 var peer_id := 1
 var networked := false
 var locally_controlled := true
+var client_authority := false
+var color_index := 0
 var input_provider: Callable
 var _network_target := Vector2.ZERO
+
+const PLAYER_COLORS := [
+	Color.WHITE,
+	Color(1.0, 0.58, 0.82),
+	Color(0.64, 1.0, 0.66),
+	Color(1.0, 0.83, 0.40),
+	Color(0.78, 0.62, 1.0),
+	Color(1.0, 0.62, 0.45),
+	Color(0.60, 0.88, 1.0),
+	Color(0.86, 0.86, 0.90),
+]
+const PLAYER_COLOR_NAMES := ["AZUL", "ROSA", "VERDE", "OURO", "ROXO", "LARANJA", "CEU", "PRATA"]
 
 
 func _ready() -> void:
@@ -153,6 +167,9 @@ func _physics_process(delta: float) -> void:
 	if networked and Session.is_client() and not locally_controlled:
 		_tick_remote(delta)
 		return
+	if networked and Session.is_host() and client_authority:
+		_tick_remote(delta)
+		return
 	if not alive or frozen:
 		return
 
@@ -165,8 +182,6 @@ func _physics_process(delta: float) -> void:
 	_recover = maxf(_recover - delta, 0.0)
 
 	var controls := _read_controls()
-	if networked and locally_controlled and Session.is_client():
-		Session.send_input(controls)
 
 	var input := _axis(controls, "left", "right")
 	if _lock <= 0.0:
@@ -209,6 +224,8 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = is_on_floor()
 
 	_update_sprite(input)
+	if networked and locally_controlled and Session.is_client():
+		Session.publish_client_state(network_snapshot())
 
 
 # ------------------------------------------------------------- controls ---
@@ -256,6 +273,19 @@ func network_snapshot() -> Dictionary:
 
 func apply_network_snapshot(snapshot: Dictionary) -> void:
 	var target := Vector2(float(snapshot.get("x", position.x)), float(snapshot.get("y", position.y)))
+	if locally_controlled and Session.is_client():
+		# The local client already simulated this player. Only host-owned states
+		# such as death and freeze are accepted back; position stays responsive.
+		var was_alive := alive
+		alive = bool(snapshot.get("alive", alive))
+		frozen = bool(snapshot.get("frozen", frozen))
+		if not alive or (not was_alive and alive):
+			position = target
+			_network_target = target
+			velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
+		if sprite != null:
+			sprite.visible = alive
+		return
 	if locally_controlled:
 		if position.distance_to(target) > 18.0:
 			position = target
@@ -263,6 +293,20 @@ func apply_network_snapshot(snapshot: Dictionary) -> void:
 			position = position.lerp(target, 0.35)
 	else:
 		_network_target = target
+	velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
+	alive = bool(snapshot.get("alive", alive))
+	frozen = bool(snapshot.get("frozen", frozen))
+	has_dash = bool(snapshot.get("dash", has_dash))
+	facing = int(snapshot.get("facing", facing))
+	if sprite != null:
+		sprite.visible = alive
+
+
+func apply_client_state(snapshot: Dictionary) -> void:
+	if not client_authority:
+		return
+	position = Vector2(float(snapshot.get("x", position.x)), float(snapshot.get("y", position.y)))
+	_network_target = position
 	velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
 	alive = bool(snapshot.get("alive", alive))
 	frozen = bool(snapshot.get("frozen", frozen))
@@ -583,21 +627,34 @@ func _update_sprite(input: float) -> void:
 		key = "player_fall"
 
 	sprite.texture = PixelArt.tex(key)
-	# Spent dash reads as a dimmer sprite — the charge has to be visible
-	# without a meter stealing screen from a 480x270 room.
-	sprite.modulate = Color(1, 1, 1) if (has_dash or not dash_unlocked) \
-		else Color(0.62, 0.68, 0.9)
-	# A jump charging up pulses gold, on top of whatever the dash tint already
-	# set — the two never overlap in practice (charging needs standing still,
-	# a spent dash needs having just moved), but neither should erase the
-	# other if they somehow did.
+	# Charging takes over the tint outright rather than blending into whatever
+	# the dash tint already set: mixing the dim dash blue with gold pulls the
+	# blue channel down harder than the green one, and against this sprite's
+	# own cyan that reads as green, not gold — a real bug this comment used to
+	# wave off as "the two never overlap in practice". They can, and did.
+	var base_color := player_color(color_index)
 	if _charge > 0.0:
 		var t := _charge / CHARGE_TIME
-		sprite.modulate = sprite.modulate.lerp(Palette.GOLD, t * 0.7)
+		sprite.modulate = base_color.lerp(Palette.GOLD, t * 0.7)
+	elif has_dash or not dash_unlocked:
+		sprite.modulate = base_color
+	else:
+		# Spent dash reads as a dimmer sprite — visible without a meter
+		# stealing screen from a 480x270 room. Darkened from the original
+		# light blue on request; it read as washed out against the sky.
+		sprite.modulate = base_color.lerp(Palette.BG, 0.55)
 	if _wall_dir != 0:
 		sprite.flip_h = _wall_dir > 0
 	else:
 		sprite.flip_h = facing < 0
+
+
+static func player_color(index: int) -> Color:
+	return PLAYER_COLORS[posmod(index, PLAYER_COLORS.size())]
+
+
+static func player_color_name(index: int) -> String:
+	return PLAYER_COLOR_NAMES[posmod(index, PLAYER_COLOR_NAMES.size())]
 
 
 # ------------------------------------------------------------- reactions ---

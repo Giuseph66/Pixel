@@ -40,7 +40,13 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_time += delta
 	_squash = maxf(_squash - delta, 0.0)
-	_sprite.texture = PixelArt.tex("elastic_b" if _squash > 0.0 else "elastic_a")
+	# The walk cycle alternates the same two frames Slime and ShieldEnemy use
+	# theirs for — it used to sit on elastic_a the whole time it walked and
+	# only ever changed frame for the bounce, which read as barely alive.
+	# The bounce keeps its own, bigger tell: a real squash of the sprite's
+	# scale, not just a swapped frame.
+	_sprite.texture = PixelArt.tex("elastic_a" if fmod(_time * 5.0, 2.0) < 1.0 else "elastic_b")
+	_sprite.scale = Vector2(1.3, 0.7) if _squash > 0.0 else Vector2.ONE
 	_sprite.flip_h = direction > 0
 
 	if is_wall.is_valid() and is_ground.is_valid():

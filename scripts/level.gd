@@ -112,6 +112,8 @@ func _ready() -> void:
 		Session.snapshot_received.connect(_on_network_snapshot)
 		Session.world_event_received.connect(_on_network_world_event)
 		Session.roster_changed.connect(_on_roster_changed)
+		if Session.is_host():
+			Session.client_state_received.connect(_on_client_player_state)
 	running = true
 
 
@@ -133,7 +135,7 @@ func _physics_process(delta: float) -> void:
 	if not Session.is_active() or not Session.is_host() or not running:
 		return
 	_snapshot_time += delta
-	if _snapshot_time < 0.05:
+	if _snapshot_time < 0.033:
 		return
 	_snapshot_time = 0.0
 	var players: Array = []
@@ -220,7 +222,10 @@ func _laser_facing_h(tx: int, ty: int) -> Vector2:
 
 
 func _laser_facing_v(tx: int, ty: int) -> Vector2:
-	if is_solid(tx, ty + 1):
+	# is_ground(), not is_solid(): standing a 'K' on a one-way slab is a normal
+	# thing to build, and is_solid() alone does not count "-" as a floor — the
+	# same gap that silently mis-aimed a portal sitting on one.
+	if is_ground(tx, ty + 1):
 		return Vector2.UP
 	if is_solid(tx, ty - 1):
 		return Vector2.DOWN
@@ -233,7 +238,11 @@ func _portal_facing(tx: int, ty: int) -> Vector2:
 		return Vector2.RIGHT
 	if is_solid(tx + 1, ty):
 		return Vector2.LEFT
-	if is_solid(tx, ty + 1):
+	# is_ground(), not is_solid(): a portal standing on a one-way slab is a
+	# completely normal thing to build (portal_fall and portal_gem both do),
+	# and is_solid() alone does not count "-" as anything to stand on. That
+	# silently sent both of their exits firing right instead of up.
+	if is_ground(tx, ty + 1):
 		return Vector2.UP
 	if is_solid(tx, ty - 1):
 		return Vector2.DOWN
@@ -680,8 +689,9 @@ func _spawn_player(peer_id: int) -> void:
 	player.peer_id = peer_id
 	player.networked = Session.is_active()
 	player.locally_controlled = peer_id == Session.local_peer_id()
-	if player.networked and Session.is_host() and peer_id != 1:
-		player.input_provider = Session.input_for.bind(peer_id)
+	player.client_authority = player.networked and Session.is_host() and peer_id != 1
+	var profile: Dictionary = Session.participants.get(peer_id, {})
+	player.color_index = int(profile.get("color", 0))
 	player.position = _spawn + Vector2(float((_players.size() % 3) * 3), 0.0)
 	player.fx = fx
 	player.dash_unlocked = dash_unlocked
@@ -885,7 +895,7 @@ func _on_door_entered(player: Player) -> void:
 		return
 	if Session.is_active():
 		_door_arrivals[player.peer_id] = true
-		if not competitive and _door_arrivals.size() < Session.participants.size():
+		if not competitive and _door_arrivals.size() < _players.size():
 			return
 	else:
 		_door_arrivals[player.peer_id] = true
@@ -943,6 +953,14 @@ func _on_network_snapshot(snapshot: Dictionary) -> void:
 			player.apply_network_snapshot(player_state)
 	_apply_entity_snapshot(snapshot.get("entities", []))
 	_update_door_charge()
+
+
+func _on_client_player_state(peer_id: int, snapshot: Dictionary) -> void:
+	if not Session.is_host() or finished:
+		return
+	var player: Player = _players.get(peer_id)
+	if player != null:
+		player.apply_client_state(snapshot)
 
 
 func _observe_host_world() -> void:

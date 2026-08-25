@@ -1268,8 +1268,12 @@ static func _level_portal_first() -> PackedStringArray:
 static func _level_portal_fall() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 24, 4, 2, 22, "#")
-	rect(g, 38, 4, 2, 22, "#")
+	# Walls run all the way to the floor tile itself. Stopping one tile short
+	# used to leave an 8px gap under them — narrower than the player's own
+	# 10px height, so it read as an open crawlspace but nothing could fit
+	# through it. Sealed, the portal is the only way across on purpose.
+	rect(g, 24, 4, 2, 23, "#")
+	rect(g, 38, 4, 2, 23, "#")
 	rect(g, 26, 8, 10, 1, "-")
 	put(g, 30, 26, "q")
 	put(g, 30, 7, "Q")
@@ -1295,21 +1299,27 @@ static func _level_portal_turn() -> PackedStringArray:
 	return bake(g)
 
 
-## Both ends of the pair face up. Entering the floor portal with a run's worth
-## of speed comes out of the ledge portal with the same speed, straight up —
-## enough to clear a gem no jump alone reaches.
+## A single climbable post, not a pair of walls sealing off a corridor — this
+## used to share portal_fall's shape almost tile for tile, just relabelled.
+## The climb ends in open air with nothing on the other side: the fall is
+## twenty-two tiles, built entirely to feed the launch on the far end, and the
+## floor underneath stays walkable the whole width of the room. Both portal
+## ends face up, so all that fall becomes height on the way back out.
 static func _level_portal_gem() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	rect(g, 20, 4, 2, 22, "#")
-	rect(g, 34, 4, 2, 22, "#")
-	put(g, 26, 26, "q")
-	rect(g, 22, 8, 10, 1, "-")
-	put(g, 26, 7, "Q")
-	put(g, 26, 3, "o")
-	puts(g, [Vector2i(14, 26), Vector2i(44, 26)], "o")
+	rect(g, 8, 6, 2, 20, "#")
+	rect(g, 4, 22, 4, 1, "-")
+	rect(g, 4, 16, 4, 1, "-")
+	rect(g, 4, 10, 4, 1, "-")
+	rect(g, 6, 5, 6, 1, "-")
+	put(g, 22, 26, "q")
+	rect(g, 40, 22, 6, 1, "-")
+	put(g, 43, 21, "Q")
+	put(g, 43, 8, "o")
+	puts(g, [Vector2i(30, 26), Vector2i(50, 26)], "o")
 	put(g, 4, 26, "P")
-	put(g, 50, 26, "X")
+	put(g, 54, 26, "X")
 	return bake(g)
 
 
