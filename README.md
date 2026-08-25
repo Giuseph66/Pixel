@@ -67,9 +67,39 @@ scripts/
   menu.gd               shared skeleton for list-of-choices screens
   title_screen.gd  level_select.gd  results_screen.gd  ending_screen.gd
   pause_menu.gd  hud.gd  transition.gd  fx.gd  util.gd
+  sandbox.gd            custom rooms: store, validation, share files and codes
+  tile_palette.gd       the tile alphabet, named and grouped for the editor
+  editor_screen.gd  sandbox_screen.gd  room_preview.gd  text_field.gd
+rooms/                  drop a .pixelroom here and it joins the campaign
 assets/branding/icon.svg
 logo/                   the standalone logo generator and its exports
 ```
+
+## Sandbox
+
+A third mode next to the campaign and endless: an in-game room editor. The room
+is drawn 1:1 under the same 14px band the HUD uses in play, so what you see in
+the editor is the screen you get when you press play.
+
+Arrows move the cursor and space paints; the mouse paints too, with the wheel
+stepping through tiles. `TAB` opens the palette, `R` is a rectangle tool, `F`
+fills an area, `O` sets the room's name, par, entity speed and which moves are
+allowed in it, `P` plays it, `H` lists every key.
+
+A new room starts from an empty box, or as a copy — of a campaign room or of
+another one you made. The copy picker lists names on the left and draws the
+room large on the right, because a campaign name like GREED tells you nothing
+about what you are about to copy.
+
+Rooms are kept in `user://sandbox.json`. Exporting one writes a readable JSON
+file to `user://export/` **and** copies a `PIXEL1.…` share code to the
+clipboard, so a room travels either as a file or as a paste. Importing takes
+both.
+
+Dropping an exported file into [`rooms/`](rooms/README.md) puts it on the
+official map: `Levels.all()` scans that folder at boot and appends what it
+finds, no code change anywhere. The full write-up is in
+[docs/SANDBOX.md](docs/SANDBOX.md).
 
 ## Adding a room
 

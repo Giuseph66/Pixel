@@ -832,7 +832,7 @@ static func _level_shield_pit() -> PackedStringArray:
 	put(g, 30, 23, "E")
 	# Shield on the bridge, bat over it: one thing you cannot walk into and one
 	# thing you cannot jump over, stacked on the same twenty tiles.
-	put(g, 30, 21, "B")
+sda	put(g, 30, 21, "B")
 	puts(g, [Vector2i(22, 23), Vector2i(38, 23), Vector2i(50, 26)], "o")
 	put(g, 10, 20, "O")
 	put(g, 4, 26, "P")
@@ -902,6 +902,15 @@ static func _level_lava_gems() -> PackedStringArray:
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
+	var list: Array = _campaign()
+	# Rooms dropped into res://rooms/ join the campaign at the end, in filename
+	# order. That folder is how a sandbox room becomes an official one: export
+	# it, copy the file in, and the game finds it at boot with no code change.
+	list.append_array(Sandbox.pack_rooms())
+	return list
+
+
+static func _campaign() -> Array:
 	return [
 		{
 			"id": "first_steps",

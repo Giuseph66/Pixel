@@ -16,6 +16,11 @@ const RESPAWN_DELAY := 0.55
 var index := 0
 var data: Dictionary = {}
 var rows: PackedStringArray = PackedStringArray()
+## What the room's fixed randomness is drawn from — the star field behind it
+## and the height of each retracting blade. It is the room index in the
+## campaign, so nothing there changes; a sandbox room carries its own, which is
+## what lets the editor re-roll a starfield without moving a single tile.
+var art_seed := 0
 
 var time := 0.0
 var gems_taken := 0
@@ -49,6 +54,7 @@ func setup(level_index: int, level_data: Dictionary) -> void:
 	data = level_data
 	rows = level_data["rows"]
 	intensity = float(level_data.get("intensity", 1.0))
+	art_seed = int(level_data.get("seed", level_index))
 
 
 func _ready() -> void:
@@ -143,7 +149,7 @@ func _bake_background() -> ImageTexture:
 	# A fixed seed per level: the sky is different in every room but never
 	# changes between attempts.
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 9000 + index * 977
+	rng.seed = 9000 + art_seed * 977
 
 	for i in 90:
 		var x := rng.randi_range(1, w - 2)
@@ -345,18 +351,11 @@ func _spawn_entities() -> void:
 					var retract := RetractSpike.new()
 					retract.speed_scale = intensity
 					retract.position = tile_center(tx, ty)
-					# A blade of one to three tiles, drawn from the room index
-					# and the tile: random across the level, identical on every
-					# attempt at it. Rolling this per rebuild would make a room
-					# you had already learned lie to you on the next death.
-					var air := 0
-					while air <= RetractSpike.MAX_HEIGHT and is_air(tx, ty - 1 - air):
-						air += 1
-					# Grow into open air only, and stop a tile short of any
-					# ceiling, so a risen blade never seals a corridor shut.
-					var cap := maxi(1, mini(air, RetractSpike.MAX_HEIGHT))
-					var tile_hash := absi((index * 8191) ^ (tx * 374761393) ^ (ty * 668265263))
-					retract.setup(ch == "Z", 1 + tile_hash % cap)
+					# A blade of one to three tiles. Both the reach and the roll
+					# live on RetractSpike, so the editor's preview and the real
+					# blade can never drift apart.
+					var air := RetractSpike.air_above(Callable(self, "is_air"), tx, ty)
+					retract.setup(ch == "Z", RetractSpike.height_for(art_seed, tx, ty, air))
 					_entities.add_child(retract)
 				"X":
 					_door = ExitDoor.new()

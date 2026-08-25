@@ -28,6 +28,7 @@ const TAB_POKE := 3.0           # extra width on the selected tab
 const PAD := 10.0
 const ROW_H := 20.0
 const LIST_TOP := 30.0
+const LIST_ROWS := 8
 
 ## All codex sprites are 8x8, so these land on exact integer scales.
 const ICON_LIST := 16.0         # target size in the contents list
@@ -197,12 +198,14 @@ func _draw_contents_page(page: Rect2) -> void:
 		Palette.GREY_DARK, 1)
 
 	var entries := _current_entries()
-	for i in entries.size():
-		_draw_contents_row(page, entries[i], i)
+	var first := clampi(index - (LIST_ROWS - 1), 0, maxi(0, entries.size() - LIST_ROWS))
+	var last := mini(first + LIST_ROWS, entries.size())
+	for i in range(first, last):
+		_draw_contents_row(page, entries[i], i, i - first)
 
 
-func _draw_contents_row(page: Rect2, entry: Dictionary, i: int) -> void:
-	var y := page.position.y + LIST_TOP + i * ROW_H
+func _draw_contents_row(page: Rect2, entry: Dictionary, i: int, row_index: int) -> void:
+	var y := page.position.y + LIST_TOP + row_index * ROW_H
 	var selected := i == index
 	var known := Save.knows(entry["id"])
 

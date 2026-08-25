@@ -34,6 +34,13 @@ var _since_write := 0.0
 ## What the last finished room newly earned, for the results screen to read.
 var last_awarded := 0
 
+## Turned off while a sandbox room is running. A custom room is not part of any
+## campaign, so nothing it does may reach the save file — and it must not, for
+## a sharper reason than tidiness: rooms are keyed by their index in
+## Levels.ids(), so a sandbox room at index 0 would file its record under
+## FIRST STEPS and quietly overwrite a real one.
+var tracking := true
+
 
 ## 1: rooms keyed by index. 2: rooms keyed by the stable id in levels.gd.
 const SCHEMA := 2
@@ -276,6 +283,8 @@ func knows(entry: String) -> bool:
 ## Note that the player has met something. Returns true the first time, which
 ## is what the "new entry" flash on screen keys off.
 func discover(entry: String) -> bool:
+	if not tracking:
+		return false
 	if knows(entry):
 		return false
 	data["codex"][entry] = true
@@ -293,6 +302,8 @@ func known_count() -> int:
 ## Record a finished room. Returns true when the time was a new record.
 func record_clear(index: int, time: float, gems: int, level_count: int,
 		total_gems: int, deaths: int, par: float) -> bool:
+	if not tracking:
+		return false
 	var key := _key(index)
 	var record := false
 
@@ -345,6 +356,8 @@ func has_secret(index: int) -> bool:
 ## Secret gems keep their own tally. Folding them into gems_taken would make
 ## the lifetime gem count mean two different things at once.
 func take_secret(index: int) -> void:
+	if not tracking:
+		return
 	if has_secret(index):
 		return
 	data["secrets"][_key(index)] = true
@@ -357,6 +370,8 @@ func secret_count() -> int:
 
 ## Record a finished endless run. Returns true when it beat the old depth.
 func record_endless(rooms: int, gems: int) -> bool:
+	if not tracking:
+		return false
 	data["used"] = true
 	var record := rooms > int(data["endless_best"])
 	if record:
@@ -367,10 +382,14 @@ func record_endless(rooms: int, gems: int) -> bool:
 
 
 func add_death() -> void:
+	if not tracking:
+		return
 	data["total_deaths"] = int(data["total_deaths"]) + 1
 
 
 func add_gem() -> void:
+	if not tracking:
+		return
 	data["gems_taken"] = int(data["gems_taken"]) + 1
 
 

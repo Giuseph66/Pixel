@@ -2,8 +2,10 @@ class_name PauseMenu
 extends Menu
 
 ## Set before the menu enters the tree. An endless run has no room list to go
-## back to, so its third choice ends the run instead.
+## back to, so its third choice ends the run instead, and a sandbox room goes
+## back to the editor it was launched from.
 var endless := false
+var sandbox := false
 
 
 func _ready() -> void:
@@ -20,6 +22,9 @@ func _ready() -> void:
 	]
 	if endless:
 		items.append({"id": "end_run", "label": Lang.t("pause.end_run")})
+	elif sandbox:
+		items.append({"id": "edit", "label": Lang.t("pause.edit")})
+		items.append({"id": "sandbox", "label": Lang.t("pause.sandbox")})
 	else:
 		items.append({"id": "levels", "label": Lang.t("pause.rooms")})
 	items.append({"id": "title", "label": Lang.t("pause.menu")})

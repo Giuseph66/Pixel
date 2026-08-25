@@ -33,6 +33,32 @@ func setup(starts_inverted: bool, tiles: int = 1) -> void:
 	height = clampi(tiles, 1, MAX_HEIGHT)
 
 
+## Open air over this tile, up to the tallest a blade can be. `is_air` is
+## whatever the caller uses to read its grid — the level asks its rows, the
+## editor asks the grid being painted.
+static func air_above(is_air: Callable, tx: int, ty: int) -> int:
+	var air := 0
+	while air <= MAX_HEIGHT and bool(is_air.call(tx, ty - 1 - air)):
+		air += 1
+	return air
+
+
+## How tall the blade at this tile grows: random across a room, identical on
+## every attempt at it, because it comes from the room's seed and the tile
+## rather than from a roll at build time. A room you had already learned would
+## otherwise lie to you on the next death.
+##
+## It lives here rather than in level.gd so the editor can ask the same
+## question and draw the answer — a blade that grows three tiles has to look
+## like one while the room is being built, not only once it kills you.
+static func height_for(art_seed: int, tx: int, ty: int, air: int) -> int:
+	# Grow into open air only, and stop a tile short of any ceiling, so a
+	# risen blade never seals a corridor shut.
+	var cap := maxi(1, mini(air, MAX_HEIGHT))
+	var tile_hash := absi((art_seed * 8191) ^ (tx * 374761393) ^ (ty * 668265263))
+	return 1 + tile_hash % cap
+
+
 func _ready() -> void:
 	_time = PERIOD * 0.5 if inverted else 0.0
 
