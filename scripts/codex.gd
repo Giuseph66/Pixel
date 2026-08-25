@@ -101,6 +101,7 @@ const BY_TILE := {
 	"q": "portal",
 	"Q": "portal",
 	"L": "laser",
+	"K": "laser",
 	"F": "ferrybat",
 }
 

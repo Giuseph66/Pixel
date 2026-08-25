@@ -106,7 +106,12 @@ caracteres por linha.
 ### Orçamento de caracteres de tile
 
 **Em uso hoje** (passos 00-18, todos entregues): `. # - ^ v o O S J W B c k d
-t T X P m n r e E A z Z ~ > < i g G u U p q Q L F`
+t T X P m n r e E A z Z ~ > < i g G u U p q Q L K F`
+
+`K` não estava no plano original do passo 16 — saiu de um pedido posterior
+para poder montar um laser vertical (`L` só dispara na própria fileira, `K`
+só na própria coluna) sem depender do contexto de paredes ao redor escolher
+sozinho.
 
 **Ainda reservados, passos 19-25 (não planejados nesta rodada):** `h` `H`
 bloco-fantasma · `V` zona de gravidade invertida · `y` `Y` clone e sensor.

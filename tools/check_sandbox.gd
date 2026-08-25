@@ -829,8 +829,9 @@ func _check_laser() -> int:
 	laser.queue_free()
 	await get_tree().process_frame
 
-	# Facing: a wall to the left means fire right, checked ahead of every
-	# other neighbour per the plan's priority order.
+	# Facing: 'L' only ever reads left/right, 'K' only ever reads up/down — an
+	# 'L' boxed in on the vertical axis but open sideways still has to pick a
+	# side rather than falling back to firing through the floor.
 	var g := Levels.blank()
 	Levels.rect(g, 0, 27, Levels.COLS, 5, "#")
 	Levels.rect(g, 20, 20, 2, 5, "#")
@@ -841,8 +842,10 @@ func _check_laser() -> int:
 	level.setup(0, Sandbox.to_level_data(room))
 	add_child(level)
 	await get_tree().process_frame
-	if level._laser_facing(22, 22) != Vector2.RIGHT:
-		bad += _fail("a laser beside a left-hand wall did not face right")
+	if level._laser_facing_h(22, 22) != Vector2.RIGHT:
+		bad += _fail("an 'L' beside a left-hand wall did not face right")
+	if level._laser_facing_v(22, 26) != Vector2.UP:
+		bad += _fail("a 'K' standing on the floor did not face up")
 	level.queue_free()
 	await get_tree().process_frame
 	return bad

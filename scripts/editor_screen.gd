@@ -43,7 +43,7 @@ const PAL_LABEL := 70.0         # where the group labels end, right-aligned
 ## A drawer wraps onto another row rather than pushing the panel wider than
 ## the screen — the tile alphabet only grows as mechanics are added, and one
 ## row per drawer stopped fitting once the terrain drawer passed nine tiles.
-const PAL_MAX_COLS := 9
+const PAL_MAX_COLS := 14
 const PAL_SUBROW := 22.0
 
 const REPEAT_DELAY := 0.26

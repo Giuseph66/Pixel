@@ -81,6 +81,7 @@ const ENTRIES := [
 	{"char": "Q", "group": TERRAIN, "sprite": "portal_b", "unique": true, "run": false},
 
 	{"char": "L", "group": HAZARD, "sprite": "laser_idle", "unique": false, "run": false},
+	{"char": "K", "group": HAZARD, "sprite": "laser_idle", "unique": false, "run": false},
 ]
 
 ## Character -> i18n suffix. The name and the one-line note under the palette
@@ -98,7 +99,8 @@ const KEYS := {
 	"u": "wind_up", "U": "wind_side",
 	"p": "phase",
 	"q": "portal_a", "Q": "portal_b",
-	"L": "laser",
+	"L": "laser_h",
+	"K": "laser_v",
 	"F": "ferrybat",
 }
 
@@ -116,6 +118,10 @@ const MARKS := {
 	# start on: 'z' flat, 'Z' already up.
 	"z": ["x...x", ".xxx.", "..x.."],
 	"Z": ["..x..", ".xxx.", "x...x"],
+	# L fires along its row, K along its column — same "which axis, direction
+	# from context" language as m/n above, not a new idea.
+	"L": [".x...x.", "xxxxxxx", ".x...x."],
+	"K": [".x.", "xxx", ".x.", ".x.", ".x.", "xxx", ".x."],
 }
 
 static var _by_char: Dictionary = {}

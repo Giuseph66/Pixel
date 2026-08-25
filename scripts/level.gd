@@ -204,20 +204,28 @@ func is_ground(tx: int, ty: int) -> bool:
 ## wall (the common case — it is usually stood on a normal floor too, which
 ## would otherwise always win a vertical check) means "cross the wall",
 ## and only a portal with nothing beside it falls back to reading up or down.
-## Right, then left, then down, then up — the order the plan asks for so an
-## emitter with more than one solid neighbour still resolves the same way
-## every time instead of depending on which check happened to run first.
-func _laser_facing(tx: int, ty: int) -> Vector2:
+## 'L' fires along the row it sits in, 'K' along the column — a designer picks
+## the axis with the tile, and only the direction on that axis is inferred
+## from context (which side has a wall to mount against). Two separate
+## functions rather than one that falls back from horizontal to vertical: that
+## fallback was the whole reason a laser boxed in by walls on both axes could
+## never be aimed vertically on purpose.
+func _laser_facing_h(tx: int, ty: int) -> Vector2:
 	if is_solid(tx - 1, ty):
 		return Vector2.RIGHT
 	if is_solid(tx + 1, ty):
 		return Vector2.LEFT
-	if is_solid(tx, ty - 1):
-		return Vector2.DOWN
+	push_warning("Level: laser at (%d,%d) has no side wall to mount on" % [tx, ty])
+	return Vector2.RIGHT
+
+
+func _laser_facing_v(tx: int, ty: int) -> Vector2:
 	if is_solid(tx, ty + 1):
 		return Vector2.UP
-	push_warning("Level: laser at (%d,%d) has no wall to mount on" % [tx, ty])
-	return Vector2.RIGHT
+	if is_solid(tx, ty - 1):
+		return Vector2.DOWN
+	push_warning("Level: laser at (%d,%d) has no floor or ceiling to mount on" % [tx, ty])
+	return Vector2.UP
 
 
 func _portal_facing(tx: int, ty: int) -> Vector2:
@@ -473,11 +481,12 @@ func _spawn_entities() -> void:
 					ferry.speed_scale = intensity
 					ferry.position = tile_center(tx, ty)
 					_entities.add_child(ferry)
-				"L":
+				"L", "K":
 					var laser := Laser.new()
 					laser.speed_scale = intensity
 					laser.position = tile_center(tx, ty)
-					laser.setup(_laser_facing(tx, ty), Callable(self, "is_solid"))
+					var facing := _laser_facing_h(tx, ty) if ch == "L" else _laser_facing_v(tx, ty)
+					laser.setup(facing, Callable(self, "is_solid"))
 					_entities.add_child(laser)
 					_lasers.append(laser)
 				"q", "Q":
