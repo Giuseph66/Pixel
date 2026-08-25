@@ -11,36 +11,43 @@ Cada arquivo desta pasta descreve **uma** mecânica do
 
 Ordem de leitura e de implementação é a numeração dos arquivos.
 
-| # | Mecânica | Fase | Tile | Salas novas |
-| --- | --- | --- | --- | --- |
-| [00](00-infra-superficie-e-tuning.md) | Infra: superfície e tuning | — | — | 0 |
-| [01](01-gelo.md) | Gelo | 1 | `~` | 4 |
-| [02](02-esteiras.md) | Esteiras | 1 | `>` `<` | 4 |
-| [03](03-espinhos-retrateis.md) | Espinhos retráteis | 1 | `z` `Z` | 4 |
-| [04](04-plataforma-circular.md) | Plataforma circular | 1 | `r` | 3 |
-| [05](05-slime-elastico.md) | Slime elástico | 1 | `e` | 4 |
-| [06](06-inimigo-escudo.md) | Inimigo-escudo | 1 | `E` | 4 |
-| [07](07-lava-subindo.md) | Lava subindo | 1 | `A` | 3 |
-| [08](08-medalhas.md) | Medalhas por sala | 1 | — | 0 |
-| [09](09-gemas-secretas.md) | Gemas secretas | 1 | `O` | 0 (altera 8) |
-| [10](10-combo-de-movimento.md) | Combo de movimento | 1 | — | 3 |
-| [11](11-salas-remixadas.md) | Salas remixadas | 1 | — | 21 (espelhadas) |
-| [12](12-interruptores.md) | Interruptores e portas | 2 | `i` `g` `G` | 5 |
-| [13](13-vento.md) | Correntes de vento | 2 | `u` | 4 |
-| [14](14-bloco-de-fase.md) | Bloco de fase | 2 | `p` | 5 |
-| [15](15-portais.md) | Portais | 2 | `q` `Q` | 5 |
-| [16](16-lasers.md) | Lasers telegrafados | 2 | `L` | 4 |
-| [17](17-morcego-transportador.md) | Morcego transportador | 2 | `F` | 4 |
-| [18](18-pulo-carregado.md) | Pulo carregado | 2 | — | 3 |
-| [19](19-impulso-de-parede.md) | Impulso de parede | 2 | — | 3 |
-| [20](20-modificadores-infinito.md) | Modificadores do infinito | 2 | — | 0 |
-| [21](21-blocos-fantasma.md) | Blocos-fantasma | 2 | `h` `H` | 4 |
-| [22](22-gravidade-invertida.md) | Gravidade invertida | 3 | `V` | 5 |
-| [23](23-eco-temporal.md) | Eco temporal | 3 | — | 4 |
-| [24](24-clone-fantasma.md) | Clone fantasma | 3 | `y` `Y` | 4 |
-| [25](25-fantasma-do-recorde.md) | Fantasma do recorde | 3 | — | 0 |
+| # | Mecânica | Fase | Tile | Salas novas | Status |
+| --- | --- | --- | --- | --- | --- |
+| [00](00-infra-superficie-e-tuning.md) | Infra: superfície e tuning | — | — | 0 | ✅ feito |
+| [01](01-gelo.md) | Gelo | 1 | `~` | 4 | ✅ feito |
+| [02](02-esteiras.md) | Esteiras | 1 | `>` `<` | 4 | ✅ feito |
+| [03](03-espinhos-retrateis.md) | Espinhos retráteis | 1 | `z` `Z` | 4 | ✅ feito |
+| [04](04-plataforma-circular.md) | Plataforma circular | 1 | `r` | 3 | ✅ feito |
+| [05](05-slime-elastico.md) | Slime elástico | 1 | `e` | 4 | ✅ feito |
+| [06](06-inimigo-escudo.md) | Inimigo-escudo | 1 | `E` | 4 | ✅ feito |
+| [07](07-lava-subindo.md) | Lava subindo | 1 | `A` | 3 | ✅ feito |
+| [08](08-medalhas.md) | Medalhas por sala | 1 | — | 0 | ✅ feito |
+| [09](09-gemas-secretas.md) | Gemas secretas | 1 | `O` | 0 (altera 8) | ✅ feito |
+| [10](10-combo-de-movimento.md) | Combo de movimento | 1 | — | 3 | ✅ feito |
+| [11](11-salas-remixadas.md) | Salas remixadas | 1 | — | 0 (reusa as 47) | ✅ feito |
+| [12](12-interruptores.md) | Interruptores e portas | 2 | `i` `g` `G` | 5 | ⏳ em andamento |
+| [13](13-vento.md) | Correntes de vento | 2 | `u` | 4 | ⬜ pendente |
+| [14](14-bloco-de-fase.md) | Bloco de fase | 2 | `p` | 5 | ⬜ pendente |
+| [15](15-portais.md) | Portais | 2 | `q` `Q` | 5 | ⬜ pendente |
+| [16](16-lasers.md) | Lasers telegrafados | 2 | `L` | 4 | ⬜ pendente |
+| [17](17-morcego-transportador.md) | Morcego transportador | 2 | `F` | 4 | ⬜ pendente |
+| [18](18-pulo-carregado.md) | Pulo carregado | 2 | — | 3 | ⬜ pendente |
+| [19](19-impulso-de-parede.md) | Impulso de parede | 2 | — | 3 | ⬜ não planejado nesta rodada |
+| [20](20-modificadores-infinito.md) | Modificadores do infinito | 2 | — | 0 | ⬜ não planejado nesta rodada |
+| [21](21-blocos-fantasma.md) | Blocos-fantasma | 2 | `h` `H` | 4 | ⬜ não planejado nesta rodada |
+| [22](22-gravidade-invertida.md) | Gravidade invertida | 3 | `V` | 5 | ⬜ não planejado nesta rodada |
+| [23](23-eco-temporal.md) | Eco temporal | 3 | — | 4 | ⬜ não planejado nesta rodada |
+| [24](24-clone-fantasma.md) | Clone fantasma | 3 | `y` `Y` | 4 | ⬜ não planejado nesta rodada |
+| [25](25-fantasma-do-recorde.md) | Fantasma do recorde | 3 | — | 0 | ⬜ não planejado nesta rodada |
 
-Total se tudo entrar: **21 salas atuais + ~79 novas**, mais 21 remixes.
+Total se tudo entrar: **47 salas atuais + ~26 novas nos passos 10-18**, mais o
+remix (reaproveita as 47, não soma).
+
+Nota sobre o passo 11: o plano original previa um quarto painel em
+`play_select_screen.gd` (história/infinito/remix). Esse painel já tinha um
+terceiro slot — SANDBOX — de um trabalho anterior a este plano. O remix entrou
+como um alternador (`R`) dentro da tela de seleção de salas em vez de um quinto
+lugar apertado numa tela de 480px de largura.
 
 ---
 
