@@ -473,8 +473,12 @@ func wall_tile() -> String:
 	if not surface_at.is_valid() or _wall_dir == 0:
 		return "."
 	var tx := floori((position.x + float(_wall_dir) * (WIDTH * 0.5 + 2.0)) / TILE)
-	var ty := floori(position.y / TILE)
-	return surface_at.call(tx, ty)
+	var top := floori((position.y - HEIGHT * 0.5 + 1.0) / TILE)
+	var bottom := floori((position.y + HEIGHT * 0.5 - 1.0) / TILE)
+	for ty in range(top, bottom + 1):
+		if surface_at.call(tx, ty) == "~":
+			return "~"
+	return surface_at.call(tx, floori(position.y / TILE))
 
 
 func push(force: Vector2) -> void:
