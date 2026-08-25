@@ -38,9 +38,13 @@ const BAKED := ["#", "~", ">", "<", "-"]
 ## an 8px sprite in a 12px box cannot do that.
 const PAL_CELL := 20.0
 const PAL_PITCH := 22.0
-const PAL_ROW := 26.0
 const PAL_LEFT := 78.0          # where the cells start, from the panel edge
 const PAL_LABEL := 70.0         # where the group labels end, right-aligned
+## A drawer wraps onto another row rather than pushing the panel wider than
+## the screen — the tile alphabet only grows as mechanics are added, and one
+## row per drawer stopped fitting once the terrain drawer passed nine tiles.
+const PAL_MAX_COLS := 9
+const PAL_SUBROW := 22.0
 
 const REPEAT_DELAY := 0.26
 const REPEAT_RATE := 0.035
@@ -943,23 +947,57 @@ func _draw_mark(rect: Rect2, ch: String, pad: float) -> void:
 				draw_rect(Rect2(at + Vector2(x, y), Vector2(1, 1)), Palette.WHITE)
 
 
+## How many sub-rows one drawer needs to hold every tile in it.
+func _group_rows(group_index: int) -> int:
+	var count := TilePalette.in_group(TilePalette.GROUPS[group_index]["id"]).size()
+	return maxi(1, ceili(float(count) / float(PAL_MAX_COLS)))
+
+
+## Vertical offset, from the top of the tile area, of a drawer's first row —
+## the sum of every drawer above it, which may itself have wrapped.
+func _group_top(group_index: int) -> float:
+	var y := 0.0
+	for g in group_index:
+		y += _group_rows(g) * PAL_SUBROW
+	return y
+
+
 func _palette_cell(group: int, i: int) -> Rect2:
 	var panel := _palette_panel()
+	var col := i % PAL_MAX_COLS
+	var row := i / PAL_MAX_COLS
 	return Rect2(
-		panel.position.x + PAL_LEFT + i * PAL_PITCH,
-		panel.position.y + 24.0 + group * PAL_ROW,
+		panel.position.x + PAL_LEFT + col * PAL_PITCH,
+		panel.position.y + 24.0 + _group_top(group) + row * PAL_SUBROW,
 		PAL_CELL, PAL_CELL
 	)
 
 
 func _palette_panel() -> Rect2:
-	var widest := 0
-	for group: Dictionary in TilePalette.GROUPS:
-		widest = maxi(widest, TilePalette.in_group(group["id"]).size())
-	var width := PAL_LEFT + widest * PAL_PITCH + 10.0
-	var height := 24.0 + TilePalette.GROUPS.size() * PAL_ROW + 42.0
+	var cols := 0
+	var total_rows := 0
+	for g in TilePalette.GROUPS.size():
+		var group: Dictionary = TilePalette.GROUPS[g]
+		cols = maxi(cols, mini(TilePalette.in_group(group["id"]).size(), PAL_MAX_COLS))
+		total_rows += _group_rows(g)
+	# The grid decides the width most of the time, but the footer note is
+	# plain sentences and the grid has no opinion on how long those run — so
+	# the wider of the two wins instead of letting a long note spill out.
+	var width := maxf(PAL_LEFT + cols * PAL_PITCH + 10.0, _footer_min_width())
+	var height := 24.0 + total_rows * PAL_SUBROW + 42.0
 	return Rect2(roundf((SCREEN.x - width) * 0.5), roundf((SCREEN.y - height) * 0.5),
 		width, height)
+
+
+## Widest line the footer ever has to show, across every tile's note — so
+## adding a longer note in some future step widens the panel instead of
+## quietly running off its edge.
+func _footer_min_width() -> float:
+	var widest := 0.0
+	for entry: Dictionary in TilePalette.ENTRIES:
+		widest = maxf(widest, PixelFont.measure(TilePalette.note_of(entry["char"]), 1).x)
+	widest = maxf(widest, PixelFont.measure(Lang.t("editor.palette_footer"), 1).x)
+	return widest + 16.0
 
 
 func _draw_palette() -> void:
@@ -980,10 +1018,11 @@ func _draw_palette() -> void:
 	for g in TilePalette.GROUPS.size():
 		var group: Dictionary = TilePalette.GROUPS[g]
 		var list := TilePalette.in_group(group["id"])
-		var row_y := panel.position.y + 24.0 + g * PAL_ROW
+		var row_y := panel.position.y + 24.0 + _group_top(g)
 
 		# Labels are right-aligned against the cells so the tray reads as one
 		# column of tiles with a spine of names beside it, not as five lists.
+		# A wrapped drawer's label still sits beside its first row only.
 		var label := Lang.t(group["label"])
 		var size := PixelFont.measure(label, 1)
 		PixelFont.draw_text(self, label,

@@ -161,9 +161,13 @@ func tile_at(tx: int, ty: int) -> String:
 	return row[tx]
 
 
-## Empty air — what a moving platform measures its runway against.
+## Empty air — what a moving platform measures its runway against. Wind is not
+## terrain (nothing about it blocks movement or gives a platform anywhere to
+## rest), so a column of it reads as open air here same as it does everywhere
+## else in the grid.
 func is_air(tx: int, ty: int) -> bool:
-	return tile_at(tx, ty) == "."
+	var ch := tile_at(tx, ty)
+	return ch == "." or ch == "u" or ch == "U"
 
 
 ## Terrain that gets baked into the static collision. Ice and conveyors are
@@ -451,6 +455,7 @@ func _spawn_entities() -> void:
 
 	_spawn_conveyors()
 	_spawn_platforms()
+	_spawn_wind()
 	_spawn_players()
 	_discover_contents()
 
@@ -534,6 +539,43 @@ func _spawn_players() -> void:
 		peer_ids.sort()
 	for peer_id: int in peer_ids:
 		_spawn_player(peer_id)
+
+
+## Wind is grouped by run like belts and platforms: a column of 'u' pushes up,
+## a band of 'U' pushes left. Two passes because one runs down a column and
+## the other along a row — the same loop shape cannot walk both.
+func _spawn_wind() -> void:
+	for tx in Levels.COLS:
+		var ty := 0
+		while ty < Levels.ROWS:
+			if tile_at(tx, ty) != "u":
+				ty += 1
+				continue
+			var run := 1
+			while ty + run < Levels.ROWS and tile_at(tx, ty + run) == "u":
+				run += 1
+			var wind := Wind.new()
+			wind.fx = fx
+			wind.setup(Vector2.UP, run)
+			wind.position = Vector2(tx * TILE, ty * TILE)
+			_entities.add_child(wind)
+			ty += run
+
+	for ty in Levels.ROWS:
+		var tx := 0
+		while tx < Levels.COLS:
+			if tile_at(tx, ty) != "U":
+				tx += 1
+				continue
+			var run := 1
+			while tx + run < Levels.COLS and tile_at(tx + run, ty) == "U":
+				run += 1
+			var wind := Wind.new()
+			wind.fx = fx
+			wind.setup(Vector2.LEFT, run)
+			wind.position = Vector2(tx * TILE, ty * TILE)
+			_entities.add_child(wind)
+			tx += run
 
 
 func _spawn_player(peer_id: int) -> void:

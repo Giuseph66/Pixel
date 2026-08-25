@@ -1085,6 +1085,75 @@ static func _level_switch_gems() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 13 — correntes de vento. 'u' is a column that pushes up, 'U' a band
+## that always pushes left — a headwind, since the only direction this game
+## ever asks you to travel is right. PUSH_UP sits under gravity on purpose:
+## riding one still falls, just slowly enough to cross what a jump alone
+## cannot.
+
+## The gap is wider than a jump; the column is what closes the difference.
+static func _level_wind_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 24, 14, 6, ".")
+	rect(g, 22, 30, 14, 1, "^")
+	rect(g, 28, 14, 2, 13, "u")
+	put(g, 29, 12, "o")
+	put(g, 4, 26, "P")
+	put(g, 46, 26, "X")
+	return bake(g)
+
+
+## Three columns, three ledges, each one a little higher. The exit sits on the
+## last ledge — there is no route up that skips the climb.
+static func _level_wind_climb() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 8, 20, 2, 7, "u")
+	rect(g, 10, 19, 6, 1, "-")
+	rect(g, 24, 13, 2, 7, "u")
+	rect(g, 26, 12, 6, 1, "-")
+	rect(g, 40, 6, 2, 7, "u")
+	rect(g, 42, 5, 12, 1, "-")
+	puts(g, [Vector2i(12, 17), Vector2i(28, 10)], "o")
+	put(g, 46, 4, "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 4, "X")
+	return bake(g)
+
+
+## A spiked pit under a row of one-way slabs, and a headwind the whole width of
+## it. Every hop across has to fight the push rather than just clear the gap.
+static func _level_wind_cross() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 27, 36, 3, ".")
+	rect(g, 12, 30, 36, 1, "^")
+	rect(g, 12, 20, 36, 7, "U")
+	rect(g, 14, 24, 8, 1, "-")
+	rect(g, 26, 24, 8, 1, "-")
+	rect(g, 38, 24, 8, 1, "-")
+	puts(g, [Vector2i(18, 22), Vector2i(30, 22), Vector2i(42, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## A column standing directly over a spiked pit. Ride it and the crossing is
+## generous; drift off it and the pit is exactly as unforgiving as ever.
+static func _level_wind_spike() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 18, 27, 24, 3, ".")
+	rect(g, 18, 30, 24, 1, "^")
+	rect(g, 26, 10, 2, 17, "u")
+	rect(g, 44, 20, 8, 1, "-")
+	puts(g, [Vector2i(29, 8), Vector2i(48, 19)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1484,6 +1553,34 @@ static func _campaign() -> Array:
 			"hint": "level.switch_gems.hint",
 			"par": 58.0,
 			"rows": _level_switch_gems(),
+		},
+		{
+			"id": "wind_first",
+			"name": "level.wind_first.name",
+			"hint": "level.wind_first.hint",
+			"par": 28.0,
+			"rows": _level_wind_first(),
+		},
+		{
+			"id": "wind_climb",
+			"name": "level.wind_climb.name",
+			"hint": "level.wind_climb.hint",
+			"par": 42.0,
+			"rows": _level_wind_climb(),
+		},
+		{
+			"id": "wind_cross",
+			"name": "level.wind_cross.name",
+			"hint": "level.wind_cross.hint",
+			"par": 46.0,
+			"rows": _level_wind_cross(),
+		},
+		{
+			"id": "wind_spike",
+			"name": "level.wind_spike.name",
+			"hint": "level.wind_spike.hint",
+			"par": 50.0,
+			"rows": _level_wind_spike(),
 		},
 	]
 

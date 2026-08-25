@@ -380,6 +380,18 @@ const STRINGS := {
 	"level.switch_gems.name": "CIRCUIT",
 	"level.switch_gems.hint": "EACH GEM SITS BEHIND A DIFFERENT STATE",
 
+	"codex.wind.name": "UPDRAFT",
+	"codex.wind.text": "IT SLOWS THE FALL, IT DOES NOT STOP IT. USE THE TIME",
+
+	"level.wind_first.name": "THE GUST",
+	"level.wind_first.hint": "THE COLUMN COVERS WHAT THE JUMP CANNOT",
+	"level.wind_climb.name": "ASCENT",
+	"level.wind_climb.hint": "COLUMN TO COLUMN, ALL THE WAY UP",
+	"level.wind_cross.name": "HEADWIND",
+	"level.wind_cross.hint": "IT PUSHES BACK THE WHOLE WAY ACROSS",
+	"level.wind_spike.name": "AIR CURRENT",
+	"level.wind_spike.hint": "IT FORGIVES MOST OF THE FALL. NOT ALL OF IT",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -534,6 +546,10 @@ const STRINGS := {
 	"pal.gate_solid.note": "SOLID UNTIL A SWITCH FLIPS IT",
 	"pal.gate_open.name": "GATE (OPEN)",
 	"pal.gate_open.note": "PASSABLE UNTIL A SWITCH FLIPS IT",
+	"pal.wind_up.name": "WIND (UP)",
+	"pal.wind_up.note": "A COLUMN. SLOWS A FALL, NEVER STOPS IT",
+	"pal.wind_side.name": "WIND (SIDE)",
+	"pal.wind_side.note": "A BAND. ALWAYS PUSHES LEFT",
 },
 
 "pt": {
@@ -840,6 +856,18 @@ const STRINGS := {
 	"level.switch_gems.name": "CIRCUITO",
 	"level.switch_gems.hint": "CADA GEMA FICA ATRAS DE UM ESTADO DIFERENTE",
 
+	"codex.wind.name": "CORRENTE DE AR",
+	"codex.wind.text": "SEGURA A QUEDA, NAO PARA. APROVEITE O TEMPO",
+
+	"level.wind_first.name": "O SOPRO",
+	"level.wind_first.hint": "A COLUNA COBRE O QUE O PULO NAO ALCANCA",
+	"level.wind_climb.name": "ASCENSAO",
+	"level.wind_climb.hint": "DE COLUNA EM COLUNA, ATE O TOPO",
+	"level.wind_cross.name": "VENTO CONTRA",
+	"level.wind_cross.hint": "ELE EMPURRA DE VOLTA A TRAVESSIA INTEIRA",
+	"level.wind_spike.name": "CORRENTE DE AR",
+	"level.wind_spike.hint": "ELE PERDOA QUASE TODA A QUEDA. NAO TODA",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -994,6 +1022,10 @@ const STRINGS := {
 	"pal.gate_solid.note": "SOLIDA ATE UM INTERRUPTOR MUDAR ISSO",
 	"pal.gate_open.name": "PORTA (ABERTA)",
 	"pal.gate_open.note": "PASSAVEL ATE UM INTERRUPTOR MUDAR ISSO",
+	"pal.wind_up.name": "VENTO (CIMA)",
+	"pal.wind_up.note": "UMA COLUNA. SEGURA A QUEDA, NUNCA PARA",
+	"pal.wind_side.name": "VENTO (LADO)",
+	"pal.wind_side.note": "UMA FAIXA. SEMPRE EMPURRA PARA A ESQUERDA",
 },
 
 "es": {
@@ -1300,6 +1332,18 @@ const STRINGS := {
 	"level.switch_gems.name": "CIRCUITO",
 	"level.switch_gems.hint": "CADA GEMA ESTA DETRAS DE UN ESTADO DIFERENTE",
 
+	"codex.wind.name": "CORRIENTE",
+	"codex.wind.text": "FRENA LA CAIDA, NO LA PARA. USA EL TIEMPO",
+
+	"level.wind_first.name": "LA RAFAGA",
+	"level.wind_first.hint": "LA COLUMNA CUBRE LO QUE EL SALTO NO ALCANZA",
+	"level.wind_climb.name": "ASCENSO",
+	"level.wind_climb.hint": "DE COLUMNA EN COLUMNA, HASTA ARRIBA",
+	"level.wind_cross.name": "VIENTO EN CONTRA",
+	"level.wind_cross.hint": "EMPUJA HACIA ATRAS TODA LA TRAVESIA",
+	"level.wind_spike.name": "CORRIENTE DE AIRE",
+	"level.wind_spike.hint": "PERDONA CASI TODA LA CAIDA. NO TODA",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1454,5 +1498,9 @@ const STRINGS := {
 	"pal.gate_solid.note": "SOLIDA HASTA QUE UN INTERRUPTOR LA CAMBIE",
 	"pal.gate_open.name": "PUERTA (ABIERTA)",
 	"pal.gate_open.note": "PASABLE HASTA QUE UN INTERRUPTOR LA CAMBIE",
+	"pal.wind_up.name": "VIENTO (ARRIBA)",
+	"pal.wind_up.note": "UNA COLUMNA. FRENA LA CAIDA, NUNCA PARA",
+	"pal.wind_side.name": "VIENTO (LADO)",
+	"pal.wind_side.note": "UNA FRANJA. SIEMPRE EMPUJA A LA IZQUIERDA",
 },
 }

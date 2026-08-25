@@ -550,6 +550,29 @@ const GRIDS := {
 		"#......#",
 		"########",
 	],
+	# Step 13 — wind. Invisible in the room itself (the particles are the
+	# tell); these two exist only so the sandbox editor has something to show
+	# where a designer put one.
+	"wind_up": [
+		"........",
+		"...cc...",
+		"..cccc..",
+		"........",
+		"...cc...",
+		"..cccc..",
+		"........",
+		"........",
+	],
+	"wind_side": [
+		"........",
+		"..c.....",
+		".cc.....",
+		"cccccc..",
+		".cc.....",
+		"..c.....",
+		"........",
+		"........",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

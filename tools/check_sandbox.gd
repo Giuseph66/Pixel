@@ -25,6 +25,7 @@ func _ready() -> void:
 	failures += await _check_input_guard()
 	failures += _check_mirror()
 	failures += await _check_switch()
+	failures += await _check_wind()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -594,6 +595,75 @@ func _find_gate(node: Node) -> GateBlock:
 		if found != null:
 			return found
 	return null
+
+
+## Step 13. Two things worth checking without eyes on the room: that a run of
+## 'u'/'U' becomes exactly one Wind node with the right direction and length,
+## and that the push is real — a player inside an upward column has to fall
+## slower than one with nothing pushing on it, over the same span of frames.
+func _check_wind() -> int:
+	var bad := 0
+
+	var g := Levels.blank()
+	Levels.rect(g, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(g, 10, 20, 1, 3, "u")
+	Levels.rect(g, 20, 15, 4, 1, "U")
+	Levels.put(g, 4, 26, "P")
+	Levels.put(g, 50, 26, "X")
+	var room := Sandbox.normalise({"rows": Levels.bake(g)})
+
+	var level := Level.new()
+	level.setup(0, Sandbox.to_level_data(room))
+	add_child(level)
+	await get_tree().process_frame
+
+	var winds: Array = []
+	_collect_winds(level, winds)
+	if winds.size() != 2:
+		bad += _fail("expected 2 Wind nodes from grouping, found %d" % winds.size())
+	else:
+		var up := 0
+		var left := 0
+		for w: Wind in winds:
+			if w.direction == Vector2.UP and w.tiles == 3:
+				up += 1
+			elif w.direction == Vector2.LEFT and w.tiles == 4:
+				left += 1
+		if up != 1 or left != 1:
+			bad += _fail("Wind grouping got a direction or length wrong")
+	level.queue_free()
+	await get_tree().process_frame
+
+	var free_faller := Player.new()
+	free_faller.position = Vector2(200, 50)
+	add_child(free_faller)
+
+	var wind := Wind.new()
+	wind.setup(Vector2.UP, 4)
+	wind.position = Vector2(196, 40)
+	add_child(wind)
+	var lifted := Player.new()
+	lifted.position = Vector2(200, 50)
+	add_child(lifted)
+
+	for i in 10:
+		await get_tree().physics_frame
+
+	if lifted.velocity.y >= free_faller.velocity.y:
+		bad += _fail("a player inside an upward wind fell as fast as one outside it")
+
+	free_faller.queue_free()
+	wind.queue_free()
+	lifted.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _collect_winds(node: Node, out: Array) -> void:
+	if node is Wind:
+		out.append(node)
+	for child in node.get_children():
+		_collect_winds(child, out)
 
 
 func _check_campaign() -> int:

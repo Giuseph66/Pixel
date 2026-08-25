@@ -10,6 +10,11 @@ extends RefCounted
 ## and a half — so pits stop at five tiles, steps at three, and the walkway is
 ## never interrupted by anything a jump cannot cross.
 ##
+## _wind() is the one deliberate exception: wind slows a fall instead of
+## stopping it, which buys enough hang time to cross a wider gap than a jump
+## alone reaches. It must stay the only exception — a second one means this
+## rule needs rewriting, not another carve-out next to it.
+##
 ## Rooms are pure functions of (run seed, depth): the same run always produces
 ## the same rooms, so a restart after a death is the room you just died in.
 
@@ -57,6 +62,7 @@ const UNLOCK := {
 	"elastic": 9,
 	"shield": 10,
 	"switch": 12,
+	"wind": 8,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -88,6 +94,7 @@ const THREAT := {
 	"elastic": 3.0,
 	"shield": 4.0,
 	"switch": 2.0,
+	"wind": 3.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -203,6 +210,7 @@ const WIDTHS := {
 	"elastic": 7,
 	"shield": 8,
 	"switch": 10,
+	"wind": 9,
 }
 
 
@@ -235,6 +243,7 @@ const TASTE := {
 	"elastic": 1.8,
 	"shield": 1.6,
 	"switch": 1.4,
+	"wind": 1.8,
 }
 
 
@@ -447,6 +456,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _shield(g, rng, x, room, spots)
 		"switch":
 			return _switch(g, rng, x, room, spots)
+		"wind":
+			return _wind(g, rng, x, room, d, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -838,6 +849,21 @@ static func _switch(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 	Levels.put(g, x + 2, STAND, "i")
 	Levels.rect(g, x + w - 4, STAND - 3, 1, 4, "g")
 	spots.append(Vector2i(x + w / 2, STAND - 4))
+	return w
+
+
+## A column standing in a gap wider than the one _pit() ever opens — see the
+## note at the top of the file for why that is allowed here and nowhere else.
+static func _wind(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: float,
+		spots: Array[Vector2i]) -> int:
+	var pw := clampi(4 + roundi(d * 3.0), 4, 7)
+	var w := pw + 4
+	if w > room:
+		return _flat(g, rng, x, room, spots)
+	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	Levels.rect(g, x + 2 + pw / 2, FLOOR - 8, 1, 11, "u")
+	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 9))
 	return w
 
 
