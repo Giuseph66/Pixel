@@ -28,6 +28,7 @@ func _ready() -> void:
 	failures += await _check_wind()
 	failures += await _check_phase()
 	failures += await _check_portal()
+	failures += await _check_laser()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -785,6 +786,68 @@ func _collect_portals(node: Node, out: Array) -> void:
 		out.append(node)
 	for child in node.get_children():
 		_collect_portals(child, out)
+
+
+## Step 16. Drives the cycle directly with oversized deltas rather than
+## waiting out 2.5 real seconds per assertion, and checks the one rule the
+## plan is explicit about: WARN and FIRE never shrink, only the SLEEP between
+## them does.
+func _check_laser() -> int:
+	var bad := 0
+
+	var laser := Laser.new()
+	laser.setup(Vector2.RIGHT, Callable(self, "_always_open"))
+	add_child(laser)
+	await get_tree().process_frame
+
+	if laser._phase != 0:
+		bad += _fail("a laser did not start asleep")
+
+	laser._physics_process(Laser.SLEEP + 0.01)
+	if laser._phase != 1:
+		bad += _fail("a laser did not warn after its sleep elapsed")
+	if not laser._area.monitoring == false:
+		bad += _fail("a laser's beam can hit something during the warning")
+
+	laser._physics_process(Laser.WARN + 0.01)
+	if laser._phase != 2:
+		bad += _fail("a laser did not fire after its warning elapsed")
+	if not laser._area.monitoring:
+		bad += _fail("a firing laser is not actually able to hit anything")
+
+	laser.speed_scale = 4.0
+	if not is_equal_approx(laser._sleep_time(), Laser.SLEEP / 4.0):
+		bad += _fail("intensity did not shorten the sleep")
+	laser.speed_scale = 1.0
+
+	laser.freeze(4.0)
+	if laser._phase != 0 or laser._area.monitoring:
+		bad += _fail("freezing a mid-fire laser left it live")
+
+	laser.queue_free()
+	await get_tree().process_frame
+
+	# Facing: a wall to the left means fire right, checked ahead of every
+	# other neighbour per the plan's priority order.
+	var g := Levels.blank()
+	Levels.rect(g, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(g, 20, 20, 2, 5, "#")
+	Levels.put(g, 4, 26, "P")
+	Levels.put(g, 54, 26, "X")
+	var room := Sandbox.normalise({"rows": Levels.bake(g)})
+	var level := Level.new()
+	level.setup(0, Sandbox.to_level_data(room))
+	add_child(level)
+	await get_tree().process_frame
+	if level._laser_facing(22, 22) != Vector2.RIGHT:
+		bad += _fail("a laser beside a left-hand wall did not face right")
+	level.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _always_open(_tx: int, _ty: int) -> bool:
+	return false
 
 
 func _check_campaign() -> int:

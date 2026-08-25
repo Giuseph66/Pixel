@@ -64,6 +64,7 @@ const UNLOCK := {
 	"switch": 12,
 	"wind": 8,
 	"phase": 11,
+	"laser": 14,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -97,6 +98,7 @@ const THREAT := {
 	"switch": 2.0,
 	"wind": 3.0,
 	"phase": 1.0,
+	"laser": 5.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -214,6 +216,7 @@ const WIDTHS := {
 	"switch": 10,
 	"wind": 9,
 	"phase": 9,
+	"laser": 10,
 }
 
 
@@ -248,6 +251,7 @@ const TASTE := {
 	"switch": 1.4,
 	"wind": 1.8,
 	"phase": 1.5,
+	"laser": 1.8,
 }
 
 
@@ -464,6 +468,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _wind(g, rng, x, room, d, spots)
 		"phase":
 			return _phase(g, rng, x, room, spots)
+		"laser":
+			return _laser(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -881,6 +887,19 @@ static func _phase(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 		spots: Array[Vector2i]) -> int:
 	var w := mini(rng.randi_range(9, 11), room)
 	Levels.rect(g, x + w / 2, STAND - 3, 2, 4, "p")
+	spots.append(Vector2i(x + w / 2, STAND - 5))
+	return w
+
+
+## An emitter on a post, firing across the walkway at chest height. Ground
+## level stays clear on both sides of it — this game has no crouch, so the
+## only answer a generated room can ask for is a timed pass, never a duck.
+static func _laser(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(10, 13), room)
+	Levels.rect(g, x + 1, STAND - 4, 1, 4, "#")
+	Levels.put(g, x + 2, STAND - 2, "L")
+	Levels.rect(g, x + w - 2, STAND - 4, 1, 4, "#")
 	spots.append(Vector2i(x + w / 2, STAND - 5))
 	return w
 

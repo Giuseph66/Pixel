@@ -608,6 +608,39 @@ const GRIDS := {
 		"..pppp..",
 		"........",
 	],
+	# Step 16 — lasers. The core brightens through the cycle: grey dormant,
+	# cyan warning, white firing. The beam itself is draw_rect(), not a
+	# sprite — its length changes every shot.
+	"laser_idle": [
+		"........",
+		".######.",
+		".#1111#.",
+		".#1221#.",
+		".#1221#.",
+		".#1111#.",
+		".######.",
+		"........",
+	],
+	"laser_warn": [
+		"........",
+		".######.",
+		".#cccc#.",
+		".#cCCc#.",
+		".#cCCc#.",
+		".#cccc#.",
+		".######.",
+		"........",
+	],
+	"laser_fire": [
+		"........",
+		".######.",
+		".#wwww#.",
+		".#wCCw#.",
+		".#wCCw#.",
+		".#wwww#.",
+		".######.",
+		"........",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

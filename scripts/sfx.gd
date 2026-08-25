@@ -150,6 +150,13 @@ static func library() -> Dictionary:
 			tone(240.0, 0.04, Wave.PULSE, 0.22, 1.0, 0.001, 0.02),
 			tone(560.0, 0.08, Wave.PULSE, 0.24, 1.4, 0.001, 0.05),
 		])),
+		# Rising whine for the warning, a short harsh burst for the shot — the
+		# ear gets the same telegraph the eye does.
+		"laser_warn": to_stream(tone(300.0, 0.4, Wave.PULSE, 0.14, 1.6, 0.05, 0.1)),
+		"laser_fire": to_stream(concat([
+			tone(900.0, 0.05, Wave.SAW, 0.28, 0.3, 0.001, 0.02),
+			tone(500.0, 0.08, Wave.SAW, 0.24, 0.5, 0.001, 0.05),
+		])),
 		"door": to_stream(concat([
 			tone(note_freq(69), 0.09, Wave.SQUARE, 0.24, 1.0, 0.002, 0.03),
 			tone(note_freq(76), 0.09, Wave.SQUARE, 0.24, 1.0, 0.002, 0.03),

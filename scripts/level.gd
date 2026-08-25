@@ -42,6 +42,9 @@ var _switches: Array = []
 ## player's state in a mode where more than one can exist.
 var _phase_blocks: Array = []
 var _dashing: Dictionary = {}
+## Step 16 — a switch also buys a few safe seconds against any laser in the
+## room, not just the gates. See toggle_switch().
+var _lasers: Array = []
 ## Step 15 — portals. One pair per room; linked after the whole grid is
 ## walked, since whichever one the scan reaches second does not exist yet
 ## when the first is created.
@@ -201,6 +204,22 @@ func is_ground(tx: int, ty: int) -> bool:
 ## wall (the common case — it is usually stood on a normal floor too, which
 ## would otherwise always win a vertical check) means "cross the wall",
 ## and only a portal with nothing beside it falls back to reading up or down.
+## Right, then left, then down, then up — the order the plan asks for so an
+## emitter with more than one solid neighbour still resolves the same way
+## every time instead of depending on which check happened to run first.
+func _laser_facing(tx: int, ty: int) -> Vector2:
+	if is_solid(tx - 1, ty):
+		return Vector2.RIGHT
+	if is_solid(tx + 1, ty):
+		return Vector2.LEFT
+	if is_solid(tx, ty - 1):
+		return Vector2.DOWN
+	if is_solid(tx, ty + 1):
+		return Vector2.UP
+	push_warning("Level: laser at (%d,%d) has no wall to mount on" % [tx, ty])
+	return Vector2.RIGHT
+
+
 func _portal_facing(tx: int, ty: int) -> Vector2:
 	if is_solid(tx - 1, ty):
 		return Vector2.RIGHT
@@ -357,6 +376,7 @@ func _spawn_entities() -> void:
 	_switches = []
 	_phase_blocks = []
 	_dashing = {}
+	_lasers = []
 	_portal_a = null
 	_portal_b = null
 
@@ -448,6 +468,13 @@ func _spawn_entities() -> void:
 					phase.position = tile_center(tx, ty)
 					_entities.add_child(phase)
 					_phase_blocks.append(phase)
+				"L":
+					var laser := Laser.new()
+					laser.speed_scale = intensity
+					laser.position = tile_center(tx, ty)
+					laser.setup(_laser_facing(tx, ty), Callable(self, "is_solid"))
+					_entities.add_child(laser)
+					_lasers.append(laser)
 				"q", "Q":
 					var portal := Portal.new()
 					portal.setup(_portal_facing(tx, ty))
@@ -747,11 +774,16 @@ func _on_combo_ended(count: int) -> void:
 ## them rather than trapping them or getting pushed aside by move_and_slide()
 ## in whatever direction the overlap happens to resolve — a telegraphed hazard
 ## beats an untelegraphed shove.
+const LASER_FREEZE := 4.0
+
+
 func toggle_switch() -> void:
 	switch_state = not switch_state
 	Audio.play("switch")
 	shake(2.0)
 
+	for laser: Laser in _lasers:
+		laser.freeze(LASER_FREEZE)
 	for gate: GateBlock in _gates:
 		var now_solid := gate.compute_solid(switch_state)
 		if now_solid and not gate.solid:

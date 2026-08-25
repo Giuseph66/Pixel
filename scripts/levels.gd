@@ -1322,6 +1322,78 @@ static func _level_portal_saw() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 16 — lasers telegrafados. Sleep, then a 0.5s blink, then 0.6s of a
+## beam that reaches until the first wall. The blink is the whole fairness of
+## the mechanic; nothing here ever shortens it.
+
+## One emitter, one wall to bounce off, floor the whole way across. The room
+## asks for nothing but reading the cycle once.
+static func _level_laser_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 14, 2, 9, "#")
+	put(g, 24, 22, "L")
+	rect(g, 44, 14, 2, 13, "#")
+	puts(g, [Vector2i(32, 26), Vector2i(38, 26), Vector2i(50, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A low beam over the first pit's jump, a high one over the ledge after it.
+## The floor route is safe from both; the two things that are not the floor
+## are not safe from either.
+static func _level_laser_stack() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 20, 27, 6, 3, ".")
+	rect(g, 20, 30, 6, 1, "^")
+	rect(g, 12, 17, 2, 10, "#")
+	put(g, 14, 22, "L")
+	rect(g, 40, 27, 6, 3, ".")
+	rect(g, 40, 30, 6, 1, "^")
+	rect(g, 42, 20, 10, 1, "-")
+	rect(g, 34, 4, 2, 15, "#")
+	put(g, 36, 10, "L")
+	puts(g, [Vector2i(28, 26), Vector2i(46, 19)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A wall-jump shaft with three emitters staggered up it, alternating sides.
+## Every jump between the walls has its own window cut out of the cycle.
+static func _level_laser_climb() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 24, 4, 2, 22, "#")
+	rect(g, 34, 4, 2, 22, "#")
+	put(g, 26, 22, "L")
+	put(g, 33, 15, "L")
+	put(g, 26, 8, "L")
+	rect(g, 24, 3, 12, 1, "#")
+	puts(g, [Vector2i(29, 18), Vector2i(29, 11)], "o")
+	put(g, 4, 26, "P")
+	put(g, 30, 2, "X")
+	return bake(g)
+
+
+## The step 12 switch, doing something new: a press freezes every laser in the
+## room for four seconds instead of a gate opening. The corridor is the same
+## corridor either way — only the timing changes.
+static func _level_laser_gate() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 10, 26, "i")
+	rect(g, 20, 20, 2, 7, "#")
+	put(g, 22, 24, "L")
+	rect(g, 44, 20, 2, 7, "#")
+	puts(g, [Vector2i(30, 26), Vector2i(50, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1819,6 +1891,34 @@ static func _campaign() -> Array:
 			"hint": "level.portal_saw.hint",
 			"par": 50.0,
 			"rows": _level_portal_saw(),
+		},
+		{
+			"id": "laser_first",
+			"name": "level.laser_first.name",
+			"hint": "level.laser_first.hint",
+			"par": 30.0,
+			"rows": _level_laser_first(),
+		},
+		{
+			"id": "laser_stack",
+			"name": "level.laser_stack.name",
+			"hint": "level.laser_stack.hint",
+			"par": 44.0,
+			"rows": _level_laser_stack(),
+		},
+		{
+			"id": "laser_climb",
+			"name": "level.laser_climb.name",
+			"hint": "level.laser_climb.hint",
+			"par": 52.0,
+			"rows": _level_laser_climb(),
+		},
+		{
+			"id": "laser_gate",
+			"name": "level.laser_gate.name",
+			"hint": "level.laser_gate.hint",
+			"par": 50.0,
+			"rows": _level_laser_gate(),
 		},
 	]
 

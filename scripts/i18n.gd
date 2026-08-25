@@ -420,6 +420,18 @@ const STRINGS := {
 	"level.portal_saw.name": "RISK",
 	"level.portal_saw.hint": "THE BLADE SHARES THE DOORWAY",
 
+	"codex.laser.name": "LASER",
+	"codex.laser.text": "IT BLINKS, THEN IT FIRES. THE BLINK IS THE INVITATION",
+
+	"level.laser_first.name": "THE BEAM",
+	"level.laser_first.hint": "WATCH IT ONCE. THERE IS TIME TO SPARE",
+	"level.laser_stack.name": "THE GRID",
+	"level.laser_stack.hint": "LOW, THEN HIGH — THEY NEVER FIRE TOGETHER",
+	"level.laser_climb.name": "CUT SHAFT",
+	"level.laser_climb.hint": "EVERY WALL JUMP HAS ITS OWN WINDOW",
+	"level.laser_gate.name": "GATED BEAM",
+	"level.laser_gate.hint": "THE SWITCH BUYS A FEW SAFE SECONDS",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -584,6 +596,8 @@ const STRINGS := {
 	"pal.portal_a.note": "NEEDS ITS PAIR SOMEWHERE IN THE ROOM",
 	"pal.portal_b.name": "PORTAL (B)",
 	"pal.portal_b.note": "NEEDS ITS PAIR SOMEWHERE IN THE ROOM",
+	"pal.laser.name": "LASER",
+	"pal.laser.note": "MOUNTS ON A WALL. FIRES AWAY FROM IT",
 },
 
 "pt": {
@@ -930,6 +944,18 @@ const STRINGS := {
 	"level.portal_saw.name": "RISCO",
 	"level.portal_saw.hint": "A LAMINA DIVIDE A PORTA COM VOCE",
 
+	"codex.laser.name": "LASER",
+	"codex.laser.text": "PISCA, DEPOIS DISPARA. O PISCA E O CONVITE",
+
+	"level.laser_first.name": "O FEIXE",
+	"level.laser_first.hint": "OBSERVE UMA VEZ. HA TEMPO DE SOBRA",
+	"level.laser_stack.name": "A GRADE",
+	"level.laser_stack.hint": "BAIXO, DEPOIS ALTO — NUNCA DISPARAM JUNTOS",
+	"level.laser_climb.name": "POCO CORTADO",
+	"level.laser_climb.hint": "CADA IMPULSO DE PAREDE TEM SUA JANELA",
+	"level.laser_gate.name": "FEIXE COM PORTA",
+	"level.laser_gate.hint": "O INTERRUPTOR COMPRA UNS SEGUNDOS SEGUROS",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1094,6 +1120,8 @@ const STRINGS := {
 	"pal.portal_a.note": "PRECISA DO PAR EM ALGUM LUGAR DA SALA",
 	"pal.portal_b.name": "PORTAL (B)",
 	"pal.portal_b.note": "PRECISA DO PAR EM ALGUM LUGAR DA SALA",
+	"pal.laser.name": "LASER",
+	"pal.laser.note": "GRUDA NUMA PAREDE. DISPARA PARA LONGE DELA",
 },
 
 "es": {
@@ -1440,6 +1468,18 @@ const STRINGS := {
 	"level.portal_saw.name": "RIESGO",
 	"level.portal_saw.hint": "LA HOJA COMPARTE LA PUERTA CONTIGO",
 
+	"codex.laser.name": "LASER",
+	"codex.laser.text": "PARPADEA, LUEGO DISPARA. EL PARPADEO ES LA SENAL",
+
+	"level.laser_first.name": "EL HAZ",
+	"level.laser_first.hint": "MIRALO UNA VEZ. SOBRA TIEMPO",
+	"level.laser_stack.name": "LA REJILLA",
+	"level.laser_stack.hint": "BAJO, LUEGO ALTO — NUNCA DISPARAN JUNTOS",
+	"level.laser_climb.name": "POZO CORTADO",
+	"level.laser_climb.hint": "CADA SALTO DE PARED TIENE SU VENTANA",
+	"level.laser_gate.name": "HAZ CON PUERTA",
+	"level.laser_gate.hint": "EL INTERRUPTOR COMPRA UNOS SEGUNDOS SEGUROS",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1604,5 +1644,7 @@ const STRINGS := {
 	"pal.portal_a.note": "NECESITA SU PAR EN ALGUN LUGAR DE LA SALA",
 	"pal.portal_b.name": "PORTAL (B)",
 	"pal.portal_b.note": "NECESITA SU PAR EN ALGUN LUGAR DE LA SALA",
+	"pal.laser.name": "LASER",
+	"pal.laser.note": "SE MONTA EN UN MURO. DISPARA LEJOS DE EL",
 },
 }
