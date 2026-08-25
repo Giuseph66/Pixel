@@ -495,7 +495,11 @@ func _spawn_entities() -> void:
 					laser.speed_scale = intensity
 					laser.position = tile_center(tx, ty)
 					var facing := _laser_facing_h(tx, ty) if ch == "L" else _laser_facing_v(tx, ty)
-					laser.setup(facing, Callable(self, "is_solid"))
+					# is_wall_or_gate(), not is_solid(): a closed gate is not baked
+					# terrain, so is_solid() alone is blind to it — the beam would
+					# sail straight through a shut gate the same way ground AI used
+					# to walk through one before it got this same swap.
+					laser.setup(facing, Callable(self, "is_wall_or_gate"))
 					_entities.add_child(laser)
 					_lasers.append(laser)
 				"q", "Q":

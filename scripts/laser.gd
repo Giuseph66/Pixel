@@ -110,8 +110,13 @@ func _physics_process(delta: float) -> void:
 
 
 func _measure() -> void:
-	var tx := roundi(position.x / 8.0)
-	var ty := roundi(position.y / 8.0)
+	# position is always a tile CENTER (tile_center() = tx*8+4), so
+	# position/8.0 lands exactly on tx+0.5. roundi() rounds .5 up, silently
+	# measuring from tx+1 instead of tx — off by one tile in the firing
+	# direction, which either cut the beam a tile short or drove it a tile
+	# into the wall depending on which way it fired. floori() lands on tx.
+	var tx := floori(position.x / 8.0)
+	var ty := floori(position.y / 8.0)
 	var steps := 0
 	while steps < MAX_REACH_TILES:
 		var nx := tx + int(dir.x) * (steps + 1)

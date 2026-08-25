@@ -847,6 +847,26 @@ func _check_laser() -> int:
 	laser.queue_free()
 	await get_tree().process_frame
 
+	# Regression: position is always a tile CENTER (tx*8+4), landing
+	# _measure()'s tx/ty exactly on a half-integer. roundi() rounds that up,
+	# silently measuring from one tile past the emitter — cutting the beam a
+	# tile short firing one way, driving it a tile into the wall firing the
+	# other way, depending on which side of the half the rounding lands on.
+	var reach_laser := Laser.new()
+	reach_laser.position = Vector2(10 * 8 + 4, 5 * 8 + 4)
+	add_child(reach_laser)
+	await get_tree().process_frame
+	reach_laser.setup(Vector2.RIGHT, func(nx: int, ny: int) -> bool: return nx == 15 and ny == 5)
+	reach_laser._measure()
+	if not is_equal_approx(reach_laser._reach, 36.0):
+		bad += _fail("a laser firing right measured %s, wanted 36 (a wall 5 tiles away)" % reach_laser._reach)
+	reach_laser.setup(Vector2.LEFT, func(nx: int, ny: int) -> bool: return nx == 5 and ny == 5)
+	reach_laser._measure()
+	if not is_equal_approx(reach_laser._reach, 36.0):
+		bad += _fail("a laser firing left measured %s, wanted 36 — likely overshooting into the wall" % reach_laser._reach)
+	reach_laser.queue_free()
+	await get_tree().process_frame
+
 	# Facing: 'L' only ever reads left/right, 'K' only ever reads up/down — an
 	# 'L' boxed in on the vertical axis but open sideways still has to pick a
 	# side rather than falling back to firing through the floor.
@@ -865,6 +885,29 @@ func _check_laser() -> int:
 	if level._laser_facing_v(22, 26) != Vector2.UP:
 		bad += _fail("a 'K' standing on the floor did not face up")
 	level.queue_free()
+	await get_tree().process_frame
+
+	# Regression: the beam's solid-check used to be is_solid(), which is
+	# blind to gates the same way ground AI used to be before it switched to
+	# is_wall_or_gate() — a closed gate never blocked the beam.
+	var gg := Levels.blank()
+	Levels.rect(gg, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(gg, 18, 20, 2, 5, "#")
+	Levels.put(gg, 20, 22, "L")
+	Levels.put(gg, 30, 22, "G")
+	Levels.put(gg, 4, 26, "P")
+	Levels.put(gg, 54, 26, "X")
+	var groom := Sandbox.normalise({"rows": Levels.bake(gg)})
+	var glevel := Level.new()
+	glevel.setup(0, Sandbox.to_level_data(groom))
+	add_child(glevel)
+	await get_tree().process_frame
+	var gate_laser: Laser = glevel._lasers[0]
+	gate_laser._physics_process(Laser.SLEEP + Laser.WARN + 0.01)
+	var expect_reach := (30 - 20 - 1) * 8.0 + 4.0
+	if not is_equal_approx(gate_laser._reach, expect_reach):
+		bad += _fail("a laser's beam passed through a closed gate (reach %s, wanted %s)" % [gate_laser._reach, expect_reach])
+	glevel.queue_free()
 	await get_tree().process_frame
 	return bad
 
