@@ -909,6 +909,42 @@ func _check_laser() -> int:
 		bad += _fail("a laser's beam passed through a closed gate (reach %s, wanted %s)" % [gate_laser._reach, expect_reach])
 	glevel.queue_free()
 	await get_tree().process_frame
+
+	# A beam that crosses a portal tile bends: it re-emerges from the twin
+	# heading whichever way that twin faces, same substitution a body gets.
+	var pg := Levels.blank()
+	Levels.rect(pg, 0, 27, Levels.COLS, 5, "#")
+	Levels.rect(pg, 18, 20, 2, 5, "#")
+	Levels.put(pg, 20, 22, "L")
+	Levels.put(pg, 26, 22, "q")
+	Levels.put(pg, 40, 14, "#")
+	Levels.put(pg, 40, 15, "Q")
+	Levels.put(pg, 40, 20, "#")
+	Levels.put(pg, 4, 26, "P")
+	Levels.put(pg, 54, 26, "X")
+	var proom := Sandbox.normalise({"rows": Levels.bake(pg)})
+	var plevel := Level.new()
+	plevel.setup(0, Sandbox.to_level_data(proom))
+	add_child(plevel)
+	await get_tree().process_frame
+	var portal_laser: Laser = plevel._lasers[0]
+	portal_laser._physics_process(Laser.SLEEP + Laser.WARN + 0.01)
+	if portal_laser._segments.size() != 2:
+		bad += _fail("a laser through a portal produced %d segment(s), wanted 2"
+			% portal_laser._segments.size())
+	else:
+		var first: Dictionary = portal_laser._segments[0]
+		var second: Dictionary = portal_laser._segments[1]
+		if not is_equal_approx(float(first["reach"]), 52.0):
+			bad += _fail("a laser's first leg into a portal measured %s, wanted 52" % first["reach"])
+		if second["dir"] != Vector2.DOWN:
+			bad += _fail("a laser did not pick up the exit portal's facing after bending")
+		if not (second["pos"] as Vector2).is_equal_approx(Vector2(40 * 8 + 4, 15 * 8 + 4)):
+			bad += _fail("a laser's second leg did not start from the exit portal")
+		if not is_equal_approx(float(second["reach"]), 36.0):
+			bad += _fail("a laser's second leg past a portal measured %s, wanted 36" % second["reach"])
+	plevel.queue_free()
+	await get_tree().process_frame
 	return bad
 
 

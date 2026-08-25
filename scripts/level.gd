@@ -233,6 +233,22 @@ func _laser_facing_v(tx: int, ty: int) -> Vector2:
 	return Vector2.UP
 
 
+## Where a laser beam re-emerges if it crosses a portal tile mid-flight —
+## the twin, same as a body that falls into one: heading swapped for
+## whichever way the exit faces. Null before both portals are linked (still
+## true the instant a laser's own _ready() takes its first measurement,
+## since the grid is walked top to bottom and linking happens only once the
+## whole thing has been read) or if the tile just isn't a portal at all.
+func _portal_exit_at(tx: int, ty: int) -> Portal:
+	var ch := tile_at(tx, ty)
+	var portal: Portal = null
+	if ch == "q":
+		portal = _portal_a
+	elif ch == "Q":
+		portal = _portal_b
+	return portal.twin if portal != null else null
+
+
 func _portal_facing(tx: int, ty: int) -> Vector2:
 	if is_solid(tx - 1, ty):
 		return Vector2.RIGHT
@@ -499,7 +515,7 @@ func _spawn_entities() -> void:
 					# terrain, so is_solid() alone is blind to it — the beam would
 					# sail straight through a shut gate the same way ground AI used
 					# to walk through one before it got this same swap.
-					laser.setup(facing, Callable(self, "is_wall_or_gate"))
+					laser.setup(facing, Callable(self, "is_wall_or_gate"), Callable(self, "_portal_exit_at"))
 					_entities.add_child(laser)
 					_lasers.append(laser)
 				"q", "Q":

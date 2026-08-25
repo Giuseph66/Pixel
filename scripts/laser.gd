@@ -14,23 +14,38 @@ const SLEEP := 1.4
 const WARN := 0.5
 const FIRE := 0.6
 const MAX_REACH_TILES := 60
+## A beam only ever has one portal pair to bounce off in a room, so two hops
+## already covers every real layout — this is a loop guard, not a design
+## target, for the degenerate case of an exit that stares straight back into
+## an entrance.
+const MAX_BOUNCES := 4
 
 var speed_scale := 1.0
 var dir := Vector2.RIGHT
 var is_solid_at: Callable
+## Optional. Given the tile just ahead of the beam, returns the Portal to
+## re-emerge from if that tile is a portal, or null. Beam bends there instead
+## of stopping — same substitution a body gets from stepping into one.
+var portal_at: Callable
 
 var _time := 0.0
 var _phase := 0          # 0 sleep, 1 warn, 2 fire
 var _frozen := 0.0       # step 12/16 — a switch can buy a safe window
-var _reach := 8.0
+## One entry per straight stretch of beam: {pos: Vector2 (local, the start —
+## the emitter for the first, a portal's centre for every bounce after),
+## dir: Vector2, reach: float}. A beam with no portal in its path is always
+## exactly one segment, so every caller that only ever knew one straight
+## beam keeps working unchanged.
+var _segments: Array = []
+var _reach := 8.0        # last segment's reach — kept for network sync
 var _sprite: Sprite2D
 var _area: Area2D
-var _shape: RectangleShape2D
 
 
-func setup(direction: Vector2, solid_check: Callable) -> void:
+func setup(direction: Vector2, solid_check: Callable, portal_check: Callable = Callable()) -> void:
 	dir = direction
 	is_solid_at = solid_check
+	portal_at = portal_check
 
 
 func _ready() -> void:
@@ -38,14 +53,10 @@ func _ready() -> void:
 	_sprite.texture = PixelArt.tex("laser_idle")
 	add_child(_sprite)
 
-	_shape = RectangleShape2D.new()
-	var cs := CollisionShape2D.new()
-	cs.shape = _shape
 	_area = Area2D.new()
 	_area.collision_layer = 0
 	_area.collision_mask = 1
 	_area.monitoring = false
-	_area.add_child(cs)
 	add_child(_area)
 	_area.body_entered.connect(_on_body_entered)
 
@@ -110,31 +121,63 @@ func _physics_process(delta: float) -> void:
 
 
 func _measure() -> void:
+	_segments.clear()
+	if not is_solid_at.is_valid():
+		_reach = 8.0
+		return
 	# position is always a tile CENTER (tile_center() = tx*8+4), so
 	# position/8.0 lands exactly on tx+0.5. roundi() rounds .5 up, silently
 	# measuring from tx+1 instead of tx — off by one tile in the firing
 	# direction, which either cut the beam a tile short or drove it a tile
 	# into the wall depending on which way it fired. floori() lands on tx.
-	var tx := floori(position.x / 8.0)
-	var ty := floori(position.y / 8.0)
-	var steps := 0
-	while steps < MAX_REACH_TILES:
-		var nx := tx + int(dir.x) * (steps + 1)
-		var ny := ty + int(dir.y) * (steps + 1)
-		if is_solid_at.call(nx, ny):
+	var seg_pos := position
+	var seg_dir := dir
+	var budget := MAX_REACH_TILES
+	var bounces := 0
+	while true:
+		var tx := floori(seg_pos.x / 8.0)
+		var ty := floori(seg_pos.y / 8.0)
+		var steps := 0
+		var exit_portal: Portal = null
+		while steps < budget:
+			var nx := tx + int(seg_dir.x) * (steps + 1)
+			var ny := ty + int(seg_dir.y) * (steps + 1)
+			if is_solid_at.call(nx, ny):
+				break
+			if portal_at.is_valid():
+				var found: Portal = portal_at.call(nx, ny)
+				if found != null:
+					exit_portal = found
+					steps += 1
+					break
+			steps += 1
+		_reach = float(steps) * 8.0 + 4.0
+		_segments.append({"pos": seg_pos, "dir": seg_dir, "reach": _reach})
+		budget -= steps
+		bounces += 1
+		if exit_portal == null or budget <= 0 or bounces >= MAX_BOUNCES:
 			break
-		steps += 1
-	_reach = float(steps) * 8.0 + 4.0
+		seg_pos = exit_portal.position
+		seg_dir = exit_portal.facing
 
 
 func _update_shape() -> void:
 	const THICK := 4.0
-	if absf(dir.x) > 0.5:
-		_shape.size = Vector2(_reach, THICK)
-		_area.position = Vector2(dir.x * _reach * 0.5, 0.0)
-	else:
-		_shape.size = Vector2(THICK, _reach)
-		_area.position = Vector2(0.0, dir.y * _reach * 0.5)
+	for child in _area.get_children():
+		child.queue_free()
+	for seg: Dictionary in _segments:
+		var d: Vector2 = seg["dir"]
+		var reach: float = seg["reach"]
+		var shape := RectangleShape2D.new()
+		var cs := CollisionShape2D.new()
+		if absf(d.x) > 0.5:
+			shape.size = Vector2(reach, THICK)
+			cs.position = (seg["pos"] as Vector2) - position + Vector2(d.x * reach * 0.5, 0.0)
+		else:
+			shape.size = Vector2(THICK, reach)
+			cs.position = (seg["pos"] as Vector2) - position + Vector2(0.0, d.y * reach * 0.5)
+		cs.shape = shape
+		_area.add_child(cs)
 
 
 ## The beam kills the instant it fires, including anyone already standing in
@@ -158,11 +201,17 @@ func _draw() -> void:
 		return
 	var thick := 1.0 if _phase == 1 else 4.0
 	var fill := Palette.CYAN if _phase == 1 else Palette.WHITE
-	var rect: Rect2
-	if absf(dir.x) > 0.5:
-		rect = Rect2(0.0 if dir.x > 0.0 else -_reach, -thick * 0.5, _reach, thick)
-	else:
-		rect = Rect2(-thick * 0.5, 0.0 if dir.y > 0.0 else -_reach, thick, _reach)
-	draw_rect(rect, fill)
-	if _phase == 2:
-		Util.draw_panel(self, rect, Color(0, 0, 0, 0), Palette.CYAN)
+	for seg: Dictionary in _segments:
+		var d: Vector2 = seg["dir"]
+		var reach: float = seg["reach"]
+		var origin: Vector2 = (seg["pos"] as Vector2) - position
+		var rect: Rect2
+		if absf(d.x) > 0.5:
+			rect = Rect2(origin.x + (0.0 if d.x > 0.0 else -reach), origin.y - thick * 0.5,
+				reach, thick)
+		else:
+			rect = Rect2(origin.x - thick * 0.5, origin.y + (0.0 if d.y > 0.0 else -reach),
+				thick, reach)
+		draw_rect(rect, fill)
+		if _phase == 2:
+			Util.draw_panel(self, rect, Color(0, 0, 0, 0), Palette.CYAN)
