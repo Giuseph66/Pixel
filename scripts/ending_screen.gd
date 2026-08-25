@@ -14,6 +14,10 @@ var deaths := 0
 var endless := false
 var rooms := 0
 var new_record := false
+## Step 10. Shown in place of the death count on this summary — deaths already
+## had a whole run of HUD counters to be read in; the run's total score has not
+## been visible anywhere until now.
+var score := 0
 
 var _rows: Array = []           # [{ "label": String, "value": String, "color": Color }]
 var _cube: Texture2D
@@ -32,7 +36,7 @@ func _ready() -> void:
 			_make("endless.depth", str(rooms), Palette.GOLD),
 			_make("endless.time", Util.format_time(total_time), Palette.GREY),
 			_make("endless.gems", str(total_gems), Palette.GREY),
-			_make("endless.deaths", str(deaths), Palette.GREY),
+			_make("endless.score", str(score), Palette.GOLD),
 		]
 		items = [
 			{"id": "endless", "label": Lang.t("title.endless")},

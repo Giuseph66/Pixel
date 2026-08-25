@@ -349,6 +349,19 @@ const STRINGS := {
 	"level.lava_gems.name": "GREED",
 	"level.lava_gems.hint": "EVERY GEM COSTS SECONDS",
 
+	"codex.combo.name": "COMBO",
+	"codex.combo.text": "CHAIN DIFFERENT MOVES IN THE AIR. THE FLOOR RESETS IT",
+
+	"hud.score": "SCORE %d",
+	"endless.score": "SCORE",
+
+	"level.combo_yard.name": "THE YARD",
+	"level.combo_yard.hint": "NOTHING HERE HURTS. SEE WHAT YOU CAN CHAIN",
+	"level.combo_gap.name": "THE CROSSING",
+	"level.combo_gap.hint": "MANY WAYS OVER. FEW OF THEM TOUCH THE FLOOR",
+	"level.combo_tower.name": "THE CLEAN CLIMB",
+	"level.combo_tower.hint": "WALLS ARE FASTER THAN STAIRS",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -772,6 +785,19 @@ const STRINGS := {
 	"level.lava_gems.name": "GANANCIA",
 	"level.lava_gems.hint": "CADA GEMA CUSTA SEGUNDOS",
 
+	"codex.combo.name": "COMBO",
+	"codex.combo.text": "ENCADEIE MOVIMENTOS NO AR. O CHAO ZERA TUDO",
+
+	"hud.score": "PONTOS %d",
+	"endless.score": "PONTOS",
+
+	"level.combo_yard.name": "O PATIO",
+	"level.combo_yard.hint": "NADA AQUI MACHUCA. VEJA O QUE VOCE ENCADEIA",
+	"level.combo_gap.name": "A TRAVESSIA",
+	"level.combo_gap.hint": "VARIAS FORMAS DE PASSAR. POUCAS TOCAM O CHAO",
+	"level.combo_tower.name": "SUBIDA LIMPA",
+	"level.combo_tower.hint": "PAREDES SAO MAIS RAPIDAS QUE ESCADAS",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1194,6 +1220,19 @@ const STRINGS := {
 	"level.lava_climb.hint": "EL POZO NO ESPERA",
 	"level.lava_gems.name": "CODICIA",
 	"level.lava_gems.hint": "CADA GEMA CUESTA SEGUNDOS",
+
+	"codex.combo.name": "COMBO",
+	"codex.combo.text": "ENCADENA MOVIMIENTOS EN EL AIRE. EL SUELO LO CORTA",
+
+	"hud.score": "PUNTOS %d",
+	"endless.score": "PUNTOS",
+
+	"level.combo_yard.name": "EL PATIO",
+	"level.combo_yard.hint": "NADA AQUI DUELE. MIRA QUE PUEDES ENCADENAR",
+	"level.combo_gap.name": "LA TRAVESIA",
+	"level.combo_gap.hint": "MUCHAS FORMAS DE CRUZAR. POCAS TOCAN EL SUELO",
+	"level.combo_tower.name": "SUBIDA LIMPIA",
+	"level.combo_tower.hint": "LOS MUROS SON MAS RAPIDOS QUE LAS ESCALERAS",
 
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",

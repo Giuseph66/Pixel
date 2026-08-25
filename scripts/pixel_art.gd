@@ -345,6 +345,18 @@ const GRIDS := {
 		"11111111",
 		"m......m",
 	],
+	# Three links climbing the same diagonal, cool to hot: the colour code the
+	# in-game popup uses (cyan, gold, white) read backwards as a staircase.
+	"icon_combo": [
+		"......w.",
+		".....ww.",
+		"....yy..",
+		"...yy...",
+		"..cc....",
+		".cc.....",
+		"........",
+		"........",
+	],
 	# The playable door is 12x16; this is its 8x8 stand-in for the book.
 	"icon_door": [
 		"..####..",

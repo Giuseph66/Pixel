@@ -7,7 +7,7 @@ extends Node2D
 ## merging each row of solid tiles into as few rectangles as possible, so a
 ## full screen of ground costs a handful of shapes instead of 1,920 of them.
 
-signal completed(time: float, gems: int, total_gems: int)
+signal completed(time: float, gems: int, total_gems: int, score: int, best_combo: int)
 signal player_died
 
 const TILE := 8
@@ -27,6 +27,10 @@ var gems_taken := 0
 var gems_total := 0
 var secrets_taken := 0
 var deaths := 0
+## Step 10 — score is 100*n*n per combo cashed in on landing; best_combo is the
+## longest chain of distinct verbs the room saw, whatever it scored.
+var score := 0
+var best_combo := 0
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
@@ -512,6 +516,8 @@ func _spawn_player(peer_id: int) -> void:
 	player.surface_at = Callable(self, "tile_at")
 	player.died.connect(_on_player_died.bind(player))
 	player.pounded.connect(_on_player_pounded)
+	player.combo_changed.connect(_on_combo_changed.bind(player))
+	player.combo_ended.connect(_on_combo_ended)
 	_entities.add_child(player)
 	_players[peer_id] = player
 	if peer_id == Session.local_peer_id() or _player == null:
@@ -588,6 +594,24 @@ func _on_player_pounded(at: Vector2) -> void:
 		# hazard, and a pound that erased it would erase the way across.
 
 
+## Combo colours read as a temperature: cyan is nothing special yet, gold is a
+## real chain, white is rare. The number is what teaches the system — words
+## would repeat what the codex already says.
+func _on_combo_changed(count: int, _verb: int, player: Player) -> void:
+	var color := Palette.CYAN
+	if count > 6:
+		color = Palette.WHITE
+	elif count >= 4:
+		color = Palette.GOLD
+	fx.popup(fx.to_local(player.global_position + Vector2(0, -14.0)),
+		"x%d" % count, color, 0.5)
+
+
+func _on_combo_ended(count: int) -> void:
+	score += 100 * count * count
+	best_combo = maxi(best_combo, count)
+
+
 func _on_block_broken(at: Vector2) -> void:
 	Audio.play_varied("break")
 	fx.emit(fx.to_local(at), 12, Palette.GOLD, 95.0, Vector2.ZERO, TAU, 0.45, 260.0)
@@ -642,7 +666,7 @@ func _finish_room() -> void:
 		_lava.stop()
 	Audio.play("door")
 	fx.emit(_door.position, 24, Palette.PURPLE, 90.0, Vector2.ZERO, TAU, 0.7, 90.0)
-	completed.emit(time, gems_taken, gems_total)
+	completed.emit(time, gems_taken, gems_total, score, best_combo)
 
 
 func _on_player_died(player: Player) -> void:
@@ -737,6 +761,8 @@ func _on_roster_changed(roster: Dictionary) -> void:
 ## untouched — they never change.
 func restart() -> void:
 	finished = false
+	score = 0
+	best_combo = 0
 	_door_arrivals = {}
 	_snapshot_time = 0.0
 	for child in _entities.get_children():

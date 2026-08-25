@@ -13,6 +13,10 @@ var level: Level
 var level_index := 0
 var level_name := ""
 var hint := ""
+## Step 10 — only endless turns this on. A campaign room has a par and medals
+## to read; a running score would be one more number competing for the same
+## eye, for a stat the room was never designed around.
+var show_score := false
 
 var _time := 0.0
 
@@ -45,6 +49,12 @@ func _draw() -> void:
 		var dsize := PixelFont.measure(deaths, 1)
 		PixelFont.draw_text(self, deaths,
 			Vector2(SCREEN.x - 16.0 - gsize.x - dsize.x, 4), Palette.MAGENTA_DARK, 1)
+
+		if show_score:
+			# Room between the clock and the death counter is otherwise empty —
+			# there is nowhere else on a 14px band to put a running total.
+			var score := Lang.tf("hud.score", [level.score])
+			PixelFont.draw_text(self, score, Vector2(300.0, 4), Palette.GOLD, 1)
 
 	_draw_hint()
 

@@ -32,6 +32,7 @@ const ENTRIES := [
 	{"id": "stomp", "kind": ABILITY, "sprite": "icon_stomp"},
 	{"id": "dash", "kind": ABILITY, "sprite": "icon_dash"},
 	{"id": "pound", "kind": ABILITY, "sprite": "icon_pound"},
+	{"id": "combo", "kind": ABILITY, "sprite": "icon_combo"},
 
 	{"id": "slime", "kind": CREATURE, "sprite": "slime_a"},
 	{"id": "bat", "kind": CREATURE, "sprite": "bat_a"},

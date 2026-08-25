@@ -9,6 +9,18 @@ signal died
 signal gem_grabbed(position: Vector2)
 signal bounced(position: Vector2)
 signal pounded(position: Vector2)
+## Step 10 — combo. Each is a distinct aerial verb; repeating one is not a new
+## count (the dash already needs a refill in between, which forces variety).
+signal combo_changed(count: int, verb: int)
+## Fired once, on landing, with whatever the combo was before it reset. Level
+## reads this to cash in the score — combo_changed alone cannot tell "grew"
+## from "about to end" apart.
+signal combo_ended(final_count: int)
+
+## POUND is listed because the design does — a pound always resolves by
+## touching the ground, which is the same instant the combo resets, so it is
+## never actually seen as a distinct member. No call site sets that bit.
+enum Verb { DASH, WALL, STOMP, SPRING, POUND }
 
 const WIDTH := 6
 const HEIGHT := 10
@@ -87,6 +99,8 @@ var _pound := 0                 # 0 none, 1 hanging, 2 falling
 var _pound_hang := 0.0
 var _recover := 0.0
 var _chain := 0
+var combo := 0
+var _combo_verbs := 0
 
 var sprite: Sprite2D
 var fx: Fx
@@ -174,6 +188,10 @@ func _physics_process(delta: float) -> void:
 		refill_dash()
 		if not _was_on_floor:
 			_on_land()
+		if combo > 0:
+			combo_ended.emit(combo)
+			combo = 0
+			_combo_verbs = 0
 	elif _wall_dir != 0 and wall_tile() != "~":
 		refill_dash()
 	_was_on_floor = is_on_floor()
@@ -303,6 +321,19 @@ func is_pounding() -> bool:
 	return _pound == 2
 
 
+## Mark one verb used this time in the air. A repeat (dash chained off a wall
+## touch, say) is not a new count — the point is variety, not spam.
+func _add_verb(verb: int) -> void:
+	var bit := 1 << verb
+	if _combo_verbs & bit:
+		return
+	_combo_verbs |= bit
+	combo += 1
+	if combo > 2:
+		_found("combo")
+	combo_changed.emit(combo, verb)
+
+
 ## Note a first-time move and say so on screen. The callout is the only place
 ## the codex ever interrupts play, and only ever once per entry.
 func _found(entry: String) -> void:
@@ -330,6 +361,7 @@ func _try_dash(input: float, controls: Dictionary) -> void:
 	_dash_dir = dir.normalized()
 
 	_found("dash")
+	_add_verb(Verb.DASH)
 	has_dash = false
 	_dash = DASH_TIME
 	_lock = DASH_TIME
@@ -440,6 +472,7 @@ func _handle_jump(controls: Dictionary) -> void:
 			facing = -_wall_dir
 			_lock = WALL_LOCK
 			_buffer = 0.0
+			_add_verb(Verb.WALL)
 			Audio.play_varied("wall_jump")
 			if fx != null:
 				fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 0.0)), 6,
@@ -501,6 +534,7 @@ func _update_sprite(input: float) -> void:
 func spring_bounce() -> void:
 	if frozen or not alive:
 		return
+	_add_verb(Verb.SPRING)
 	refill_dash()
 	_dash = 0.0
 	velocity.y = SPRING_VELOCITY
@@ -516,6 +550,7 @@ func stomp() -> void:
 	if frozen or not alive:
 		return
 	_found("stomp")
+	_add_verb(Verb.STOMP)
 	refill_dash()
 	_dash = 0.0
 	_pound = 0
@@ -608,6 +643,8 @@ func respawn(at: Vector2) -> void:
 	_dash = 0.0
 	_pound = 0
 	_recover = 0.0
+	combo = 0
+	_combo_verbs = 0
 	_network_target = at
 	if sprite != null:
 		sprite.visible = true

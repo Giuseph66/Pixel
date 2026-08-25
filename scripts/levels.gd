@@ -903,6 +903,67 @@ static func _level_lava_gems() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 10 — combo. Playgrounds, not tests: nothing here kills, so the reward
+## for chaining moves is purely the number and the reach it buys, never survival.
+
+## Two walls, three slimes, a spring, two crystals: everything the combo can
+## chain through, laid out with nothing that punishes standing on the floor.
+## The high gems only come down to whoever links wall jumps and the dash.
+static func _level_combo_yard() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 10, 2, 14, "#")           # left wall for wall jumps
+	rect(g, 46, 10, 2, 14, "#")           # right wall
+	puts(g, [Vector2i(18, 26), Vector2i(28, 26), Vector2i(42, 26)], "S")
+	put(g, 34, 26, "J")
+	puts(g, [Vector2i(24, 16), Vector2i(36, 16)], "d")
+	puts(g, [Vector2i(16, 8), Vector2i(30, 6), Vector2i(44, 8)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A spike bed wider than any single move crosses. A spring alone reaches the
+## far shelf; two wall posts inside the pit turn the same crossing into a
+## wall-jump chain instead, and a crystal overhead lets a dash carry the rest.
+static func _level_combo_gap() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, 16, 5, "#")
+	rect(g, 44, 27, COLS - 44, 5, "#")
+	rect(g, 16, 30, 28, 1, "^")
+	rect(g, 23, 14, 2, 16, "#")
+	rect(g, 37, 14, 2, 16, "#")
+	put(g, 12, 26, "J")
+	rect(g, 28, 21, 5, 1, "-")
+	put(g, 30, 15, "d")
+	puts(g, [Vector2i(30, 19), Vector2i(42, 12)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## Both routes reach the same bridge. One is a wall-jump shaft straight up from
+## the spawn; the other is a staircase that wanders across half the room to get
+## there on foot. The par is set for the shaft — walking is a legitimate way to
+## finish, just not a fast one.
+static func _level_combo_tower() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 6, 1, 21, "#")            # shaft, left wall
+	rect(g, 15, 6, 1, 21, "#")            # shaft, right wall
+	rect(g, 10, 5, 49, 1, "-")            # bridge, shaft top to the door
+	rect(g, 22, 23, 5, 1, "-")
+	rect(g, 30, 19, 5, 1, "-")
+	rect(g, 22, 15, 5, 1, "-")
+	rect(g, 30, 11, 5, 1, "-")
+	rect(g, 22, 7, 5, 1, "-")
+	puts(g, [Vector2i(24, 21), Vector2i(32, 9)], "o")
+	put(g, 12, 3, "o")
+	put(g, 4, 26, "P")
+	put(g, 56, 4, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1246,6 +1307,27 @@ static func _campaign() -> Array:
 			"hint": "level.lava_gems.hint",
 			"par": 58.0,
 			"rows": _level_lava_gems(),
+		},
+		{
+			"id": "combo_yard",
+			"name": "level.combo_yard.name",
+			"hint": "level.combo_yard.hint",
+			"par": 30.0,
+			"rows": _level_combo_yard(),
+		},
+		{
+			"id": "combo_gap",
+			"name": "level.combo_gap.name",
+			"hint": "level.combo_gap.hint",
+			"par": 38.0,
+			"rows": _level_combo_gap(),
+		},
+		{
+			"id": "combo_tower",
+			"name": "level.combo_tower.name",
+			"hint": "level.combo_tower.hint",
+			"par": 40.0,
+			"rows": _level_combo_tower(),
 		},
 	]
 

@@ -17,6 +17,8 @@ var _depth := 0
 var _run_time := 0.0
 var _run_gems := 0
 var _run_deaths := 0
+var _run_score := 0
+var _run_best_combo := 0
 
 # The room just cleared, held back until the player leaves the results screen.
 # Replaying it from there has to not count twice.
@@ -497,6 +499,8 @@ func _start_run() -> void:
 	_run_time = 0.0
 	_run_gems = 0
 	_run_deaths = 0
+	_run_score = 0
+	_run_best_combo = 0
 	_pending = {}
 	_build_room(_depth, LevelGen.generate(_run_seed, _depth))
 
@@ -508,6 +512,7 @@ func _next_endless_room() -> void:
 ## Close the run, bank the record and show the summary.
 func _end_run() -> void:
 	var record := Save.record_endless(_depth, _run_gems)
+	Save.record_endless_score(_run_score, _run_best_combo)
 	_clear_all()
 
 	var screen := EndingScreen.new()
@@ -516,6 +521,7 @@ func _end_run() -> void:
 	screen.total_time = _run_time
 	screen.total_gems = _run_gems
 	screen.deaths = _run_deaths
+	screen.score = _run_score
 	screen.new_record = record
 	screen.chosen.connect(_on_ending_chosen)
 	_set_screen(screen)
@@ -548,6 +554,7 @@ func _build_room(index: int, data: Dictionary) -> void:
 	_hud.level_index = index
 	_hud.level_name = data["name"]
 	_hud.hint = data["hint"]
+	_hud.show_score = _endless
 	add_child(_hud)
 
 
@@ -564,7 +571,7 @@ func _restart_room() -> void:
 		_hud.hint = ""
 
 
-func _on_room_completed(time: float, gems: int, total: int) -> void:
+func _on_room_completed(time: float, gems: int, total: int, score: int, best_combo: int) -> void:
 	if Session.is_active():
 		await get_tree().create_timer(0.45).timeout
 		if Session.is_host():
@@ -576,7 +583,7 @@ func _on_room_completed(time: float, gems: int, total: int) -> void:
 		_go(func(): _show_sandbox_results(time, gems, total, deaths))
 		return
 	if _endless:
-		_on_endless_room_completed(time, gems, total)
+		_on_endless_room_completed(time, gems, total, score, best_combo)
 		return
 
 	var record := Save.record_clear(_current, time, gems, _levels.size(),
@@ -589,8 +596,10 @@ func _on_room_completed(time: float, gems: int, total: int) -> void:
 	_go(func(): _show_results(time, best, record, gems, total, deaths, held, earned))
 
 
-func _on_endless_room_completed(time: float, gems: int, total: int) -> void:
-	_pending = {"time": time, "gems": gems, "deaths": _level.deaths}
+func _on_endless_room_completed(time: float, gems: int, total: int, score: int,
+		best_combo: int) -> void:
+	_pending = {"time": time, "gems": gems, "deaths": _level.deaths,
+		"score": score, "best_combo": best_combo}
 	await get_tree().create_timer(0.45).timeout
 	_go(func(): _show_endless_results(time, gems, total, int(_pending["deaths"])))
 
@@ -604,6 +613,8 @@ func _commit_room() -> void:
 	_run_time += float(_pending["time"])
 	_run_gems += int(_pending["gems"])
 	_run_deaths += int(_pending["deaths"])
+	_run_score += int(_pending.get("score", 0))
+	_run_best_combo = maxi(_run_best_combo, int(_pending.get("best_combo", 0)))
 	_pending = {}
 
 

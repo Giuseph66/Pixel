@@ -381,6 +381,22 @@ func record_endless(rooms: int, gems: int) -> bool:
 	return record
 
 
+## Score and best combo are their own record, independent of depth: a shallow
+## run played with style can beat a deep run played flat, and the two numbers
+## should not have to agree to both be worth keeping.
+func record_endless_score(run_score: int, run_best_combo: int) -> bool:
+	if not tracking:
+		return false
+	data["used"] = true
+	var record := run_score > int(data.get("endless_score", 0))
+	if record:
+		data["endless_score"] = run_score
+	if run_best_combo > int(data.get("endless_best_combo", 0)):
+		data["endless_best_combo"] = run_best_combo
+	save_game()
+	return record
+
+
 func add_death() -> void:
 	if not tracking:
 		return
