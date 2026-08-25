@@ -1454,6 +1454,55 @@ static func _level_ferry_spike() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 18 — pulo carregado. Standing still on the ground for CHARGE_TIME
+## (0.35s) makes the next jump climb about 7.9 tiles instead of 4.7. No tile
+## of its own and no infinite-mode segment — the generator's steps and gaps
+## are all sized for the normal jump, and a charge is a bonus escape from a
+## mistake, never something a generated room is built to require.
+
+## Six tiles up, nothing else in the room. The only question the room asks is
+## whether you know the move exists.
+static func _level_charge_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 34, 21, 14, 6, "#")
+	put(g, 40, 20, "o")
+	put(g, 4, 26, "P")
+	put(g, 44, 20, "X")
+	return bake(g)
+
+
+## Three tall steps. The first and the last give a wide landing to charge on;
+## the middle one is narrow enough that stopping on it at all is the hard part.
+static func _level_charge_gap() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 21, 8, 6, "#")
+	rect(g, 26, 15, 3, 12, "#")
+	rect(g, 36, 9, 8, 18, "#")
+	puts(g, [Vector2i(15, 20), Vector2i(38, 8)], "o")
+	put(g, 4, 26, "P")
+	put(g, 40, 8, "X")
+	return bake(g)
+
+
+## Two routes to the same door: a short climb that costs two charges (0.7s
+## stood still), or a long way around at floor level and up a staircase that
+## never asks you to stop moving. Neither route is wrong.
+static func _level_charge_race() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 16, 21, 6, 6, "#")
+	rect(g, 30, 15, 6, 6, "#")
+	rect(g, 36, 15, 19, 1, "-")
+	rect(g, 44, 24, 4, 1, "-")
+	rect(g, 50, 20, 4, 1, "-")
+	puts(g, [Vector2i(19, 20), Vector2i(33, 14)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 14, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -2007,6 +2056,27 @@ static func _campaign() -> Array:
 			"hint": "level.ferry_spike.hint",
 			"par": 56.0,
 			"rows": _level_ferry_spike(),
+		},
+		{
+			"id": "charge_first",
+			"name": "level.charge_first.name",
+			"hint": "level.charge_first.hint",
+			"par": 24.0,
+			"rows": _level_charge_first(),
+		},
+		{
+			"id": "charge_gap",
+			"name": "level.charge_gap.name",
+			"hint": "level.charge_gap.hint",
+			"par": 38.0,
+			"rows": _level_charge_gap(),
+		},
+		{
+			"id": "charge_race",
+			"name": "level.charge_race.name",
+			"hint": "level.charge_race.hint",
+			"par": 42.0,
+			"rows": _level_charge_race(),
 		},
 	]
 

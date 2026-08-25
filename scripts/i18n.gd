@@ -444,6 +444,16 @@ const STRINGS := {
 	"level.ferry_spike.name": "OVER THE SPIKES",
 	"level.ferry_spike.hint": "MISSING THE RIDE COSTS MORE THAN TIME HERE",
 
+	"codex.charge.name": "CHARGED JUMP",
+	"codex.charge.text": "STAND STILL A MOMENT. THE NEXT JUMP GOES HALF AGAIN",
+
+	"level.charge_first.name": "THE PAUSE",
+	"level.charge_first.hint": "NOTHING BUT STANDING STILL REACHES THIS",
+	"level.charge_gap.name": "BREATHING ROOM",
+	"level.charge_gap.hint": "THERE IS ONLY SPACE TO CHARGE ON SOME OF THESE",
+	"level.charge_race.name": "THE COST",
+	"level.charge_race.hint": "TWO CHARGES UP, OR A LONG WAY AROUND",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -982,6 +992,16 @@ const STRINGS := {
 	"level.ferry_spike.name": "SOBRE OS ESPINHOS",
 	"level.ferry_spike.hint": "PERDER A CARONA CUSTA MAIS QUE TEMPO AQUI",
 
+	"codex.charge.name": "PULO CARREGADO",
+	"codex.charge.text": "FIQUE PARADO UM INSTANTE. O PULO SAI BEM MAIOR",
+
+	"level.charge_first.name": "A PAUSA",
+	"level.charge_first.hint": "SO FICAR PARADO ALCANCA ISSO",
+	"level.charge_gap.name": "FOLEGO",
+	"level.charge_gap.hint": "SO EM ALGUNS DELES HA ESPACO PARA CARREGAR",
+	"level.charge_race.name": "O CUSTO",
+	"level.charge_race.hint": "DUAS CARGAS, OU UM CAMINHO BEM MAIS LONGO",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -1519,6 +1539,16 @@ const STRINGS := {
 	"level.ferry_dive.hint": "UN SOLO VIAJE NO CRUZA ESTO",
 	"level.ferry_spike.name": "SOBRE LOS PINCHOS",
 	"level.ferry_spike.hint": "PERDER EL VIAJE CUESTA MAS QUE TIEMPO AQUI",
+
+	"codex.charge.name": "SALTO CARGADO",
+	"codex.charge.text": "QUEDATE QUIETO UN INSTANTE. EL SALTO SALE MAYOR",
+
+	"level.charge_first.name": "LA PAUSA",
+	"level.charge_first.hint": "SOLO QUEDARSE QUIETO ALCANZA ESTO",
+	"level.charge_gap.name": "RESPIRO",
+	"level.charge_gap.hint": "SOLO EN ALGUNOS HAY ESPACIO PARA CARGAR",
+	"level.charge_race.name": "EL COSTO",
+	"level.charge_race.hint": "DOS CARGAS, O UN CAMINO MUCHO MAS LARGO",
 
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",

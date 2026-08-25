@@ -30,6 +30,7 @@ func _ready() -> void:
 	failures += await _check_portal()
 	failures += await _check_laser()
 	failures += await _check_ferry()
+	failures += await _check_charge()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -901,6 +902,46 @@ func _check_ferry() -> int:
 	player.queue_free()
 	if is_instance_valid(ferry):
 		ferry.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+## Step 18. Exercises _handle_jump() directly with the buffer and coyote
+## windows pre-armed, rather than simulating 0.35 real seconds of a player
+## standing still to get there — the charge/jump interaction is what this
+## checks, not the standing-still detection, which is one plain condition.
+func _check_charge() -> int:
+	var bad := 0
+	var player := Player.new()
+	add_child(player)
+	await get_tree().process_frame
+
+	player._buffer = 0.1
+	player._coyote = 0.1
+	player._charge = 0.0
+	player._handle_jump({})
+	var plain := player.velocity.y
+
+	player.velocity = Vector2.ZERO
+	player._buffer = 0.1
+	player._coyote = 0.1
+	player._charge = Player.CHARGE_TIME
+	player._handle_jump({})
+	var charged := player.velocity.y
+
+	if not (charged < plain):
+		bad += _fail("a fully charged jump was not higher than a plain one")
+	if not is_equal_approx(charged, plain * Player.CHARGE_BOOST):
+		bad += _fail("a full charge did not apply CHARGE_BOOST exactly")
+	if player._charge != 0.0:
+		bad += _fail("jumping did not spend the charge")
+
+	player._charge = 0.2
+	player._on_land()
+	if player._charge != 0.0:
+		bad += _fail("landing did not clear an in-progress charge")
+
+	player.queue_free()
 	await get_tree().process_frame
 	return bad
 

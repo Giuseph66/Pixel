@@ -77,6 +77,12 @@ const POUND_REACH := 13.0       # pixels around the landing that get cleared
 const CHAIN_STEP := 0.09
 const CHAIN_MAX := 1.45
 
+## Step 18 — standing still charges the next jump. JUMP_CUT still applies on
+## top of the boosted velocity, same as any other jump — the charge changes
+## how high, never whether letting go early still cuts it short.
+const CHARGE_TIME := 0.35
+const CHARGE_BOOST := 1.3
+
 var alive := true
 var frozen := false             # set once the room is won; control is over
 var has_dash := true
@@ -104,6 +110,8 @@ var _recover := 0.0
 var _chain := 0
 var combo := 0
 var _combo_verbs := 0
+var _charge := 0.0
+var _charge_particle_t := 0.0
 
 var sprite: Sprite2D
 var fx: Fx
@@ -179,6 +187,7 @@ func _physics_process(delta: float) -> void:
 		_try_dash(input, controls)
 		_apply_horizontal(input, delta)
 		_apply_gravity(input, delta)
+		_tick_charge(input, delta)
 		_handle_jump(controls)
 
 	velocity += external_force * delta
@@ -484,10 +493,37 @@ func _apply_gravity(input: float, delta: float) -> void:
 		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale)
 
 
+## Standing still with no input on the ground charges the next jump. It
+## survives being airborne on purpose — that is the jump it is paying for,
+## not a second one — but resets the instant you touch ground again, charged
+## or not, so it can never carry over from one landing into the next.
+func _tick_charge(input: float, delta: float) -> void:
+	if is_on_floor() and absf(velocity.x) < 4.0 and absf(input) < 0.01:
+		var was_full := _charge >= CHARGE_TIME
+		_charge = minf(_charge + delta, CHARGE_TIME)
+		if fx != null:
+			_charge_particle_t += delta
+			if _charge_particle_t >= 0.08:
+				_charge_particle_t = 0.0
+				fx.emit(_fx_at(Vector2(0, HEIGHT * 0.5)), 1, Palette.GOLD, 20.0,
+					Vector2.UP, 0.3, 0.3, 40.0)
+		if not was_full and _charge >= CHARGE_TIME:
+			_found("charge")
+			_squash(Vector2(1.15, 0.85))
+			Audio.play("charge")
+	elif not is_on_floor():
+		pass
+	else:
+		_charge = 0.0
+		_charge_particle_t = 0.0
+
+
 func _handle_jump(controls: Dictionary) -> void:
 	if _buffer > 0.0:
 		if _coyote > 0.0:
-			velocity.y = JUMP_VELOCITY
+			var boost := CHARGE_BOOST if _charge >= CHARGE_TIME else 1.0
+			velocity.y = JUMP_VELOCITY * boost
+			_charge = 0.0
 			_buffer = 0.0
 			_coyote = 0.0
 			Audio.play_varied("jump")
@@ -515,6 +551,7 @@ func _on_land() -> void:
 	if fx != null:
 		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 7)
 	_squash(Vector2(1.25, 0.75))
+	_charge = 0.0
 
 
 ## Particles live in the level's coordinate space, not the player's.
@@ -550,6 +587,13 @@ func _update_sprite(input: float) -> void:
 	# without a meter stealing screen from a 480x270 room.
 	sprite.modulate = Color(1, 1, 1) if (has_dash or not dash_unlocked) \
 		else Color(0.62, 0.68, 0.9)
+	# A jump charging up pulses gold, on top of whatever the dash tint already
+	# set — the two never overlap in practice (charging needs standing still,
+	# a spent dash needs having just moved), but neither should erase the
+	# other if they somehow did.
+	if _charge > 0.0:
+		var t := _charge / CHARGE_TIME
+		sprite.modulate = sprite.modulate.lerp(Palette.GOLD, t * 0.7)
 	if _wall_dir != 0:
 		sprite.flip_h = _wall_dir > 0
 	else:
