@@ -277,23 +277,37 @@ func refill_dash() -> void:
 	has_dash = true
 
 
+## The ground under your feet decides two things: how fast you can change your
+## mind about where you are going, and where "standing still" actually is.
+##
+## A conveyor moves the target rather than pushing against it. Pushing loses:
+## ground friction is 1250 px/s and a belt worth fighting would have to beat
+## that every frame, which is a belt that also throws you off ice and stairs.
+## Moving the target means standing still on a belt carries you at exactly
+## CONVEYOR_PUSH, running with it adds, and running against it subtracts.
 func _apply_horizontal(input: float, delta: float) -> void:
-	var target := input * RUN_SPEED * speed_scale
+	var tile := ground_tile()
+	var slippery := tile == "~"
+
+	var carry := 0.0
+	if tile == ">":
+		carry = CONVEYOR_PUSH
+	elif tile == "<":
+		carry = -CONVEYOR_PUSH
+
+	var target := input * RUN_SPEED * speed_scale + carry
 	var rate := 0.0
 	if absf(input) > 0.01:
-		# Acceleration depends on surface
-		if is_on_floor():
-			var tile := ground_tile()
-			rate = ACCEL_ICE if tile == "~" else ACCEL_GROUND
-		else:
+		if not is_on_floor():
 			rate = ACCEL_AIR
-	else:
-		# Friction depends on surface
-		if is_on_floor():
-			var tile := ground_tile()
-			rate = FRICTION_ICE if tile == "~" else FRICTION_GROUND
 		else:
+			rate = ACCEL_ICE if slippery else ACCEL_GROUND
+	else:
+		if not is_on_floor():
 			rate = FRICTION_AIR
+		else:
+			rate = FRICTION_ICE if slippery else FRICTION_GROUND
+
 	velocity.x = move_toward(velocity.x, target, rate * delta)
 	if absf(input) > 0.01:
 		facing = -1 if input < 0.0 else 1
@@ -429,13 +443,20 @@ func stomp() -> void:
 	Audio.play_varied("stomp")
 
 
-## Surface consultado a cada frame: injetado por Level antes de entrar na árvore.
+## What the level is made of, asked one tile at a time. Level hands this over
+## before the player enters the tree; without it the player still runs, it just
+## treats every surface as ordinary ground.
 var surface_at: Callable
+## Cleared every frame, so two things pushing at once add up for one frame
+## rather than accumulating forever.
 var external_force := Vector2.ZERO
+## Endless modifiers scale these. Jump velocity is deliberately not scaled with
+## gravity: heavier gravity against an unchanged jump is the point.
 var speed_scale := 1.0
 var gravity_scale := 1.0
 
-## Caractere sob os pés, ou "." quando não há chão.
+
+## The character under the feet, or "." when there is no ground under them.
 func ground_tile() -> String:
 	if not surface_at.is_valid() or not is_on_floor():
 		return "."

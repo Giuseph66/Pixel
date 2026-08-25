@@ -17,8 +17,6 @@ const AUTOSAVE := 15.0          # seconds of play between disk writes
 
 ## Rooms whose unlock also hands over an ability. Story order is the teacher,
 ## so the move arrives with the room built to teach it.
-const DASH_ROOM := 12           # 0-based: room 13, "FIRST DASH"
-const POUND_ROOM := 18          # room 19, "SLAM"
 const DASH_ROOM_ID := "first_dash"
 const POUND_ROOM_ID := "slam"
 
@@ -33,7 +31,12 @@ var active := 0
 var data: Dictionary = {}
 
 var _since_write := 0.0
+## What the last finished room newly earned, for the results screen to read.
+var last_awarded := 0
 
+
+## 1: rooms keyed by index. 2: rooms keyed by the stable id in levels.gd.
+const SCHEMA := 2
 
 const MEDAL_TIME := 1
 const MEDAL_GEMS := 2
@@ -47,13 +50,22 @@ static func blank_slot() -> Dictionary:
 		"cleared": {},          # room index (as String) -> true
 		"gems": {},             # room index (as String) -> best gem count
 		"medals": {},           # room id -> bitmask (1=time, 2=gems, 4=clean)
-		"secrets": {},          # room id -> true when secret gem taken
+		"secrets": {},          # room id -> true when its secret gem was taken
+		"secrets_taken": 0,     # how many secret gems this slot has ever found
 		"total_deaths": 0,
 		"endless_best": 0,      # deepest endless run, in rooms cleared
 		"endless_gems": 0,      # gems taken in that run
 		"play_time": 0.0,
 		"gems_taken": 0,        # every gem ever picked up, not the best per room
 		"codex": {},            # entry id -> true, once seen
+		# Bumped when the key format changes. Two things depend on it living
+		# here. _read() only copies keys a blank slot already declares, so a
+		# marker missing from this dictionary would never survive a restart and
+		# the migration would run again on data it had already converted. And
+		# it starts at 1, not SCHEMA: a save written before the marker existed
+		# has no marker to load, so the default it falls back to has to be the
+		# old format, or the migration skips exactly the slots that need it.
+		"schema": 1,
 	}
 
 
@@ -62,6 +74,9 @@ func _ready() -> void:
 		slots.append(blank_slot())
 	data = slots[0]
 	load_game()
+	# Warm the room-id cache now rather than on the first save query, which
+	# would otherwise land inside the level select's first frame and hitch it.
+	Levels.ids()
 
 
 # ------------------------------------------------------------------- disk ---
@@ -103,8 +118,8 @@ func _read(path: String) -> void:
 	active = clampi(int(parsed.get("active", 0)), 0, SLOTS - 1)
 	data = slots[active]
 
-	# Migrate old numeric keys to stable room IDs (schema 1 -> 2)
-	_migrate_to_schema_2()
+	for slot: Dictionary in slots:
+		_migrate_to_schema_2(slot)
 
 
 func _import_legacy() -> void:
@@ -130,46 +145,36 @@ func _import_legacy() -> void:
 	save_game()
 
 
-## Migrate old numeric keys to stable room IDs (schema 1 -> 2).
-## Old keys were str(index), new keys are room IDs like "first_dash".
-func _migrate_to_schema_2() -> void:
-	if data.get("schema") == 2:
-		return  # Already migrated
+## Rooms used to be keyed by their index in Levels.all(), which meant inserting
+## a room silently handed one player's records to another room. They are keyed
+## by a stable id now; this rewrites an old slot once.
+const SCHEMA_1_ORDER := [
+	"first_steps", "prickly", "ceiling_spikes", "slime_time", "bounce",
+	"the_climb", "double_trouble", "spring_stair", "ledge_climb", "spike_gauntlet",
+	"spring_tower", "wall_finale", "first_dash", "crystal_chain", "platform_ride",
+	"beat", "dash_gauntlet", "mid_finale", "slam", "break_in", "chain_bounce",
+]
 
-	# List of room IDs in the original order (21 rooms)
-	var old_order := [
-		"first_steps", "prickly", "ceiling_spikes", "slime_time", "bounce",
-		"the_climb", "double_trouble", "spring_stair", "ledge_climb", "spike_gauntlet",
-		"spring_tower", "wall_finale", "first_dash", "crystal_chain", "platform_ride",
-		"beat", "dash_gauntlet", "mid_finale", "slam", "break_in", "chain_bounce"
-	]
 
-	# Migrate best_times
-	var new_times := {}
-	for i in range(old_order.size()):
-		var old_key := str(i)
-		if data["best_times"].has(old_key):
-			new_times[old_order[i]] = data["best_times"][old_key]
-	data["best_times"] = new_times
+func _migrate_to_schema_2(slot: Dictionary) -> void:
+	if int(slot.get("schema", 1)) >= 2:
+		return
 
-	# Migrate cleared
-	var new_cleared := {}
-	for i in range(old_order.size()):
-		var old_key := str(i)
-		if data["cleared"].has(old_key):
-			new_cleared[old_order[i]] = data["cleared"][old_key]
-	data["cleared"] = new_cleared
+	for field: String in ["best_times", "cleared", "gems"]:
+		var old_values: Dictionary = slot.get(field, {})
+		var moved := {}
+		for i in SCHEMA_1_ORDER.size():
+			var old_key := str(i)
+			if old_values.has(old_key):
+				moved[SCHEMA_1_ORDER[i]] = old_values[old_key]
+		# Anything already keyed by id is kept as it is: a half-migrated slot
+		# must never lose the half that was already done.
+		for key: String in old_values:
+			if not key.is_valid_int():
+				moved[key] = old_values[key]
+		slot[field] = moved
 
-	# Migrate gems
-	var new_gems := {}
-	for i in range(old_order.size()):
-		var old_key := str(i)
-		if data["gems"].has(old_key):
-			new_gems[old_order[i]] = data["gems"][old_key]
-	data["gems"] = new_gems
-
-	data["schema"] = 2
-	save_game()
+	slot["schema"] = SCHEMA
 
 
 func save_game() -> void:
@@ -210,9 +215,13 @@ func slot_is_empty(index: int) -> bool:
 
 # ---------------------------------------------------------------- queries ---
 
-## Get the stable key for a room by index. Uses room ID if available, falls back to string index.
+## The save key for a room. Endless rooms are not in the campaign list and fall
+## back to the index, which is all they ever need.
 func _key(index: int) -> String:
-	return String(Levels.all()[index].get("id", str(index)))
+	var list := Levels.ids()
+	if index < 0 or index >= list.size() or list[index].is_empty():
+		return str(index)
+	return list[index]
 
 
 func is_unlocked(index: int) -> bool:
@@ -282,7 +291,8 @@ func known_count() -> int:
 # ---------------------------------------------------------------- updates ---
 
 ## Record a finished room. Returns true when the time was a new record.
-func record_clear(index: int, time: float, gems: int, level_count: int, deaths: int = 0, par: float = 0.0) -> bool:
+func record_clear(index: int, time: float, gems: int, level_count: int,
+		total_gems: int, deaths: int, par: float) -> bool:
 	var key := _key(index)
 	var record := false
 
@@ -297,13 +307,16 @@ func record_clear(index: int, time: float, gems: int, level_count: int, deaths: 
 	if index + 1 >= int(data["unlocked"]) and index + 1 < level_count:
 		data["unlocked"] = index + 2
 
-	_award(index, time, gems, level_count, deaths, par)
+	last_awarded = _award(index, time, gems, total_gems, deaths, par)
 	save_game()
 	return record
 
 
-func _award(index: int, time: float, gems: int, total: int, deaths: int, par: float) -> void:
-	var key := _key(index)
+## Hand out whatever this attempt earned and report back only what is new, so
+## the results screen can celebrate a first medal without re-celebrating three
+## the player already had. Medals accumulate: a slow clean run and a fast messy
+## one add up to two medals over two visits.
+func _award(index: int, time: float, gems: int, total: int, deaths: int, par: float) -> int:
 	var earned := 0
 	if par > 0.0 and time <= par:
 		earned |= MEDAL_TIME
@@ -312,7 +325,34 @@ func _award(index: int, time: float, gems: int, total: int, deaths: int, par: fl
 	if deaths == 0:
 		earned |= MEDAL_CLEAN
 	var before := medals(index)
-	data["medals"][key] = before | earned
+	data["medals"][_key(index)] = before | earned
+	return earned & ~before
+
+
+## Every medal in the campaign, for the counter on the front end.
+func medal_count() -> int:
+	var total := 0
+	for value in data["medals"].values():
+		var bits := int(value)
+		total += (bits & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1)
+	return total
+
+
+func has_secret(index: int) -> bool:
+	return bool(data["secrets"].get(_key(index), false))
+
+
+## Secret gems keep their own tally. Folding them into gems_taken would make
+## the lifetime gem count mean two different things at once.
+func take_secret(index: int) -> void:
+	if has_secret(index):
+		return
+	data["secrets"][_key(index)] = true
+	data["secrets_taken"] = int(data.get("secrets_taken", 0)) + 1
+
+
+func secret_count() -> int:
+	return int(data.get("secrets_taken", 0))
 
 
 ## Record a finished endless run. Returns true when it beat the old depth.
@@ -331,10 +371,6 @@ func add_death() -> void:
 
 
 func add_gem() -> void:
-	data["gems_taken"] = int(data["gems_taken"]) + 1
-
-
-func add_secret() -> void:
 	data["gems_taken"] = int(data["gems_taken"]) + 1
 
 

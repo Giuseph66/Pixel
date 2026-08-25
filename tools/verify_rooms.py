@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Reachability checker for PIXEL rooms.
 
-Rebuilds every room exactly the way levels.gd paints it, then runs a breadth
+Reads every room out of tools/rooms.json — written straight from levels.gd by
+tools/dump_rooms.gd — then runs a breadth
 first search over the real player physics — the constants below are copied
 from player.gd — to answer one question per room: can you actually get from
 P to X without touching a spike?
@@ -17,6 +18,34 @@ Rooms 1-6 are known playable by hand, so they double as a test of the checker:
 if it cannot beat those, the checker is wrong, not the level.
 """
 
+KNOWN LIMITATION — the search does not finish.
+
+The breadth first search runs out of its 500,000 state budget and reports
+TIMEOUT on every room, including FIRST STEPS, which is the easiest room in the
+game. This is not new and it is not caused by any room: checked out at commit
+516f19f, before ice or belts or anything else existed, room 1 times out in the
+same way and in about the same eighty seconds. The state key is a rounded pixel
+position crossed with velocity buckets, and a 480x256 room has more of those
+than the budget can hold.
+
+So: a FAIL from this tool currently means nothing, and a pass is not available
+to be had. Do not read a clean run as evidence that a room is beatable, and do
+not claim a room was verified with it. Fixing it means changing the search
+itself — biasing it toward the door, or modelling motion more coarsely — which
+is its own piece of work.
+
+One thing it does still do usefully: warnings() reads the grid without
+searching, so structural checks (no spawn, no exit, unreachable gems by
+geometry) are still worth running.
+
+What this tool models: terrain, one way slabs, spikes, springs and the door.
+What it does not model: time. Timed blocks, retracting spikes, saws, moving
+platforms, elastic slimes and the rising tide are all invisible to it, so rooms
+built around them cannot be judged here even once the search is fixed.
+
+
+import json
+import os
 import sys
 from collections import deque
 
@@ -80,10 +109,18 @@ def move_toward(v, target, delta):
     return v + (delta if target > v else -delta)
 
 
+# Ice and conveyors collide exactly like terrain; what makes them different is
+# friction and carry, which only change how a route feels, never whether one
+# exists. Moving platforms are deliberately not solid here: the checker has no
+# clock, so it cannot know where one is, and calling their spawn tile a wall
+# would prove the wrong room reachable.
+SOLID = frozenset("#~><")
+
+
 class World:
     def __init__(self, grid):
         self.g = grid
-        self.solid = [[c == "#" for c in row] for row in grid]
+        self.solid = [[c in SOLID for c in row] for row in grid]
         self.oneway = [[c == "-" for c in row] for row in grid]
         self.springs = [(x, y) for y in range(ROWS) for x in range(COLS)
                         if grid[y][x] == "J"]
@@ -123,7 +160,7 @@ class World:
         for ty in range(max(0, int(y0 // TILE) - 1), min(ROWS, int(y1 // TILE) + 2)):
             for tx in range(max(0, int(x0 // TILE) - 1), min(COLS, int(x1 // TILE) + 2)):
                 c = self.g[ty][tx]
-                if c == "^":
+                if c in ("^", "z", "Z"):
                     sy0, sy1 = ty * TILE + 4, ty * TILE + 8
                 elif c == "v":
                     sy0, sy1 = ty * TILE, ty * TILE + 4
@@ -500,21 +537,40 @@ def level_12():
 LEVELS = [level_1, level_2, level_3, level_4, level_5, level_6,
           level_7, level_8, level_9, level_10, level_11, level_12]
 
+ROOMS_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rooms.json")
+
+
+def load_rooms():
+    """Every room as (name, grid).
+
+    Prefers tools/rooms.json, written by tools/dump_rooms.gd straight out of
+    levels.gd. The Python mirror below it is a fallback and only ever covered
+    the first twelve rooms — which is how the campaign quietly grew to forty
+    seven with nothing checking the other thirty five.
+    """
+    if os.path.exists(ROOMS_JSON):
+        with open(ROOMS_JSON) as f:
+            data = json.load(f)
+        return [(r["id"] or str(i + 1), [list(row) for row in r["rows"]])
+                for i, r in enumerate(data)]
+    print("tools/rooms.json missing — falling back to the first 12 rooms only.")
+    print("regenerate it with:  godot --headless --script-scene tools/dump_rooms.tscn\n")
+    return [(str(i + 1), fn()) for i, fn in enumerate(LEVELS)]
+
 
 def main():
     which = [int(a) for a in sys.argv[1:] if a.isdigit()]
     show = "--show" in sys.argv
     bad = 0
-    for i, fn in enumerate(LEVELS, 1):
+    for i, (name, g) in enumerate(load_rooms(), 1):
         if which and i not in which:
             continue
-        g = fn()
         if show:
-            render(g, f"room {i}")
+            render(g, f"room {i} {name}")
         verdict, expanded = solve(g)
         ok = verdict == "SOLVABLE"
         bad += 0 if ok else 1
-        print(f"{'ok  ' if ok else 'FAIL'} room {i:2d}  {verdict:12s} "
+        print(f"{'ok  ' if ok else 'FAIL'} {i:2d} {name:18s} {verdict:12s} "
               f"{expanded:7d} states")
         for w in warnings(g):
             print(w)

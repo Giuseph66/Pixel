@@ -19,6 +19,11 @@ extends RefCounted
 ##   d  dash crystal            m  slab that slides sideways
 ##   t  timed block, on first   n  slab that rides up and down
 ##   T  timed block, off first  k  breakable block, opens to a ground pound
+##   ~  ice, almost no friction  r  slab that rides a circle
+##   >  belt, pushes right       e  elastic slime, bounces you and lives
+##   <  belt, pushes left        E  shielded walker, only a pound gets through
+##   z  timed spike, down first  A  the line a rising tide starts from
+##   Z  timed spike, up first    O  secret gem, outside the door's count
 
 const COLS := 60
 const ROWS := 32
@@ -438,6 +443,7 @@ static func _level_ice_first() -> PackedStringArray:
 	rect(g, 0, 27, COLS, 5, "#")
 	rect(g, 10, 27, 40, 1, "~")          # ice surface, only top line
 	puts(g, [Vector2i(18, 26), Vector2i(30, 26), Vector2i(42, 26)], "o")
+	put(g, 54, 20, "O")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
 	return bake(g)
@@ -447,12 +453,13 @@ static func _level_ice_first() -> PackedStringArray:
 static func _level_ice_edge() -> PackedStringArray:
 	var g := blank()
 	rect(g, 0, 27, COLS, 5, "#")
-	# Ice plates of 8 tiles, separated by 4-tile pits with spikes
-	for x in [10, 28, 46]:
-		rect(g, x, 27, 8, 1, "~")
-		if x + 8 < COLS:
-			rect(g, x + 8, 29, 4, 1, "^")
-	puts(g, [Vector2i(14, 26), Vector2i(32, 26), Vector2i(50, 26)], "o")
+	# Plates of ice with real gaps between them. Four tiles is inside a running
+	# jump; what makes it hard is arriving at the edge still carrying speed.
+	for x in [10, 24, 38]:
+		rect(g, x, 27, 10, 1, "~")
+		rect(g, x + 10, 27, 4, 3, ".")
+		rect(g, x + 10, 30, 4, 1, "^")
+	puts(g, [Vector2i(14, 26), Vector2i(28, 26), Vector2i(42, 26)], "o")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
 	return bake(g)
@@ -515,6 +522,7 @@ static func _level_belt_launch() -> PackedStringArray:
 	rect(g, 24, 30, 6, 1, "^")
 	rect(g, 34, 27, 8, 1, ">")
 	puts(g, [Vector2i(20, 24), Vector2i(40, 26)], "o")
+	put(g, 8, 20, "O")
 	put(g, 4, 26, "P")
 	put(g, 52, 26, "X")
 	return bake(g)
@@ -543,6 +551,7 @@ static func _level_retract_first() -> PackedStringArray:
 	for x in [14, 26, 38]:
 		rect(g, x, 26, 3, 1, "z")
 	puts(g, [Vector2i(20, 25), Vector2i(32, 25), Vector2i(44, 25)], "o")
+	put(g, 50, 20, "O")
 	put(g, 4, 26, "P")
 	put(g, 52, 26, "X")
 	return bake(g)
@@ -587,6 +596,230 @@ static func _level_retract_saw() -> PackedStringArray:
 	puts(g, [Vector2i(24, 25), Vector2i(40, 25)], "o")
 	put(g, 4, 26, "P")
 	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The orbit ferries you across. Board it on the left bank, step off on the
+## right; the circle always comes back, so a missed jump costs a lap, not a life.
+static func _level_orbit_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 24, 27, 12, 3, ".")
+	rect(g, 24, 30, 12, 1, "^")
+	rect(g, 29, 25, 2, 1, "r")
+	puts(g, [Vector2i(21, 25), Vector2i(29, 20), Vector2i(40, 25)], "o")
+	put(g, 8, 20, "O")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## Two circles, out of phase, with a ledge between them. Every gem sits at the
+## top of a lap, so the room asks which lap to take rather than which jump.
+static func _level_orbit_gems() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 27, 32, 3, ".")
+	rect(g, 14, 30, 32, 1, "^")
+	rect(g, 28, 24, 4, 1, "#")
+	rect(g, 20, 25, 2, 1, "r")
+	rect(g, 38, 25, 2, 1, "r")
+	puts(g, [Vector2i(20, 20), Vector2i(29, 22), Vector2i(38, 20)], "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## An orbit over the pit and a blade waiting on the far bank. Crossing is only
+## half of it: the landing has to be timed against the saw as well.
+static func _level_orbit_saw() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 27, 14, 3, ".")
+	rect(g, 22, 30, 14, 1, "^")
+	rect(g, 28, 25, 2, 1, "r")
+	rect(g, 40, 25, 1, 2, "#")
+	rect(g, 50, 25, 1, 2, "#")
+	put(g, 45, 26, "W")
+	puts(g, [Vector2i(19, 25), Vector2i(28, 20), Vector2i(54, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 56, 26, "X")
+	return bake(g)
+
+
+## The elastic is the lift. There is no staircase, no spring and no crystal —
+## the only way up to the door is to land on something that throws you back.
+static func _level_elastic_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 22, 26, "e")
+	rect(g, 34, 19, 12, 2, "#")
+	puts(g, [Vector2i(14, 26), Vector2i(28, 26), Vector2i(38, 18)], "o")
+	put(g, 4, 26, "P")
+	put(g, 42, 18, "X")
+	return bake(g)
+
+
+## The elastic is penned in, and the ledge only covers the far half of its walk.
+## Bouncing is easy; bouncing in the right place is the room.
+static func _level_elastic_timing() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 22, 2, 5, "#")
+	rect(g, 40, 22, 2, 5, "#")
+	put(g, 24, 26, "e")
+	rect(g, 30, 18, 12, 2, "#")
+	puts(g, [Vector2i(8, 26), Vector2i(20, 26), Vector2i(34, 17)], "o")
+	put(g, 4, 26, "P")
+	put(g, 38, 17, "X")
+	return bake(g)
+
+
+## Two elastics, one above the other: the first throw reaches the second, and
+## the second reaches the roof. The slabs on the right get there too, slowly.
+static func _level_elastic_chain() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 14, 26, "e")
+	rect(g, 22, 20, 8, 1, "-")
+	put(g, 26, 19, "e")
+	rect(g, 40, 12, 12, 2, "#")
+	rect(g, 52, 20, 6, 1, "-")
+	rect(g, 46, 16, 6, 1, "-")
+	puts(g, [Vector2i(26, 15), Vector2i(26, 8), Vector2i(54, 19)], "o")
+	put(g, 4, 26, "P")
+	put(g, 44, 11, "X")
+	return bake(g)
+
+
+## Spikes under everything and one elastic above them. The slabs cross the pit
+## on their own, so the bounce is for the gems and for the time it saves.
+static func _level_elastic_spike() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 18, 27, 24, 3, ".")
+	rect(g, 18, 30, 24, 1, "^")
+	rect(g, 22, 25, 4, 1, "-")
+	rect(g, 30, 25, 4, 1, "-")
+	rect(g, 38, 25, 3, 1, "-")
+	put(g, 31, 24, "e")
+	puts(g, [Vector2i(23, 20), Vector2i(31, 18), Vector2i(48, 26)], "o")
+	put(g, 52, 20, "O")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## One armoured walker, a clear floor and plenty of room overhead. The room is
+## a single question: the answer you have used all game does not work here.
+static func _level_shield_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 30, 26, "E")
+	puts(g, [Vector2i(16, 26), Vector2i(40, 26), Vector2i(48, 26)], "o")
+	put(g, 30, 20, "O")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Plain slimes and armoured ones in a row. The chain wants every head in turn;
+## one of these heads has to be skipped.
+static func _level_shield_mix() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	puts(g, [Vector2i(14, 26), Vector2i(30, 26), Vector2i(44, 26)], "S")
+	puts(g, [Vector2i(22, 26), Vector2i(38, 26)], "E")
+	puts(g, [Vector2i(18, 22), Vector2i(34, 22), Vector2i(48, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A shield under a ledge. There is no room to build up a pound beside it, so
+## the drop has to start from above.
+static func _level_shield_drop() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 18, 21, 24, 1, "#")
+	rect(g, 12, 24, 5, 1, "-")
+	put(g, 30, 26, "E")
+	rect(g, 44, 27, 8, 3, ".")
+	rect(g, 44, 30, 8, 1, "^")
+	puts(g, [Vector2i(24, 20), Vector2i(36, 20), Vector2i(30, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 55, 26, "X")
+	return bake(g)
+
+
+## A narrow ledge over spikes with a shield already on it. Sharing the ledge is
+## the difficulty; the pound clears it, but the landing has nowhere to go.
+static func _level_shield_pit() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 16, 27, 28, 3, ".")
+	rect(g, 16, 30, 28, 1, "^")
+	rect(g, 20, 24, 20, 1, "#")
+	put(g, 30, 23, "E")
+	puts(g, [Vector2i(22, 23), Vector2i(38, 23), Vector2i(50, 26)], "o")
+	put(g, 10, 20, "O")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The tide starts at your feet and never stops. A plain zigzag of slabs, which
+## would be nothing at all if standing still were still an option.
+static func _level_lava_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 29, COLS, 3, "#")
+	put(g, 30, 28, "A")
+	rect(g, 8, 25, 12, 1, "-")
+	rect(g, 24, 22, 12, 1, "-")
+	rect(g, 40, 19, 12, 1, "-")
+	rect(g, 24, 16, 12, 1, "-")
+	rect(g, 8, 13, 12, 1, "-")
+	rect(g, 24, 10, 12, 1, "-")
+	rect(g, 38, 7, 12, 2, "#")
+	puts(g, [Vector2i(14, 24), Vector2i(30, 15), Vector2i(14, 12)], "o")
+	put(g, 4, 28, "P")
+	put(g, 42, 6, "X")
+	return bake(g)
+
+
+## The same shaft as THE CLIMB, with a reason not to rest in it.
+static func _level_lava_climb() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 29, COLS, 3, "#")
+	put(g, 30, 28, "A")
+	rect(g, 22, 6, 1, 22, "#")
+	rect(g, 27, 8, 1, 20, "#")
+	rect(g, 8, 7, 15, 1, "#")
+	rect(g, 27, 5, 20, 1, "#")
+	puts(g, [Vector2i(24, 22), Vector2i(25, 14), Vector2i(34, 4)], "o")
+	put(g, 4, 28, "P")
+	put(g, 38, 4, "X")
+	return bake(g)
+
+
+## A wider tower, and every gem is a step off the fastest line. The tide decides
+## how greedy you get to be.
+static func _level_lava_gems() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 29, COLS, 3, "#")
+	put(g, 30, 28, "A")
+	rect(g, 6, 25, 10, 1, "-")
+	rect(g, 20, 25, 10, 1, "-")
+	rect(g, 34, 22, 10, 1, "-")
+	rect(g, 20, 19, 10, 1, "-")
+	rect(g, 6, 16, 10, 1, "-")
+	rect(g, 20, 13, 10, 1, "-")
+	rect(g, 34, 10, 10, 1, "-")
+	rect(g, 20, 7, 14, 2, "#")
+	puts(g, [Vector2i(10, 24), Vector2i(38, 21), Vector2i(10, 15)], "o")
+	put(g, 50, 12, "O")
+	put(g, 4, 28, "P")
+	put(g, 26, 6, "X")
 	return bake(g)
 
 
@@ -846,6 +1079,83 @@ static func all() -> Array:
 			"par": 50.0,
 			"rows": _level_orbit_saw(),
 		},
+		{
+			"id": "elastic_first",
+			"name": "level.elastic_first.name",
+			"hint": "level.elastic_first.hint",
+			"par": 36.0,
+			"rows": _level_elastic_first(),
+		},
+		{
+			"id": "elastic_timing",
+			"name": "level.elastic_timing.name",
+			"hint": "level.elastic_timing.hint",
+			"par": 46.0,
+			"rows": _level_elastic_timing(),
+		},
+		{
+			"id": "elastic_chain",
+			"name": "level.elastic_chain.name",
+			"hint": "level.elastic_chain.hint",
+			"par": 55.0,
+			"rows": _level_elastic_chain(),
+		},
+		{
+			"id": "elastic_spike",
+			"name": "level.elastic_spike.name",
+			"hint": "level.elastic_spike.hint",
+			"par": 55.0,
+			"rows": _level_elastic_spike(),
+		},
+		{
+			"id": "shield_first",
+			"name": "level.shield_first.name",
+			"hint": "level.shield_first.hint",
+			"par": 30.0,
+			"rows": _level_shield_first(),
+		},
+		{
+			"id": "shield_mix",
+			"name": "level.shield_mix.name",
+			"hint": "level.shield_mix.hint",
+			"par": 44.0,
+			"rows": _level_shield_mix(),
+		},
+		{
+			"id": "shield_drop",
+			"name": "level.shield_drop.name",
+			"hint": "level.shield_drop.hint",
+			"par": 48.0,
+			"rows": _level_shield_drop(),
+		},
+		{
+			"id": "shield_pit",
+			"name": "level.shield_pit.name",
+			"hint": "level.shield_pit.hint",
+			"par": 52.0,
+			"rows": _level_shield_pit(),
+		},
+		{
+			"id": "lava_first",
+			"name": "level.lava_first.name",
+			"hint": "level.lava_first.hint",
+			"par": 40.0,
+			"rows": _level_lava_first(),
+		},
+		{
+			"id": "lava_climb",
+			"name": "level.lava_climb.name",
+			"hint": "level.lava_climb.hint",
+			"par": 48.0,
+			"rows": _level_lava_climb(),
+		},
+		{
+			"id": "lava_gems",
+			"name": "level.lava_gems.name",
+			"hint": "level.lava_gems.hint",
+			"par": 58.0,
+			"rows": _level_lava_gems(),
+		},
 	]
 
 
@@ -853,8 +1163,21 @@ static func count() -> int:
 	return all().size()
 
 
+## Room ids in campaign order, built once.
+##
+## all() repaints all 36 rooms every time it is called — about 23 ms — and the
+## save file asks which id sits at an index on every single query, several times
+## per room per frame on the level select. Caching the ids turns that screen
+## from seconds per frame back into nothing.
+static var _ids := PackedStringArray()
+
+
+static func ids() -> PackedStringArray:
+	if _ids.is_empty():
+		for room: Dictionary in all():
+			_ids.append(String(room.get("id", "")))
+	return _ids
+
+
 static func index_of(room_id: String) -> int:
-	for i in all().size():
-		if all()[i].get("id", "") == room_id:
-			return i
-	return -1
+	return ids().find(room_id)

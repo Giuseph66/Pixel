@@ -50,6 +50,11 @@ const ENTRIES := [
 	{"id": "ice", "kind": WORLD, "sprite": "ice"},
 	{"id": "belt", "kind": WORLD, "sprite": "belt_a"},
 	{"id": "retract", "kind": WORLD, "sprite": "spike_up"},
+	{"id": "orbit", "kind": WORLD, "sprite": "platform_icon"},
+	{"id": "lava", "kind": WORLD, "sprite": "spike_up"},
+	{"id": "elastic", "kind": CREATURE, "sprite": "elastic_a"},
+	{"id": "shield", "kind": CREATURE, "sprite": "shield_a"},
+	{"id": "secret", "kind": COLLECTIBLE, "sprite": "gem_secret"},
 ]
 
 ## Which entry a level tile reveals, for the pass that runs when a room builds.
@@ -74,6 +79,11 @@ const BY_TILE := {
 	"<": "belt",
 	"z": "retract",
 	"Z": "retract",
+	"r": "orbit",
+	"e": "elastic",
+	"E": "shield",
+	"A": "lava",
+	"O": "secret",
 }
 
 

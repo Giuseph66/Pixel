@@ -1,65 +1,52 @@
 class_name Conveyor
 extends Node2D
 
-## Moving ground that pushes the player horizontal ly in one direction.
-## Painted on story rooms as ">" (right) or "<" (left) tiles.
+## The arrows on a run of belt tiles.
+##
+## The push itself lives in the player, which reads the tile under its feet the
+## same way it reads ice — a belt is terrain, not a force. This node exists so
+## the direction is visible and obviously moving; without the animation the
+## tile is a grey slab that mysteriously carries you.
 
-const TILE := 8.0
+const TILE := 8
+const FRAME_TIME := 0.09
 
-var direction := 1          # 1 for right (>), -1 for left (<)
-var width := 0.0            # pixels
-var height := TILE
+var direction := 1              # 1 for '>', -1 for '<'
+var length := 1                 # in tiles
 
-var _area: Area2D
+var _sprite: Sprite2D
+var _time := 0.0
+
+
+func setup(dir: int, tiles: int) -> void:
+	direction = dir
+	length = maxi(tiles, 1)
 
 
 func _ready() -> void:
-	_area = Area2D.new()
-	_area.collision_layer = 0
-	_area.collision_mask = 1
-	add_child(_area)
-
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(width, height)
-	shape.shape = rect
-	shape.position = Vector2(width * 0.5, height * 0.5)
-	_area.add_child(shape)
-
-	var sprite := Sprite2D.new()
-	sprite.texture = _bake_sprite()
-	add_child(sprite)
+	_sprite = Sprite2D.new()
+	_sprite.centered = false
+	_sprite.flip_h = direction < 0
+	_sprite.texture = _bake("belt_a")
+	add_child(_sprite)
 
 
-func setup(dir: int, w: float) -> void:
-	direction = dir
-	width = w
+func _process(delta: float) -> void:
+	_time += delta
+	# Two frames, half a chevron apart, which reads as the band sliding.
+	var frame := "belt_a" if fmod(_time, FRAME_TIME * 2.0) < FRAME_TIME else "belt_b"
+	_sprite.texture = _bake(frame)
 
 
-## Bake the sprite of moving tiles with animated arrows.
-func _bake_sprite() -> ImageTexture:
-	var w := int(width)
-	var h := int(height)
-	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Palette.OUTLINE)
+## One tile of art repeated across the run. Cached by PixelArt per frame name,
+## so the two textures are built once for the whole room.
+func _bake(frame: String) -> ImageTexture:
+	var key := "%s_x%d" % [frame, length]
+	if PixelArt.has_cached(key):
+		return PixelArt.cached(key)
 
-	# Simple alternating pattern for direction indicator
-	var ch := ">" if direction > 0 else "<"
-	var frames := 2
-	var pixels_per_frame := (w / frames) if w > 0 else 1
-	var alt := randi() % frames
-
-	for y in h:
-		for x in w:
-			if (x / pixels_per_frame) % 2 == alt:
-				img.set_pixel(x, y, Palette.CYAN_MID)
-			else:
-				img.set_pixel(x, y, Palette.CYAN_DARK)
-
-	return ImageTexture.create_from_image(img)
-
-
-func _physics_process(_delta: float) -> void:
-	for body in _area.get_overlapping_bodies():
-		if body is Player and (body as Player).is_on_floor():
-			(body as Player).push(Vector2(direction * Player.CONVEYOR_PUSH * 6.0, 0.0))
+	var tile := PixelArt.tex(frame).get_image()
+	var img := Image.create_empty(length * TILE, TILE, false, Image.FORMAT_RGBA8)
+	for i in length:
+		img.blit_rect(tile, Rect2i(0, 0, TILE, TILE), Vector2i(i * TILE, 0))
+	return PixelArt.store(key, ImageTexture.create_from_image(img))

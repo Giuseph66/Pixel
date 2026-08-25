@@ -297,9 +297,13 @@ func _build_room(index: int, data: Dictionary) -> void:
 	add_child(_hud)
 
 
+## Restarting on purpose is a fresh attempt, clock and all — including the
+## death count, which is what the clean-run medal is judged on. Dying and
+## respawning is not: that is the same attempt, and it already cost you.
 func _restart_room() -> void:
 	_level.restart()
 	_level.time = 0.0
+	_level.deaths = 0
 	if _hud != null:
 		_hud.hint = ""
 
@@ -309,11 +313,14 @@ func _on_room_completed(time: float, gems: int, total: int) -> void:
 		_on_endless_room_completed(time, gems, total)
 		return
 
-	var record := Save.record_clear(_current, time, gems, _levels.size())
+	var record := Save.record_clear(_current, time, gems, _levels.size(),
+		total, _level.deaths, float(_levels[_current].get("par", 0.0)))
 	var best := Save.best_time(_current)
 	var deaths := _level.deaths
 	await get_tree().create_timer(0.45).timeout
-	_go(func(): _show_results(time, best, record, gems, total, deaths))
+	var earned := Save.last_awarded
+	var held := Save.medals(_current)
+	_go(func(): _show_results(time, best, record, gems, total, deaths, held, earned))
 
 
 func _on_endless_room_completed(time: float, gems: int, total: int) -> void:
@@ -358,7 +365,7 @@ func _show_endless_results(time: float, gems: int, total: int, deaths: int) -> v
 
 
 func _show_results(time: float, best: float, record: bool, gems: int, total: int,
-		deaths: int) -> void:
+		deaths: int, medals: int = 0, new_medals: int = 0) -> void:
 	_clear_all()
 	var data: Dictionary = _levels[_current]
 
@@ -371,6 +378,8 @@ func _show_results(time: float, best: float, record: bool, gems: int, total: int
 	screen.gems_total = total
 	screen.deaths = deaths
 	screen.par = float(data["par"])
+	screen.medals = medals
+	screen.new_medals = new_medals
 
 	if _current + 1 < _levels.size():
 		screen.items = [

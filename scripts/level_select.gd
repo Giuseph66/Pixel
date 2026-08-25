@@ -173,6 +173,8 @@ func _draw_card(i: int) -> void:
 		PixelFont.draw_text(self, "*", rect.position + Vector2(rect.size.x - 13.0, PAD),
 			Palette.GOLD, 2)
 
+	_draw_medal_dots(rect, Save.medals(i), Save.has_secret(i))
+
 	var data: Dictionary = _levels[i]
 	var lines := _wrap(Lang.t(data["name"]), NAME_CHARS, NAME_LINES)
 	for line_index in lines.size():
@@ -192,6 +194,23 @@ func _draw_card(i: int) -> void:
 		origin + Vector2(0, ROW_GEMS), Palette.GOLD if all_gems else Palette.GREY_DARK, 1)
 
 	_draw_gem_bar(rect, taken, total, all_gems)
+
+
+## Three dots for the three medals, plus a fourth for the room's secret gem.
+## Lit or unlit, they are always all drawn: an empty slot is the only thing that
+## tells you there is something here still to win.
+const MEDAL_COLOURS := [Palette.CYAN, Palette.GOLD, Palette.WHITE]
+
+
+func _draw_medal_dots(rect: Rect2, medals: int, secret: bool) -> void:
+	var x := rect.position.x + rect.size.x - 9.0
+	var y := rect.position.y + PAD + 13.0
+	for slot in 3:
+		var lit := (medals & (1 << slot)) != 0
+		draw_rect(Rect2(x, y + slot * 4.0, 3.0, 3.0),
+			MEDAL_COLOURS[slot] if lit else Palette.FRAME)
+	if secret:
+		draw_rect(Rect2(x - 5.0, y + 4.0, 3.0, 3.0), Palette.PURPLE)
 
 
 ## Thin progress bar hugging the bottom edge, so a glance across the grid shows

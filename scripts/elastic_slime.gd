@@ -1,66 +1,80 @@
 class_name ElasticSlime
 extends Node2D
 
-## Slime that bounces the player instead of dying. Never dies from stomps.
+## A slime you land on instead of landing through. Stomping it does not kill it:
+## it throws you the way a spring does and carries on walking.
+##
+## That makes it the one enemy in the game that is also a route. The sides still
+## kill — without that it would be a moving platform with a face, and the room
+## would have nothing to say.
+##
+## It walks by reading the grid, and resolves contact by hand, for the reasons
+## written at the top of slime.gd.
 
+signal bounced(at: Vector2)
+
+const SPEED := 22.0
 const TILE := 8.0
+const BOX := Vector2(7.0, 8.0)
+const TOP_OFFSET := 4.0
+const SQUASH := 0.16
 
-var player: Player
+var direction := -1
 var speed_scale := 1.0
+var player: Player
+var is_wall: Callable
+var is_ground: Callable
+
 var _sprite: Sprite2D
-var _area: Area2D
-var _position_x := 0.0
-var _direction := 1
-var _ground: Callable
-var _wall: Callable
-var _squash_time := 0.0
+var _time := 0.0
+var _squash := 0.0
+var _approached_from_above := true
+
 
 func _ready() -> void:
-	_area = Area2D.new()
-	_area.collision_layer = 0
-	_area.collision_mask = 1
-	add_child(_area)
-
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(TILE, TILE)
-	shape.shape = rect
-	shape.position = Vector2(TILE * 0.5, TILE * 0.5)
-	_area.add_child(shape)
-
 	_sprite = Sprite2D.new()
-	_sprite.centered = false
+	_sprite.texture = PixelArt.tex("elastic_a")
 	add_child(_sprite)
-
-	_position_x = position.x
-
-
-func setup(g: Callable, w: Callable) -> void:
-	_ground = g
-	_wall = w
 
 
 func _physics_process(delta: float) -> void:
-	if _ground.call(floori(position.x / TILE), floori((position.y + TILE) / TILE)):
-		# Walk
-		var next_x := position.x + _direction * 34.0 * speed_scale * delta
-		var test_x := floori(next_x / TILE)
-		if not _wall.call(test_x, floori((position.y + TILE) / TILE)):
-			_direction *= -1
-		position.x = next_x
+	_time += delta
+	_squash = maxf(_squash - delta, 0.0)
+	_sprite.texture = PixelArt.tex("elastic_b" if _squash > 0.0 else "elastic_a")
+	_sprite.flip_h = direction > 0
+
+	if is_wall.is_valid() and is_ground.is_valid():
+		var tx := floori(position.x / TILE)
+		var ty := floori(position.y / TILE)
+		var ahead := tx + direction
+		if is_wall.call(ahead, ty) or not is_ground.call(ahead, ty + 1):
+			direction = -direction
+		else:
+			position.x += direction * SPEED * speed_scale * delta
 	else:
-		# Fall
-		position.y += 60.0 * delta
+		position.x += direction * SPEED * speed_scale * delta
 
-	_squash_time = maxf(_squash_time - delta, 0.0)
-	var frame := "elastic_a" if _squash_time <= 0.0 else "elastic_b"
-	_sprite.texture = PixelArt.tex(frame)
+	_check_player()
 
-	# Check stomp
-	for area in _area.get_overlapping_areas():
-		if area.get_parent() is Player:
-			var p := area.get_parent() as Player
-			var py := p.global_position.y + Player.HEIGHT * 0.5
-			if p.previous_bottom < py:
-				p.spring_bounce()
-				_squash_time = 0.1
+
+func _check_player() -> void:
+	if player == null or not player.alive or player.frozen:
+		return
+
+	var delta_pos := player.global_position - global_position
+	var touching := absf(delta_pos.x) < (Player.WIDTH + BOX.x) * 0.5 \
+		and absf(delta_pos.y) < (Player.HEIGHT + BOX.y) * 0.5
+
+	if not touching:
+		var feet := player.global_position.y + Player.HEIGHT * 0.5
+		_approached_from_above = feet <= global_position.y - TOP_OFFSET
+		return
+
+	if _approached_from_above:
+		# spring_bounce rather than stomp: no chain, and it lives. The chain is
+		# the reward for a row of kills, and nothing died here.
+		player.spring_bounce()
+		bounced.emit(global_position)
+		_squash = SQUASH
+	else:
+		player.kill()

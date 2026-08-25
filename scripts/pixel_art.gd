@@ -380,6 +380,138 @@ const GRIDS := {
 		"YyyyyyyYyyyyyyY",
 		".YYYYYYYYYYYYY.",
 	],
+	# --- ice, conveyors, retracting spikes ---
+	"ice": [
+		"########",
+		"#wwCCCC#",
+		"#wCCCCC#",
+		"#CCCwCC#",
+		"#CCCCCC#",
+		"#CCwCCC#",
+		"#CCCCCC#",
+		"########",
+	],
+	"belt_a": [
+		"########",
+		"#222222#",
+		"#C22C22#",
+		"#2C22C2#",
+		"#C22C22#",
+		"#222222#",
+		"#222222#",
+		"########",
+	],
+	"belt_b": [
+		"########",
+		"#222222#",
+		"#22C22C#",
+		"#C22C22#",
+		"#22C22C#",
+		"#222222#",
+		"#222222#",
+		"########",
+	],
+	# Risen: the same silhouette as a fixed spike, so the danger reads the same.
+	"spike_up": [
+		"........",
+		"...##...",
+		"..#w1#..",
+		"..#11#..",
+		".#1112#.",
+		".#1122#.",
+		"#112222#",
+		"#MMMMMM#",
+	],
+	# Retracted: a base plate you can walk over.
+	"spike_low": [
+		"........",
+		"........",
+		"........",
+		"........",
+		"........",
+		"..#11#..",
+		"#112222#",
+		"#MMMMMM#",
+	],
+	# --- shielded and elastic enemies ---
+	"shield_a": [
+		"..####..",
+		".#1111#.",
+		"#w1111w#",
+		".#gggg#.",
+		"#gwggwg#",
+		"#g#gg#g#",
+		"#GGGGGG#",
+		".######.",
+	],
+	"shield_b": [
+		"..####..",
+		".#1111#.",
+		"#w1111w#",
+		".#gggg#.",
+		"#ggwwgg#",
+		"#g#gg#g#",
+		"#GGGGGG#",
+		"..####..",
+	],
+	"elastic_a": [
+		"........",
+		"..####..",
+		".#yyyy#.",
+		"#ywyywy#",
+		"#y#yy#y#",
+		"#yyyyyy#",
+		"#YYYYYY#",
+		".######.",
+	],
+	"elastic_b": [
+		"........",
+		"........",
+		"..####..",
+		".#yyyy#.",
+		"#ywyywy#",
+		"#yyyyyy#",
+		"#YYYYYY#",
+		".######.",
+	],
+	# --- collectibles and medals ---
+	"gem_secret": [
+		"..pp..",
+		".pwwp.",
+		"ppwppp",
+		"pppppp",
+		".pMMp.",
+		"..MM..",
+	],
+	# Drawn white and tinted at the call site, so one grid serves both the
+	# earned and the unearned state.
+	"medal_time": [
+		"#######",
+		"#wwwww#",
+		"#.www.#",
+		"#..w..#",
+		"#.www.#",
+		"#wwwww#",
+		"#######",
+	],
+	"medal_gems": [
+		"...w...",
+		"..www..",
+		".wwwww.",
+		"wwwwwww",
+		".wwwww.",
+		"..www..",
+		"...w...",
+	],
+	"medal_clean": [
+		".wwwww.",
+		"wwwwwww",
+		"wwwwwww",
+		"wwwwwww",
+		".wwwww.",
+		"..www..",
+		"...w...",
+	],
 }
 
 static var _cache: Dictionary = {}
@@ -389,8 +521,31 @@ static var _cache: Dictionary = {}
 static func tex(name: String) -> ImageTexture:
 	if _cache.has(name):
 		return _cache[name]
+	# A missing grid used to take the whole frame down with an invalid index.
+	# A loud warning and a blank texture is the better trade: the sprite is
+	# obviously absent on screen and the room stays playable.
+	if not GRIDS.has(name):
+		push_error("PixelArt: no sprite named '%s'" % name)
+		_cache[name] = from_grid(["."])
+		return _cache[name]
 	var t := from_grid(GRIDS[name])
 	_cache[name] = t
+	return t
+
+
+## Small shared cache for textures that are built rather than drawn from a grid
+## — a belt band the width of its run, for instance. Rooms rebuild on every
+## death, so without this the same strip is rebaked hundreds of times.
+static func has_cached(key: String) -> bool:
+	return _cache.has(key)
+
+
+static func cached(key: String) -> ImageTexture:
+	return _cache[key]
+
+
+static func store(key: String, t: ImageTexture) -> ImageTexture:
+	_cache[key] = t
 	return t
 
 

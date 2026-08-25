@@ -40,22 +40,25 @@ func setup(tiles: int, is_vertical: bool, tx: int, ty: int, free_at: Callable,
 	mode = Mode.ORBIT if orbit_mode else (Mode.LINEAR_V if is_vertical else Mode.LINEAR_H)
 
 	if orbit_mode:
-		# Measure radius as the smallest of four directions
+		# The circle only fits if it fits in every direction, so the radius is
+		# the smallest of the four. Sideways is measured from the ends of the
+		# slab and vertically across its whole width — measuring from the
+		# origin tile alone would count the slab's own tiles as walls.
 		var left := 0
 		while left < MAX_TRAVEL and free_at.call(tx - left - 1, ty):
 			left += 1
 		var right := 0
-		while right < MAX_TRAVEL and free_at.call(tx + 1 + right, ty):
+		while right < MAX_TRAVEL and free_at.call(tx + length + right, ty):
 			right += 1
 		var up := 0
-		while up < MAX_TRAVEL and free_at.call(tx, ty - up - 1):
+		while up < MAX_TRAVEL and _row_free(free_at, tx, ty - up - 1, length):
 			up += 1
 		var down := 0
-		while down < MAX_TRAVEL and free_at.call(tx, ty + 1 + down):
+		while down < MAX_TRAVEL and _row_free(free_at, tx, ty + down + 1, length):
 			down += 1
 		var radius_tiles := mini(mini(left, right), mini(up, down))
 		_radius = float(radius_tiles) * TILE
-		_angle = float(tx) * 0.7  # desync nearby platforms
+		_angle = float(tx) * 0.7  # so two platforms never start in step
 	else:
 		var low := 0
 		var high := 0

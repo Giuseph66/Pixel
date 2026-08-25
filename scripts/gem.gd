@@ -20,7 +20,7 @@ func _ready() -> void:
 	add_child(shape)
 
 	_sprite = Sprite2D.new()
-	_sprite.texture = PixelArt.tex("gem")
+	_sprite.texture = PixelArt.tex("gem_secret" if secret else "gem")
 	add_child(_sprite)
 
 	body_entered.connect(_on_body_entered)

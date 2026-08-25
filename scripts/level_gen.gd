@@ -50,8 +50,12 @@ const UNLOCK := {
 	"beat": 7,
 	"vault": 9,
 	"crystal": 6,               # not a segment: see _place_crystals()
+	"lava": 12,                 # not a segment either: milestone rooms flood
 	"ice": 6,
+	"belt": 5,
 	"retract": 7,
+	"elastic": 9,
+	"shield": 10,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -80,6 +84,8 @@ const THREAT := {
 	"ice": 2.0,
 	"belt": 1.5,
 	"retract": 2.5,
+	"elastic": 3.0,
+	"shield": 4.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -149,6 +155,8 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 	Levels.put(g, COLS - 6, STAND, "X")
 	_place_crystals(g, rng, depth)
 	_scatter_gems(g, spots)
+	_place_secret(g, rng, depth)
+	_flood_milestone(g, depth)
 
 	# "name" here is finished text rather than a key. Lang.t() hands back
 	# anything it does not recognise, so the screens that translate story room
@@ -190,6 +198,8 @@ const WIDTHS := {
 	"ice": 8,
 	"belt": 6,
 	"retract": 6,
+	"elastic": 7,
+	"shield": 8,
 }
 
 
@@ -219,6 +229,8 @@ const TASTE := {
 	"ice": 1.6,
 	"belt": 1.4,
 	"retract": 1.5,
+	"elastic": 1.8,
+	"shield": 1.6,
 }
 
 
@@ -421,6 +433,10 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _belt(g, rng, x, room, d, spots)
 		"retract":
 			return _retract(g, rng, x, room, d, spots)
+		"elastic":
+			return _elastic(g, rng, x, room, spots)
+		"shield":
+			return _shield(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -679,6 +695,11 @@ static func _ferry(g: Array, rng: RandomNumberGenerator, x: int, room: int, d: f
 	var w := mini(pw + 6, room)
 	Levels.rect(g, x + 2, FLOOR, pw, 3, ".")
 	Levels.rect(g, x + 2, FLOOR + 3, pw, 1, "^")
+	# Orbits are deliberately not generated here. Their radius is measured
+	# against whatever air surrounds them, and nothing in the generator can
+	# prove the circle does not sweep into terrain on the diagonal — a slab
+	# that ends up pinned turns the segment into a room with no way across.
+	# The three campaign rooms teach the mechanic on hand-checked geometry.
 	var vertical := rng.randf() < 0.35
 	_soft_rect(g, x + 2, FLOOR - rng.randi_range(3, 4), 3, 1, "n" if vertical else "m")
 	spots.append(Vector2i(x + 2 + pw / 2, FLOOR - 6))
@@ -771,6 +792,57 @@ static func _retract(g: Array, rng: RandomNumberGenerator, x: int, room: int, d:
 	Levels.rect(g, x + 2, STAND, sw, 1, "Z" if flip else "z")
 	spots.append(Vector2i(x + 2 + sw / 2, STAND - 3))
 	return w
+
+
+## An elastic on clear ground. It is the first segment that hands out height
+## for free, so its gem sits where only the bounce can reach it — the reward
+## for using the thing rather than walking around it.
+static func _elastic(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(7, 10), room)
+	Levels.put(g, x + w / 2, STAND, "e")
+	spots.append(Vector2i(x + w / 2, STAND - 7))
+	return w
+
+
+## An armoured walker. It needs headroom — the answer is a ground pound, and a
+## pound with no run-up is no answer at all — so it never goes under a ceiling.
+static func _shield(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(8, 11), room)
+	var mid := x + w / 2
+	for above in range(1, 5):
+		if not _clear_air(g, mid, STAND - above):
+			return _flat(g, rng, x, room, spots)
+	Levels.put(g, mid, STAND, "E")
+	spots.append(Vector2i(mid, STAND - 3))
+	return w
+
+
+## Every fifth room already spikes in difficulty. Flooding it gives that spike
+## a face the player recognises from across the room, instead of it being the
+## same room with more things in it.
+static func _flood_milestone(g: Array, depth: int) -> void:
+	if depth < int(UNLOCK["lava"]) or (depth + 1) % MILESTONE != 0:
+		return
+	Levels.put(g, COLS / 2, ROWS - 2, "A")
+
+
+## One secret per room, as high as the room will take it. It never blocks
+## anything, so the only thing it costs is the detour.
+static func _place_secret(g: Array, rng: RandomNumberGenerator, depth: int) -> void:
+	if depth < 3:
+		return
+	var best := Vector2i(-1, -1)
+	for attempt in 80:
+		var x := rng.randi_range(START_X, END_X - 1)
+		var y := rng.randi_range(3, STAND - 6)
+		if not _clear_air(g, x, y):
+			continue
+		if best.x < 0 or y < best.y:
+			best = Vector2i(x, y)
+	if best.x >= 0:
+		Levels.put(g, best.x, best.y, "O")
 
 
 # ------------------------------------------------------------------- gems ---

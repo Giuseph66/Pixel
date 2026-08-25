@@ -20,6 +20,7 @@ var rows: PackedStringArray = PackedStringArray()
 var time := 0.0
 var gems_taken := 0
 var gems_total := 0
+var secrets_taken := 0
 var deaths := 0
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
@@ -39,6 +40,7 @@ var _entities: Node2D
 var _bodies: Node2D
 var _player: Player
 var _door: ExitDoor
+var _lava: Lava
 var _spawn := Vector2.ZERO
 
 
@@ -110,15 +112,20 @@ func is_air(tx: int, ty: int) -> bool:
 	return tile_at(tx, ty) == "."
 
 
+## Terrain that gets baked into the static collision. Ice and conveyors are
+## ordinary walls as far as physics is concerned — what makes them different is
+## the friction the player reads off the tile and the entity riding on top.
+## Moving platforms are deliberately absent: they carry their own body, and
+## marking their spawn tiles solid would leave a wall behind once they move off.
 func is_solid(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "m" or ch == "n" or ch == "r"
+	return ch == "#" or ch == "~" or ch == ">" or ch == "<"
 
 
-## Anything you can stand on, which includes one-way slabs, ice, conveyors, and platforms.
+## Anything you can stand on, which includes one-way slabs.
 func is_ground(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "#" or ch == "~" or ch == ">" or ch == "<" or ch == "-" or ch == "m" or ch == "n" or ch == "r"
+	return is_solid(tx, ty) or ch == "-"
 
 
 func tile_center(tx: int, ty: int) -> Vector2:
@@ -246,6 +253,7 @@ func _add_box(body: StaticBody2D, x: int, y: int, w: int, h: int, one_way: bool)
 func _spawn_entities() -> void:
 	gems_total = 0
 	gems_taken = 0
+	secrets_taken = 0
 
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
@@ -312,9 +320,30 @@ func _spawn_entities() -> void:
 					timed.speed_scale = intensity
 					timed.position = tile_center(tx, ty)
 					_entities.add_child(timed)
+				"e":
+					var elastic := ElasticSlime.new()
+					elastic.speed_scale = intensity
+					elastic.position = tile_center(tx, ty)
+					elastic.is_wall = Callable(self, "is_solid")
+					elastic.is_ground = Callable(self, "is_ground")
+					elastic.bounced.connect(_on_elastic_bounced)
+					_entities.add_child(elastic)
+				"E":
+					var shield := ShieldEnemy.new()
+					shield.speed_scale = intensity
+					shield.position = tile_center(tx, ty)
+					shield.is_wall = Callable(self, "is_solid")
+					shield.is_ground = Callable(self, "is_ground")
+					shield.squashed.connect(_on_slime_squashed)
+					_entities.add_child(shield)
+				"A":
+					_lava = Lava.new()
+					_lava.speed_scale = intensity
+					_lava.setup(float(ty * TILE))
+					_entities.add_child(_lava)
 				"z", "Z":
 					var retract := RetractSpike.new()
-					retract.setup(ch == "Z")
+					retract.inverted = ch == "Z"
 					retract.speed_scale = intensity
 					retract.position = tile_center(tx, ty)
 					_entities.add_child(retract)
@@ -351,6 +380,12 @@ func _discover_contents() -> void:
 	for child in _entities.get_children():
 		if child is Slime:
 			(child as Slime).player = _player
+		elif child is ElasticSlime:
+			(child as ElasticSlime).player = _player
+		elif child is ShieldEnemy:
+			(child as ShieldEnemy).player = _player
+	if _lava != null:
+		_lava.player = _player
 
 	_update_door_charge()
 
@@ -370,8 +405,8 @@ func _spawn_conveyors() -> void:
 				run += 1
 
 			var conveyor := Conveyor.new()
-			conveyor.setup(1 if ch == ">" else -1, float(run * 8))
-			conveyor.position = Vector2(float(tx * 8), float(ty * 8))
+			conveyor.setup(1 if ch == ">" else -1, run)
+			conveyor.position = Vector2(tx * TILE, ty * TILE)
 			_entities.add_child(conveyor)
 			tx += run
 
@@ -418,19 +453,24 @@ func get_player() -> Player:
 # --------------------------------------------------------------- events ---
 
 func _on_gem_collected(gem: Gem) -> void:
+	var at := fx.to_local(gem.global_position)
 	if gem.secret:
-		Save.add_secret()
-		Audio.play("gem", 1.35)  # higher pitch for secret
+		# Deliberately outside gems_total: the door fills from the gems the
+		# room asks for, and a secret the player has not found yet must never
+		# leave that bar looking incomplete.
+		secrets_taken += 1
+		Save.take_secret(index)
+		Audio.play("gem", 1.35)
+		fx.emit(at, 14, Palette.PURPLE, 90.0, Vector2.ZERO, TAU, 0.5, 200.0)
+		fx.popup(at, Lang.t("secret.found"), Palette.PURPLE, 1.1)
 	else:
 		gems_taken += 1
 		Save.add_gem()
 		Audio.play("gem", 1.0 + gems_taken * 0.03)
-	var at := fx.to_local(gem.global_position)
-	fx.emit(at, 10, Palette.GOLD, 80.0, Vector2.ZERO, TAU, 0.4, 180.0)
-	fx.popup(at, "+1", Palette.GOLD)
-	gem.queue_free()
-	if not gem.secret:
+		fx.emit(at, 10, Palette.GOLD, 80.0, Vector2.ZERO, TAU, 0.4, 180.0)
+		fx.popup(at, "+1", Palette.GOLD)
 		_update_door_charge()
+	gem.queue_free()
 
 
 ## A ground pound clears the ground it lands on: blocks give way, and anything
@@ -448,6 +488,10 @@ func _on_player_pounded(at: Vector2) -> void:
 			(child as Slime).die()
 		elif child is Bat and distance <= Player.POUND_REACH:
 			(child as Bat).die()
+		elif child is ShieldEnemy and distance <= Player.POUND_REACH:
+			(child as ShieldEnemy).die()
+		# ElasticSlime is deliberately absent: it is a route as much as a
+		# hazard, and a pound that erased it would erase the way across.
 
 
 func _on_block_broken(at: Vector2) -> void:
@@ -458,6 +502,11 @@ func _on_block_broken(at: Vector2) -> void:
 func _on_bat_squashed(at: Vector2) -> void:
 	fx.emit(fx.to_local(at), 12, Palette.PURPLE, 90.0, Vector2.UP, PI, 0.4, 260.0)
 	shake(2.0)
+
+
+func _on_elastic_bounced(at: Vector2) -> void:
+	fx.emit(fx.to_local(at), 8, Palette.GOLD, 70.0, Vector2.UP, PI, 0.3, 220.0)
+	shake(1.5)
 
 
 func _on_slime_squashed(at: Vector2) -> void:
@@ -478,6 +527,8 @@ func _on_door_entered() -> void:
 	running = false
 	if _player != null:
 		_player.enter_door(_door.global_position)
+	if _lava != null:
+		_lava.stop()
 	Audio.play("door")
 	fx.emit(_door.position, 24, Palette.PURPLE, 90.0, Vector2.ZERO, TAU, 0.7, 90.0)
 	completed.emit(time, gems_taken, gems_total)
@@ -505,5 +556,6 @@ func restart() -> void:
 		child.queue_free()
 	fx.clear()
 	_door = null
+	_lava = null
 	_spawn_entities()
 	running = true

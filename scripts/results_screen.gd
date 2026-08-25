@@ -12,6 +12,10 @@ var gems := 0
 var gems_total := 0
 var deaths := 0
 var par := 0.0
+## Bitmask of everything this room has ever earned, and the subset this attempt
+## earned for the first time — the new ones are the only ones worth a flash.
+var medals := 0
+var new_medals := 0
 
 ## Endless mode reuses the second row for the run's running total, so it gets
 ## to rename it. Left empty, it reads "BEST".
@@ -51,12 +55,53 @@ func draw_header() -> void:
 		Palette.GOLD if gems_total > 0 and gems >= gems_total else Palette.GREY)
 	_row(panel, 3, Lang.t("results.deaths"), str(deaths), Palette.GREY)
 
+	_draw_medals(panel)
+
+	# Both of these sit in the empty middle of the last row, between the
+	# "DEATHS" label and its value, which is the only gap left inside the panel.
+	var note_y := panel.position.y + panel.size.y - 13.0
 	if new_record and fmod(_time, 0.9) < 0.55:
-		PixelFont.draw_text_centered(self, Lang.t("results.record"), cx,
-			panel.position.y + 90.0, Palette.MAGENTA, 1)
+		PixelFont.draw_text_centered(self, Lang.t("results.record"), cx, note_y,
+			Palette.MAGENTA, 1)
 	elif under_par:
 		PixelFont.draw_text_centered(self, Lang.tf("results.under_par",
-			[Util.format_time(par)]), cx, panel.position.y + 90.0, Palette.GREY_DARK, 1)
+			[Util.format_time(par)]), cx, note_y, Palette.GREY_DARK, 1)
+
+
+## Three seals along the foot of the panel: under par, every gem, no deaths.
+## They are independent on purpose — the fast route and the greedy route are
+## rarely the same one, so a room worth mastering takes more than one visit.
+##
+## Icons only, in the eighteen-pixel band between the panel and the menu.
+## Naming each seal here would need three labels across 260 pixels and they ran
+## straight through the menu underneath; the level select and the codex carry
+## the words instead.
+const MEDALS := [
+	{"bit": 1, "sprite": "medal_time", "colour": Palette.CYAN},
+	{"bit": 2, "sprite": "medal_gems", "colour": Palette.GOLD},
+	{"bit": 4, "sprite": "medal_clean", "colour": Palette.WHITE},
+]
+const MEDAL_STEP := 13.0
+
+
+func _draw_medals(panel: Rect2) -> void:
+	if gems_total <= 0 and par <= 0.0:
+		return
+
+	var y := panel.position.y + panel.size.y + 9.0
+	var x := panel.position.x + panel.size.x * 0.5 - MEDAL_STEP
+	for entry: Dictionary in MEDALS:
+		var bit := int(entry["bit"])
+		var held := (medals & bit) != 0
+		var colour: Color = entry["colour"] if held else Palette.FRAME
+		# One won just now blinks; one carried in from an earlier visit sits still.
+		if (new_medals & bit) != 0 and fmod(_time, 0.5) < 0.25:
+			colour = Palette.MAGENTA
+
+		var icon := PixelArt.tex(String(entry["sprite"]))
+		draw_texture(icon, Vector2(x - icon.get_width() * 0.5,
+			y - icon.get_height() * 0.5), colour)
+		x += MEDAL_STEP
 
 
 func _row(panel: Rect2, i: int, label: String, value: String, color: Color) -> void:
