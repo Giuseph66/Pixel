@@ -366,6 +366,20 @@ const STRINGS := {
 	"level.combo_tower.name": "THE CLEAN CLIMB",
 	"level.combo_tower.hint": "WALLS ARE FASTER THAN STAIRS",
 
+	"codex.switch.name": "SWITCH",
+	"codex.switch.text": "FLIPS EVERY DOOR IN THE ROOM. OPEN ONE, CLOSE ANOTHER",
+
+	"level.switch_first.name": "THE BUTTON",
+	"level.switch_first.hint": "STEP ON IT. WATCH WHAT MOVES",
+	"level.switch_trade.name": "TRADE-OFF",
+	"level.switch_trade.hint": "OPENING ONE DOOR CLOSES THE OTHER",
+	"level.switch_run.name": "THERE AND BACK",
+	"level.switch_run.hint": "THE DOOR IS FAR FROM ITS BUTTON",
+	"level.switch_saw.name": "SHUT DOWN",
+	"level.switch_saw.hint": "A BLADE GUARDS THE BUTTON. TIME YOUR STEP",
+	"level.switch_gems.name": "CIRCUIT",
+	"level.switch_gems.hint": "EACH GEM SITS BEHIND A DIFFERENT STATE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "BUILD YOUR OWN",
@@ -514,6 +528,12 @@ const STRINGS := {
 	"pal.spawn.note": "WHERE THE PLAYER APPEARS. ONE PER ROOM",
 	"pal.exit.name": "EXIT DOOR",
 	"pal.exit.note": "THE FOOT OF A TWO-TILE DOOR. ONE PER ROOM",
+	"pal.switch.name": "SWITCH",
+	"pal.switch.note": "FLIPS EVERY GATE IN THE ROOM",
+	"pal.gate_solid.name": "GATE (CLOSED)",
+	"pal.gate_solid.note": "SOLID UNTIL A SWITCH FLIPS IT",
+	"pal.gate_open.name": "GATE (OPEN)",
+	"pal.gate_open.note": "PASSABLE UNTIL A SWITCH FLIPS IT",
 },
 
 "pt": {
@@ -806,6 +826,20 @@ const STRINGS := {
 	"level.combo_tower.name": "SUBIDA LIMPA",
 	"level.combo_tower.hint": "PAREDES SAO MAIS RAPIDAS QUE ESCADAS",
 
+	"codex.switch.name": "INTERRUPTOR",
+	"codex.switch.text": "INVERTE TODAS AS PORTAS DA SALA. ABRE UMA, FECHA OUTRA",
+
+	"level.switch_first.name": "O BOTAO",
+	"level.switch_first.hint": "PISE NELE. VEJA O QUE SE MOVE",
+	"level.switch_trade.name": "A TROCA",
+	"level.switch_trade.hint": "ABRIR UMA PORTA FECHA A OUTRA",
+	"level.switch_run.name": "IDA E VOLTA",
+	"level.switch_run.hint": "A PORTA FICA LONGE DO PROPRIO BOTAO",
+	"level.switch_saw.name": "DESLIGA",
+	"level.switch_saw.hint": "UMA LAMINA GUARDA O BOTAO. CONTE O TEMPO",
+	"level.switch_gems.name": "CIRCUITO",
+	"level.switch_gems.hint": "CADA GEMA FICA ATRAS DE UM ESTADO DIFERENTE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CRIE AS SUAS",
@@ -954,6 +988,12 @@ const STRINGS := {
 	"pal.spawn.note": "ONDE O JOGADOR APARECE. UM POR SALA",
 	"pal.exit.name": "PORTA DE SAIDA",
 	"pal.exit.note": "O PE DE UMA PORTA DE 2 TILES. UMA POR SALA",
+	"pal.switch.name": "INTERRUPTOR",
+	"pal.switch.note": "INVERTE TODAS AS PORTAS DA SALA",
+	"pal.gate_solid.name": "PORTA (FECHADA)",
+	"pal.gate_solid.note": "SOLIDA ATE UM INTERRUPTOR MUDAR ISSO",
+	"pal.gate_open.name": "PORTA (ABERTA)",
+	"pal.gate_open.note": "PASSAVEL ATE UM INTERRUPTOR MUDAR ISSO",
 },
 
 "es": {
@@ -1246,6 +1286,20 @@ const STRINGS := {
 	"level.combo_tower.name": "SUBIDA LIMPIA",
 	"level.combo_tower.hint": "LOS MUROS SON MAS RAPIDOS QUE LAS ESCALERAS",
 
+	"codex.switch.name": "INTERRUPTOR",
+	"codex.switch.text": "INVIERTE TODAS LAS PUERTAS. ABRE UNA, CIERRA OTRA",
+
+	"level.switch_first.name": "EL BOTON",
+	"level.switch_first.hint": "PISALO. MIRA QUE SE MUEVE",
+	"level.switch_trade.name": "EL CAMBIO",
+	"level.switch_trade.hint": "ABRIR UNA PUERTA CIERRA LA OTRA",
+	"level.switch_run.name": "IDA Y VUELTA",
+	"level.switch_run.hint": "LA PUERTA QUEDA LEJOS DE SU PROPIO BOTON",
+	"level.switch_saw.name": "APAGADO",
+	"level.switch_saw.hint": "UNA HOJA GUARDA EL BOTON. CUENTA EL TIEMPO",
+	"level.switch_gems.name": "CIRCUITO",
+	"level.switch_gems.hint": "CADA GEMA ESTA DETRAS DE UN ESTADO DIFERENTE",
+
 	# ------------------------------------------------------- sandbox ---
 	"play.sandbox": "SANDBOX",
 	"play.sandbox_new": "CREA LAS TUYAS",
@@ -1394,5 +1448,11 @@ const STRINGS := {
 	"pal.spawn.note": "DONDE APARECE EL JUGADOR. UNO POR SALA",
 	"pal.exit.name": "PUERTA DE SALIDA",
 	"pal.exit.note": "EL PIE DE UNA PUERTA DE 2 TILES. UNA POR SALA",
+	"pal.switch.name": "INTERRUPTOR",
+	"pal.switch.note": "INVIERTE TODAS LAS PUERTAS DE LA SALA",
+	"pal.gate_solid.name": "PUERTA (CERRADA)",
+	"pal.gate_solid.note": "SOLIDA HASTA QUE UN INTERRUPTOR LA CAMBIE",
+	"pal.gate_open.name": "PUERTA (ABIERTA)",
+	"pal.gate_open.note": "PASABLE HASTA QUE UN INTERRUPTOR LA CAMBIE",
 },
 }

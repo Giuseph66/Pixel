@@ -56,6 +56,7 @@ const ENTRIES := [
 	{"id": "elastic", "kind": CREATURE, "sprite": "elastic_a"},
 	{"id": "shield", "kind": CREATURE, "sprite": "shield_a"},
 	{"id": "secret", "kind": COLLECTIBLE, "sprite": "gem_secret"},
+	{"id": "switch", "kind": WORLD, "sprite": "switch_off"},
 ]
 
 ## Which entry a level tile reveals, for the pass that runs when a room builds.
@@ -85,6 +86,9 @@ const BY_TILE := {
 	"E": "shield",
 	"A": "lava",
 	"O": "secret",
+	"i": "switch",
+	"g": "switch",
+	"G": "switch",
 }
 
 

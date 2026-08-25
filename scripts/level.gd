@@ -31,6 +31,12 @@ var deaths := 0
 ## longest chain of distinct verbs the room saw, whatever it scored.
 var score := 0
 var best_combo := 0
+## Step 12 — one boolean for the whole room. Every switch pad flips it; every
+## gate reads it. No per-gate wiring, because a room is one screen and the
+## player can already see everything that just changed.
+var switch_state := false
+var _gates: Array = []
+var _switches: Array = []
 ## 1.0 in the story; endless winds it up with depth.
 var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
@@ -176,6 +182,19 @@ func is_ground(tx: int, ty: int) -> bool:
 	return is_solid(tx, ty) or ch == "-"
 
 
+## What is_solid() cannot see: a gate reads the room's live switch state
+## instead of the grid, since the grid never changes after the room is baked.
+## Ground AI (Slime, Saw, ElasticSlime, ShieldEnemy) reads this instead of
+## is_solid() for "is there a wall ahead" — without it they walk straight
+## through a closed gate, because the gate was never part of the baked terrain
+## in the first place.
+func is_wall_or_gate(tx: int, ty: int) -> bool:
+	var ch := tile_at(tx, ty)
+	if ch == "g" or ch == "G":
+		return switch_state != (ch == "G")
+	return is_solid(tx, ty)
+
+
 func tile_center(tx: int, ty: int) -> Vector2:
 	return Vector2(tx * TILE + TILE * 0.5, ty * TILE + TILE * 0.5)
 
@@ -302,6 +321,9 @@ func _spawn_entities() -> void:
 	gems_total = 0
 	gems_taken = 0
 	secrets_taken = 0
+	switch_state = false
+	_gates = []
+	_switches = []
 
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
@@ -334,7 +356,7 @@ func _spawn_entities() -> void:
 					var slime := Slime.new()
 					slime.speed_scale = intensity
 					slime.position = tile_center(tx, ty)
-					slime.is_wall = Callable(self, "is_solid")
+					slime.is_wall = Callable(self, "is_wall_or_gate")
 					slime.is_ground = Callable(self, "is_ground")
 					slime.squashed.connect(_on_slime_squashed)
 					_entities.add_child(slime)
@@ -342,7 +364,7 @@ func _spawn_entities() -> void:
 					var saw := Saw.new()
 					saw.speed_scale = intensity
 					saw.position = tile_center(tx, ty)
-					saw.is_wall = Callable(self, "is_solid")
+					saw.is_wall = Callable(self, "is_wall_or_gate")
 					saw.is_ground = Callable(self, "is_ground")
 					_entities.add_child(saw)
 				"B":
@@ -374,7 +396,7 @@ func _spawn_entities() -> void:
 					var elastic := ElasticSlime.new()
 					elastic.speed_scale = intensity
 					elastic.position = tile_center(tx, ty)
-					elastic.is_wall = Callable(self, "is_solid")
+					elastic.is_wall = Callable(self, "is_wall_or_gate")
 					elastic.is_ground = Callable(self, "is_ground")
 					elastic.bounced.connect(_on_elastic_bounced)
 					_entities.add_child(elastic)
@@ -382,10 +404,23 @@ func _spawn_entities() -> void:
 					var shield := ShieldEnemy.new()
 					shield.speed_scale = intensity
 					shield.position = tile_center(tx, ty)
-					shield.is_wall = Callable(self, "is_solid")
+					shield.is_wall = Callable(self, "is_wall_or_gate")
 					shield.is_ground = Callable(self, "is_ground")
 					shield.squashed.connect(_on_slime_squashed)
 					_entities.add_child(shield)
+				"i":
+					var pad := SwitchPad.new()
+					pad.position = tile_center(tx, ty)
+					pad.pressed.connect(toggle_switch)
+					_entities.add_child(pad)
+					_switches.append(pad)
+				"g", "G":
+					var gate := GateBlock.new()
+					gate.inverted = ch == "G"
+					gate.solid = gate.compute_solid(switch_state)
+					gate.position = tile_center(tx, ty)
+					_entities.add_child(gate)
+					_gates.append(gate)
 				"A":
 					_lava = Lava.new()
 					_lava.speed_scale = intensity
@@ -610,6 +645,26 @@ func _on_combo_changed(count: int, _verb: int, player: Player) -> void:
 func _on_combo_ended(count: int) -> void:
 	score += 100 * count * count
 	best_combo = maxi(best_combo, count)
+
+
+## One boolean, every gate reads it. A gate closing on top of someone kills
+## them rather than trapping them or getting pushed aside by move_and_slide()
+## in whatever direction the overlap happens to resolve — a telegraphed hazard
+## beats an untelegraphed shove.
+func toggle_switch() -> void:
+	switch_state = not switch_state
+	Audio.play("switch")
+	shake(2.0)
+
+	for gate: GateBlock in _gates:
+		var now_solid := gate.compute_solid(switch_state)
+		if now_solid and not gate.solid:
+			for player: Player in get_players():
+				if player.alive and gate.overlaps_player(player):
+					player.kill()
+		gate.set_solid(now_solid)
+	for pad: SwitchPad in _switches:
+		pad.refresh(switch_state)
 
 
 func _on_block_broken(at: Vector2) -> void:

@@ -56,6 +56,7 @@ const UNLOCK := {
 	"retract": 7,
 	"elastic": 9,
 	"shield": 10,
+	"switch": 12,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -86,6 +87,7 @@ const THREAT := {
 	"retract": 2.5,
 	"elastic": 3.0,
 	"shield": 4.0,
+	"switch": 2.0,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -200,6 +202,7 @@ const WIDTHS := {
 	"retract": 6,
 	"elastic": 7,
 	"shield": 8,
+	"switch": 10,
 }
 
 
@@ -231,6 +234,7 @@ const TASTE := {
 	"retract": 1.5,
 	"elastic": 1.8,
 	"shield": 1.6,
+	"switch": 1.4,
 }
 
 
@@ -284,6 +288,10 @@ static func _pick(rng: RandomNumberGenerator, depth: int, previous: String, room
 
 ## Segments are coarse, so a room can come in under budget. Sprinkle single
 ## hazards into whatever clear floor is left until it does not.
+##
+## Never add 'g' or 'G' here. Gates only ever come from _switch(), which always
+## paints the button in the same breath — a gate with no switch in the room is
+## a wall with no door, and _top_up() has no way to guarantee it painted one.
 static func _top_up(g: Array, rng: RandomNumberGenerator, depth: int, deficit: float,
 		spots: Array[Vector2i]) -> float:
 	var added := 0.0
@@ -437,6 +445,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _elastic(g, rng, x, room, spots)
 		"shield":
 			return _shield(g, rng, x, room, spots)
+		"switch":
+			return _switch(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -816,6 +826,18 @@ static func _shield(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 			return _flat(g, rng, x, room, spots)
 	Levels.put(g, mid, STAND, "E")
 	spots.append(Vector2i(mid, STAND - 3))
+	return w
+
+
+## A button and the wall it seals shut. Always painted together for the same
+## reason _top_up() must never learn to paint 'g' on its own: a gate with no
+## switch in the room is a wall with no door.
+static func _switch(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(10, 13), room)
+	Levels.put(g, x + 2, STAND, "i")
+	Levels.rect(g, x + w - 4, STAND - 3, 1, 4, "g")
+	spots.append(Vector2i(x + w / 2, STAND - 4))
 	return w
 
 

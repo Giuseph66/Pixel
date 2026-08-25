@@ -505,6 +505,51 @@ const GRIDS := {
 		"#112222#",
 		"#MMMMMM#",
 	],
+	# Step 12 — switches and gates. The lever leans toward the side it means:
+	# left and dim when off, right and lit when on. Gate is a filled block
+	# behind the same outline every wall has, versus an outline with nothing
+	# behind it — full versus empty is the whole vocabulary a 8x8 tile has for
+	# "in your way" against "not in your way any more".
+	"switch_off": [
+		"........",
+		"..1.....",
+		"..11....",
+		"...11...",
+		"....11..",
+		"..2222..",
+		".222222.",
+		"........",
+	],
+	"switch_on": [
+		"........",
+		".....c..",
+		"....cc..",
+		"...cc...",
+		"..cc....",
+		"..2222..",
+		".222222.",
+		"........",
+	],
+	"gate_solid": [
+		"########",
+		"#yyyyyy#",
+		"#yYYYYy#",
+		"#yYyyYy#",
+		"#yYyyYy#",
+		"#yYYYYy#",
+		"#yyyyyy#",
+		"########",
+	],
+	"gate_open": [
+		"########",
+		"#......#",
+		"#......#",
+		"#......#",
+		"#......#",
+		"#......#",
+		"#......#",
+		"########",
+	],
 	# --- shielded and elastic enemies ---
 	# Same trick as the slime's walk: frame b drops one body row and shifts
 	# everything down into it, so the whole plate squashes on the beat instead

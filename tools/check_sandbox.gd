@@ -24,6 +24,7 @@ func _ready() -> void:
 	failures += _check_copy()
 	failures += await _check_input_guard()
 	failures += _check_mirror()
+	failures += await _check_switch()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -520,6 +521,79 @@ func _counts(rows: PackedStringArray) -> Dictionary:
 			var ch := row[i]
 			out[ch] = int(out.get(ch, 0)) + 1
 	return out
+
+
+## Step 12. A gate with no switch in the room is a wall with no door — cheap
+## to check for every campaign room, and for a sample of generated ones too,
+## since the generator has its own path (_switch()) that is supposed to be the
+## only source of 'g'/'G' there.
+func _check_switch() -> int:
+	var bad := 0
+
+	for room: Dictionary in Levels.all():
+		var has_gate := false
+		var has_switch := false
+		for row: String in room["rows"]:
+			has_gate = has_gate or row.count("g") > 0 or row.count("G") > 0
+			has_switch = has_switch or row.count("i") > 0
+		if has_gate and not has_switch:
+			bad += _fail("room '%s' has a gate with no switch to open it"
+				% str(room.get("id", "?")))
+
+	for depth in [12, 16, 20, 24]:
+		var data := LevelGen.generate(4242, depth)
+		var rows: PackedStringArray = data["rows"]
+		var has_gate := false
+		var has_switch := false
+		for row: String in rows:
+			has_gate = has_gate or row.count("g") > 0 or row.count("G") > 0
+			has_switch = has_switch or row.count("i") > 0
+		if has_gate and not has_switch:
+			bad += _fail("a generated depth-%d room has a gate with no switch" % depth)
+
+	# The mechanism itself: build the actual first switch room, flip it twice,
+	# and confirm the gate's collision — not just its sprite — followed along.
+	var room: Dictionary = {}
+	for entry: Dictionary in Levels.all():
+		if entry.get("id", "") == "switch_first":
+			room = entry
+			break
+	if room.is_empty():
+		bad += _fail("switch_first is missing from the campaign")
+		return bad
+
+	var level := Level.new()
+	level.setup(0, room)
+	add_child(level)
+	await get_tree().process_frame
+
+	# Gates live under Level's private _entities node; walk the tree instead of
+	# reaching into a var this test has no business touching directly.
+	var gate := _find_gate(level)
+	if gate == null:
+		bad += _fail("switch_first built with no GateBlock in it")
+	else:
+		var closed := gate.solid
+		level.toggle_switch()
+		if gate.solid == closed:
+			bad += _fail("toggling the switch did not move the gate")
+		level.toggle_switch()
+		if gate.solid != closed:
+			bad += _fail("two presses did not return the gate to its start")
+
+	level.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+func _find_gate(node: Node) -> GateBlock:
+	if node is GateBlock:
+		return node
+	for child in node.get_children():
+		var found := _find_gate(child)
+		if found != null:
+			return found
+	return null
 
 
 func _check_campaign() -> int:

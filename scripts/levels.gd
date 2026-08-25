@@ -998,6 +998,93 @@ static func _level_combo_tower() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 12 — interruptores e portas. Every gate in a room shares one boolean:
+## Level.switch_state. 'g' starts solid, 'G' starts open; either kind flips on
+## the same press, which is what makes opening one path close another for free.
+
+## The button is in plain sight of the door it opens. The whole room is one
+## sentence: this causes that.
+static func _level_switch_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 34, 20, 2, 7, "g")             # the wall that seals the corridor
+	put(g, 26, 26, "i")
+	puts(g, [Vector2i(20, 25), Vector2i(44, 25), Vector2i(50, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## An open door and a closed one, back to back. The switch trades one for the
+## other in the same press: what let you in seals behind you the instant what
+## lets you out unseals ahead.
+static func _level_switch_trade() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 18, 18, 2, 9, "G")             # starts open — the way in
+	put(g, 26, 26, "i")
+	rect(g, 38, 18, 2, 9, "g")             # starts closed — opens after the switch
+	puts(g, [Vector2i(12, 25), Vector2i(30, 26), Vector2i(48, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The gate is right at the start; the button that opens it is a whole detour
+## away. Getting there and back costs more time than the room's floor plan
+## suggests, which is the toll this mechanic charges when it is not solving a
+## puzzle so much as gatekeeping a shortcut.
+static func _level_switch_run() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 20, 2, 7, "g")
+	rect(g, 6, 24, 3, 1, "-")
+	rect(g, 6, 21, 3, 1, "-")
+	rect(g, 6, 18, 3, 1, "-")
+	rect(g, 6, 15, 3, 1, "-")
+	rect(g, 6, 12, 44, 1, "-")             # the long bridge back over the gate
+	put(g, 46, 11, "i")
+	puts(g, [Vector2i(30, 11), Vector2i(20, 25), Vector2i(40, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 16, 26, "X")
+	return bake(g)
+
+
+## A penned saw between the spawn and the button — the switch is not the only
+## thing paying attention in this room.
+static func _level_switch_saw() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 25, 1, 2, "#")
+	rect(g, 24, 25, 1, 2, "#")
+	put(g, 18, 26, "W")
+	rect(g, 38, 20, 2, 7, "g")
+	put(g, 30, 26, "i")
+	puts(g, [Vector2i(20, 24), Vector2i(44, 25), Vector2i(50, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Two hatches in the floor instead of two walls. One starts open — drop in for
+## its gem before the switch seals it. The other starts sealed and only opens
+## once that same switch has been pressed, holding two gems the first hatch
+## never could.
+static func _level_switch_gems() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 20, 27, "G")                    # hatch A — starts open
+	rect(g, 18, 28, 5, 2, ".")
+	put(g, 20, 29, "o")
+	put(g, 30, 26, "i")
+	put(g, 42, 27, "g")                    # hatch B — starts sealed
+	rect(g, 40, 28, 5, 2, ".")
+	puts(g, [Vector2i(41, 29), Vector2i(44, 29)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1362,6 +1449,41 @@ static func _campaign() -> Array:
 			"hint": "level.combo_tower.hint",
 			"par": 40.0,
 			"rows": _level_combo_tower(),
+		},
+		{
+			"id": "switch_first",
+			"name": "level.switch_first.name",
+			"hint": "level.switch_first.hint",
+			"par": 30.0,
+			"rows": _level_switch_first(),
+		},
+		{
+			"id": "switch_trade",
+			"name": "level.switch_trade.name",
+			"hint": "level.switch_trade.hint",
+			"par": 42.0,
+			"rows": _level_switch_trade(),
+		},
+		{
+			"id": "switch_run",
+			"name": "level.switch_run.name",
+			"hint": "level.switch_run.hint",
+			"par": 48.0,
+			"rows": _level_switch_run(),
+		},
+		{
+			"id": "switch_saw",
+			"name": "level.switch_saw.name",
+			"hint": "level.switch_saw.hint",
+			"par": 46.0,
+			"rows": _level_switch_saw(),
+		},
+		{
+			"id": "switch_gems",
+			"name": "level.switch_gems.name",
+			"hint": "level.switch_gems.hint",
+			"par": 58.0,
+			"rows": _level_switch_gems(),
 		},
 	]
 
