@@ -60,8 +60,12 @@ static func blank_slot() -> Dictionary:
 		"secrets": {},          # room id -> true when its secret gem was taken
 		"secrets_taken": 0,     # how many secret gems this slot has ever found
 		"total_deaths": 0,
-		"endless_best": 0,      # deepest endless run, in rooms cleared
-		"endless_gems": 0,      # gems taken in that run
+		# Step 20 — endless modifiers. Keyed by combo, "+"-joined and sorted
+		# ("" for a plain run, "dark", "rush+dark"): a modified run is a
+		# different challenge, not a harder version of the same one, so it
+		# keeps its own record rather than competing with a clean run's.
+		"endless_best": {},     # combo key -> deepest run, in rooms cleared
+		"endless_gems": {},     # combo key -> gems taken in that run
 		"play_time": 0.0,
 		"gems_taken": 0,        # every gem ever picked up, not the best per room
 		"codex": {},            # entry id -> true, once seen
@@ -140,6 +144,7 @@ func _read(path: String) -> void:
 	for slot: Dictionary in slots:
 		_migrate_to_schema_2(slot)
 		_repair_remix(slot)
+		_migrate_endless_best(slot)
 
 
 func _import_legacy() -> void:
@@ -190,6 +195,19 @@ func _repair_remix(slot: Dictionary) -> void:
 	for field: String in ["best_times", "cleared", "gems", "medals"]:
 		if typeof(remix.get(field)) != TYPE_DICTIONARY:
 			remix[field] = {}
+
+
+## endless_best/endless_gems used to be one scalar for the whole slot. A save
+## written before step 20 has them as a plain int; the modifier-keyed run
+## folds forward as the "" (no modifier) combo, so nobody's depth record
+## disappears the first time this loads.
+func _migrate_endless_best(slot: Dictionary) -> void:
+	if typeof(slot.get("endless_best")) == TYPE_DICTIONARY:
+		return
+	var old_best := int(slot.get("endless_best", 0))
+	var old_gems := int(slot.get("endless_gems", 0))
+	slot["endless_best"] = {"": old_best} if old_best > 0 else {}
+	slot["endless_gems"] = {"": old_gems} if old_gems > 0 else {}
 
 
 func _migrate_to_schema_2(slot: Dictionary) -> void:
@@ -271,7 +289,7 @@ func is_cleared(index: int) -> bool:
 func best_time(index: int) -> float:
 	return float(data["best_times"].get(_key(index), 0.0))
 
-
+   
 func best_gems(index: int) -> int:
 	return int(data["gems"].get(_key(index), 0))
 
@@ -459,17 +477,37 @@ func secret_count() -> int:
 	return int(data.get("secrets_taken", 0))
 
 
-## Record a finished endless run. Returns true when it beat the old depth.
-func record_endless(rooms: int, gems: int) -> bool:
+## Record a finished endless run against its own modifier combo. Returns true
+## when it beat the old depth for that combo specifically — "" is the plain,
+## no-modifier run.
+func record_endless(rooms: int, gems: int, mods_key: String = "") -> bool:
 	if not tracking:
 		return false
 	data["used"] = true
-	var record := rooms > int(data["endless_best"])
+	var best: Dictionary = data["endless_best"]
+	var record := rooms > int(best.get(mods_key, 0))
 	if record:
-		data["endless_best"] = rooms
-		data["endless_gems"] = gems
+		best[mods_key] = rooms
+		(data["endless_gems"] as Dictionary)[mods_key] = gems
 	save_game()
 	return record
+
+
+func endless_best(mods_key: String = "") -> int:
+	return int((data["endless_best"] as Dictionary).get(mods_key, 0))
+
+
+func endless_gems(mods_key: String = "") -> int:
+	return int((data["endless_gems"] as Dictionary).get(mods_key, 0))
+
+
+## The deepest run across every combo, for a summary screen with no room to
+## break the record down by combo.
+static func best_of(dict: Dictionary) -> int:
+	var best := 0
+	for v in dict.values():
+		best = maxi(best, int(v))
+	return best
 
 
 ## Score and best combo are their own record, independent of depth: a shallow

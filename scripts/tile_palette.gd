@@ -82,6 +82,8 @@ const ENTRIES := [
 
 	{"char": "L", "group": HAZARD, "sprite": "laser_idle", "unique": false, "run": false},
 	{"char": "K", "group": HAZARD, "sprite": "laser_idle", "unique": false, "run": false},
+	{"char": "h", "group": TERRAIN, "sprite": "ghost_h", "unique": false, "run": true},
+	{"char": "H", "group": TERRAIN, "sprite": "ghost_H", "unique": false, "run": true},
 ]
 
 ## Character -> i18n suffix. The name and the one-line note under the palette
@@ -102,6 +104,8 @@ const KEYS := {
 	"L": "laser_h",
 	"K": "laser_v",
 	"F": "ferrybat",
+	"h": "ghost_still",
+	"H": "ghost_move",
 }
 
 ## Painted over the icon where two tiles share a sprite. Three of the moving

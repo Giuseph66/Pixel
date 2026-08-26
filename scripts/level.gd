@@ -55,6 +55,14 @@ var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
 var dash_unlocked := true
 var pound_unlocked := true
+## Step 20 — endless modifiers. main.gd sets these before add_child(); Level
+## only has to forward them to whatever player it spawns, and to build the
+## darkness overlay when asked. "brittle" needs none of this — it is baked
+## straight into the room's tiles by LevelGen, before Level ever sees them.
+var player_speed_scale := 1.0
+var player_gravity_scale := 1.0
+var dark := false
+var _darkness: Darkness
 var running := false
 var finished := false
 
@@ -108,6 +116,11 @@ func _ready() -> void:
 	add_child(fx)
 
 	_spawn_entities()
+	if dark:
+		_darkness = Darkness.new()
+		_darkness.player = _player
+		_darkness.glow_provider = Callable(self, "_dark_glow_positions")
+		add_child(_darkness)
 	if Session.is_active():
 		Session.snapshot_received.connect(_on_network_snapshot)
 		Session.world_event_received.connect(_on_network_world_event)
@@ -577,6 +590,7 @@ func _spawn_entities() -> void:
 	_spawn_conveyors()
 	_spawn_platforms()
 	_spawn_wind()
+	_spawn_ghost_blocks()
 	_stabilize_entity_names()
 	_spawn_players()
 	_discover_contents()
@@ -612,6 +626,8 @@ func _discover_contents() -> void:
 			(child as ShieldEnemy).players = get_players()
 		elif child is FerryBat:
 			(child as FerryBat).players = get_players()
+		elif child is GhostBlock:
+			(child as GhostBlock).players = get_players()
 	if _lava != null:
 		_lava.players = get_players()
 	if Session.is_client():
@@ -669,6 +685,29 @@ func _spawn_platforms() -> void:
 			platform.setup(run, ch == "n", tx, ty, Callable(self, "is_air"), ch == "r")
 			platform.position = tile_center(tx, ty)
 			_entities.add_child(platform)
+			tx += run
+
+
+## Ghost blocks are runs like conveyors and platforms: one strip node per run
+## of matching tiles, not one node per tile. players is wired in
+## _discover_contents() afterwards, same as every other player-aware entity —
+## _spawn_players() has not run yet when this pass does.
+func _spawn_ghost_blocks() -> void:
+	for ty in Levels.ROWS:
+		var tx := 0
+		while tx < Levels.COLS:
+			var ch := tile_at(tx, ty)
+			if ch != "h" and ch != "H":
+				tx += 1
+				continue
+			var run := 1
+			while tx + run < Levels.COLS and tile_at(tx + run, ty) == ch:
+				run += 1
+
+			var block := GhostBlock.new()
+			block.setup(ch == "H", run)
+			block.position = Vector2(tx * TILE, ty * TILE)
+			_entities.add_child(block)
 			tx += run
 
 
@@ -732,6 +771,8 @@ func _spawn_player(peer_id: int) -> void:
 	player.fx = fx
 	player.dash_unlocked = dash_unlocked
 	player.pound_unlocked = pound_unlocked
+	player.speed_scale = player_speed_scale
+	player.gravity_scale = player_gravity_scale
 	player.surface_at = Callable(self, "tile_at")
 	player.died.connect(_on_player_died.bind(player))
 	player.pounded.connect(_on_player_pounded.bind(player))
@@ -747,6 +788,17 @@ func _spawn_player(peer_id: int) -> void:
 
 func get_player() -> Player:
 	return _player
+
+
+## Every uncollected gem or crystal, in Level's local space — what the 'dark'
+## overlay draws a glow dot on top of so the modifier costs navigation, not
+## collection outright.
+func _dark_glow_positions() -> Array:
+	var out: Array = []
+	for child in _entities.get_children():
+		if child is Gem or child is DashCrystal:
+			out.append((child as Node2D).position)
+	return out
 
 
 func get_players() -> Array[Player]:
@@ -1125,7 +1177,7 @@ func _observe_host_world() -> void:
 		if child is Slime or child is ElasticSlime or child is ShieldEnemy \
 				or child is Bat or child is Saw or child is Crumble \
 				or child is TimedBlock or child is RetractSpike or child is Laser \
-				or child is Lava or child is FerryBat:
+				or child is Lava or child is FerryBat or child is GhostBlock:
 			child.set_physics_process(false)
 
 
@@ -1199,4 +1251,8 @@ func restart() -> void:
 	_door = null
 	_lava = null
 	_spawn_entities()
+	# _darkness lives outside _entities and survives the wipe above; it just
+	# needs pointing at the player restart() rebuilt.
+	if _darkness != null:
+		_darkness.player = _player
 	running = true

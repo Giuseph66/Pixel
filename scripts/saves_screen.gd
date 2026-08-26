@@ -107,7 +107,7 @@ func _draw_slot(i: int) -> void:
 	_row(rect, 0, Lang.t("saves.rooms"), "%d/%d" % [cleared, Levels.count()])
 	_row(rect, 1, Lang.t("saves.time"), Util.format_clock(float(slot["play_time"])))
 	_row(rect, 2, Lang.t("saves.gems"), str(int(slot["gems_taken"])))
-	_row(rect, 3, Lang.t("saves.endless"), str(int(slot["endless_best"])))
+	_row(rect, 3, Lang.t("saves.endless"), str(Save.best_of(slot["endless_best"])))
 	_row(rect, 4, Lang.t("saves.deaths"), str(int(slot["total_deaths"])))
 	_row(rect, 5, Lang.t("saves.codex"), "%d/%d" % [
 		int((slot["codex"] as Dictionary).size()), Codex.count()])

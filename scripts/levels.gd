@@ -247,6 +247,103 @@ static func _level_7() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 19 — impulso de parede. A wall jump thrown within WALL_WINDOW of first
+## touch leaves ~25% faster horizontally. The move keeps working exactly as
+## before if you just wait and jump — this only rewards doing it fast.
+
+## A wall-jump chimney that pinches in the middle: seven tiles across at both
+## ends, five through the long middle stretch. The narrow part is what the
+## climb is actually thrown against; the flares are where you enter and where
+## you leave.
+##
+## Its roof is broken over both flares. That is the whole route — the shaft
+## used to be roofed end to end, which made the climb a dead end and left the
+## exit stranded on top of a lid nothing could reach. Pop out through either
+## gap, land on the roof, walk to the door. Floor waits at the bottom the whole
+## way up: missing a jump costs the climb, never a life.
+static func _level_boost_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 13, 5, 2, 1, "#")       # roof, left of the first gap
+	rect(g, 16, 5, 5, 1, "#")       # roof, between the two gaps
+	rect(g, 22, 5, 4, 1, "#")       # roof, right of the second gap
+	rect(g, 12, 1, 1, 5, "#")       # post that caps the roof's left end
+	rect(g, 14, 6, 1, 19, "#")      # outer walls, full height of the shaft
+	rect(g, 22, 6, 1, 19, "#")
+	rect(g, 15, 8, 1, 16, "#")      # inner faces: the pinch, five tiles apart
+	rect(g, 21, 8, 1, 16, "#")
+	puts(g, [Vector2i(18, 9), Vector2i(18, 15), Vector2i(18, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 24, 4, "X")
+	return bake(g)
+
+## A staggered climb rather than a straight chimney: no two posts line up, so
+## every jump is thrown at a face that has moved since the last one. The door
+## sits partway up with a spike hung directly over it, which makes the last
+## approach a landing rather than a scramble.
+##
+## The floor on the left is its own small trap — spikes above and below a thin
+## ledge — so dropping off the climb is not a free reset.
+static func _level_boost_zigzag() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 5, 5, 12, 1, "#")        # roof, left span
+	rect(g, 18, 5, 8, 1, "#")        # roof, right span
+	rect(g, 16, 6, 1, 4, "#")
+	rect(g, 24, 6, 2, 2, "#")
+	rect(g, 17, 8, 1, 2, "#")
+	rect(g, 24, 8, 1, 2, "#")
+	rect(g, 18, 10, 2, 3, "#")
+	rect(g, 26, 10, 2, 4, "#")
+	put(g, 18, 13, "#")
+	rect(g, 16, 14, 2, 4, "#")
+	rect(g, 22, 14, 2, 5, "#")
+	rect(g, 5, 17, 11, 1, "#")       # ledge over the left-hand trap
+	rect(g, 5, 18, 1, 2, "#")
+	rect(g, 18, 18, 2, 3, "#")
+	rect(g, 24, 19, 2, 3, "#")
+	put(g, 18, 21, "#")
+	rect(g, 15, 22, 2, 3, "#")
+	rect(g, 21, 22, 2, 3, "#")
+	rect(g, 1, 18, 4, 1, "^")        # the trap: spikes, a floor, spikes again
+	rect(g, 1, 19, 4, 1, "#")
+	rect(g, 1, 20, 5, 1, "v")
+	put(g, 16, 12, "^")              # hung right over the door
+	puts(g, [Vector2i(23, 9), Vector2i(21, 17), Vector2i(17, 21)], "o")
+	put(g, 4, 26, "P")
+	put(g, 16, 13, "X")
+	return bake(g)
+
+
+## The crossing this whole step is about: leave a wall over open ground rather
+## than climb one. The left half is a ladder of short posts with a spike on top
+## of each, alternating sides — you climb it by touching and leaving, never by
+## resting. The tall wall at the far right of that ladder is the launch face.
+##
+## Past it, eleven tiles of spikes. A boosted jump clears them; anything slower
+## catches the one-way slab a few tiles short instead — a miss costs the walk
+## back, never the run.
+static func _level_boost_gap() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 15, 27, 12, 3, ".")      # the gap, at the edge of one jump
+	rect(g, 15, 30, 12, 1, "^")
+	rect(g, 13, 9, 2, 22, "#")       # the launch wall, its right face open air
+	rect(g, 8, 8, 7, 1, "#")         # roof over the ladder
+	rect(g, 4, 9, 1, 3, "#")         # the ladder: posts alternating sides
+	rect(g, 8, 12, 1, 3, "#")
+	rect(g, 4, 15, 1, 3, "#")
+	rect(g, 8, 18, 1, 3, "#")
+	rect(g, 4, 21, 1, 3, "#")
+	puts(g, [Vector2i(4, 8), Vector2i(8, 11), Vector2i(4, 14),
+		Vector2i(8, 17), Vector2i(4, 20)], "^")
+	rect(g, 19, 24, 5, 1, "-")       # a miss lands here instead of the spikes
+	puts(g, [Vector2i(20, 17), Vector2i(21, 23), Vector2i(40, 26)], "o")
+	put(g, 6, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
 ## A spring staircase. Each spring stands on the tier below it and fires
 ## through the one-way tier above — a spring under solid ground is a dead end.
 static func _level_8() -> PackedStringArray:
@@ -1531,6 +1628,76 @@ static func _level_charge_race() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 21 — blocos fantasma. 'h' is solid while the player is almost still and
+## vanishes the instant they move; 'H' is the opposite. Both stay visible,
+## faded rather than gone, while intangible — GhostBlock.gd owns that fade.
+## Last chapter of the campaign, on purpose: the rule is invisible on sight,
+## and by here the player already trusts the game enough to test it instead of
+## assuming it is broken.
+
+## A single 'h' block, solid floor underneath it. Standing on it holds;
+## walking makes it vanish and costs one tile of fall, nothing else.
+static func _level_ghost_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 26, 26, 6, 1, "h")
+	put(g, 29, 24, "o")
+	put(g, 4, 26, "P")
+	put(g, 52, 26, "X")
+	return bake(g)
+
+
+## A corridor of 'H' with the floor gone from underneath it: only a run
+## crosses it, and stopping partway drops two tiles onto ordinary ground, not
+## a pit.
+static func _level_ghost_move() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 14, 27, 26, 2, ".")
+	rect(g, 14, 26, 26, 1, "H")
+	puts(g, [Vector2i(20, 25), Vector2i(40, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A staircase alternating 'h' and 'H': every step hands you to the next only
+## if you meet it in the right state, so the climb is stop-start-stop rather
+## than one continuous run.
+static func _level_ghost_mix() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 12, 24, 4, 1, "h")
+	rect(g, 20, 20, 4, 1, "H")
+	rect(g, 12, 16, 4, 1, "h")
+	rect(g, 20, 12, 4, 1, "H")
+	rect(g, 12, 8, 4, 1, "h")
+	puts(g, [Vector2i(22, 19), Vector2i(22, 11)], "o")
+	put(g, 4, 26, "P")
+	put(g, 13, 7, "X")
+	return bake(g)
+
+
+## Three gems, three different reasons a block held: a pedestal that only
+## holds for someone who stopped on it first (the floor alone cannot reach the
+## gem above it), a bridge that only holds while already moving, and a
+## platform with nothing under it at all — the only way on is a jump, which is
+## exactly what keeps it solid the instant you land.
+static func _level_ghost_gems() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 10, 24, 3, 1, "h")
+	put(g, 11, 20, "o")
+	rect(g, 24, 27, 10, 2, ".")
+	rect(g, 24, 26, 10, 1, "H")
+	put(g, 28, 25, "o")
+	rect(g, 44, 22, 3, 1, "H")
+	put(g, 45, 21, "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -1585,6 +1752,27 @@ static func _campaign() -> Array:
 			"hint": "level.6.hint",
 			"par": 60.0,
 			"rows": _level_6(),
+		},
+		{
+			"id": "boost_first",
+			"name": "level.boost_first.name",
+			"hint": "level.boost_first.hint",
+			"par": 30.0,
+			"rows": _level_boost_first(),
+		},
+		{
+			"id": "boost_zigzag",
+			"name": "level.boost_zigzag.name",
+			"hint": "level.boost_zigzag.hint",
+			"par": 40.0,
+			"rows": _level_boost_zigzag(),
+		},
+		{
+			"id": "boost_gap",
+			"name": "level.boost_gap.name",
+			"hint": "level.boost_gap.hint",
+			"par": 34.0,
+			"rows": _level_boost_gap(),
 		},
 		{
 			"id": "double_trouble",
@@ -2105,6 +2293,34 @@ static func _campaign() -> Array:
 			"hint": "level.charge_race.hint",
 			"par": 42.0,
 			"rows": _level_charge_race(),
+		},
+		{
+			"id": "ghost_first",
+			"name": "level.ghost_first.name",
+			"hint": "level.ghost_first.hint",
+			"par": 26.0,
+			"rows": _level_ghost_first(),
+		},
+		{
+			"id": "ghost_move",
+			"name": "level.ghost_move.name",
+			"hint": "level.ghost_move.hint",
+			"par": 40.0,
+			"rows": _level_ghost_move(),
+		},
+		{
+			"id": "ghost_mix",
+			"name": "level.ghost_mix.name",
+			"hint": "level.ghost_mix.hint",
+			"par": 52.0,
+			"rows": _level_ghost_mix(),
+		},
+		{
+			"id": "ghost_gems",
+			"name": "level.ghost_gems.name",
+			"hint": "level.ghost_gems.hint",
+			"par": 58.0,
+			"rows": _level_ghost_gems(),
 		},
 	]
 

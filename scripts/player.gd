@@ -56,6 +56,13 @@ const WALL_JUMP := Vector2(152.0, -252.0)
 const WALL_LOCK := 0.13         # input is ignored briefly after a wall jump
 const WALL_CLING := 24.0        # lean held into the wall so contact is not lost
 
+## Step 19 — wall boost. A wall jump thrown within the window of first contact
+## leaves faster. Vertical reach never changes — only how far it carries —
+## because a taller wall jump would quietly change what every existing room's
+## alcançability was built against.
+const WALL_WINDOW := 0.09       # ~5 frames at 60fps, same order as COYOTE_TIME
+const WALL_BOOST := 1.25        # 152 -> 190 px/s horizontal, on a perfect jump
+
 const SPRING_VELOCITY := -450.0
 
 # --- dash -------------------------------------------------------------------
@@ -117,6 +124,10 @@ var _lock := 0.0
 var _anim := 0.0
 var _was_on_floor := false
 var _wall_dir := 0
+## How long the current wall contact has held, measured as of the start of
+## this frame — so a wall jump thrown on the very frame contact begins reads
+## exactly 0.0, not one frame late.
+var _wall_time := 0.0
 var _dash := 0.0                # seconds of dash left
 var _dash_dir := Vector2.ZERO
 var _dash_cool := 0.0
@@ -664,6 +675,14 @@ func _apply_horizontal(input: float, delta: float) -> void:
 ## you — only steering away from the wall, jumping, or running out of wall
 ## does. Holding a direction to avoid falling is busywork, not difficulty.
 func _apply_gravity(input: float, delta: float) -> void:
+	# Measured against last frame's contact, before this frame's is recomputed
+	# below — so a wall jump thrown the instant contact begins reads _wall_time
+	# as exactly 0.0, not one frame late.
+	if _wall_dir != 0:
+		_wall_time += delta
+	else:
+		_wall_time = 0.0
+
 	_wall_dir = 0
 	if not is_on_floor() and is_on_wall_only():
 		var normal := get_wall_normal()
@@ -727,16 +746,25 @@ func _handle_jump(controls: Dictionary) -> void:
 				fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 6)
 			visual_event.emit("jump", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.UP)
 		elif _wall_dir != 0:
+			# Step 19 — wall boost. Only the horizontal component scales: a
+			# taller wall jump would quietly change what every existing room's
+			# reachability was built against, but a faster one barely matters
+			# in a chimney narrow enough to wall-jump in the first place.
+			var perfect := _wall_time <= WALL_WINDOW
 			velocity.y = WALL_JUMP.y
-			velocity.x = -_wall_dir * WALL_JUMP.x
+			velocity.x = -_wall_dir * WALL_JUMP.x * (WALL_BOOST if perfect else 1.0)
 			facing = -_wall_dir
 			_lock = WALL_LOCK
 			_buffer = 0.0
 			_add_verb(Verb.WALL)
-			Audio.play_varied("wall_jump")
+			if perfect:
+				Audio.play("wall_jump", 1.18)
+			else:
+				Audio.play_varied("wall_jump")
+			var boost_color := Palette.WHITE if perfect else Palette.CYAN
 			if fx != null:
-				fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 0.0)), 6,
-					Palette.CYAN, 70.0, Vector2(-_wall_dir, -0.5), 1.2, 0.3, 200.0)
+				fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 0.0)), 6 if not perfect else 10,
+					boost_color, 70.0, Vector2(-_wall_dir, -0.5), 1.2, 0.3, 200.0)
 			visual_event.emit("wall_jump", _fx_at(Vector2(_wall_dir * 4.0, 0.0)),
 				Vector2(-_wall_dir, -0.5))
 

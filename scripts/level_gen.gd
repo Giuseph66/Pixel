@@ -67,6 +67,7 @@ const UNLOCK := {
 	"phase": 11,
 	"laser": 14,
 	"ferrybat": 13,
+	"ghost": 17,
 }
 
 ## What each segment is worth in threat. The room is built to a budget of
@@ -102,6 +103,7 @@ const THREAT := {
 	"phase": 1.0,
 	"laser": 5.0,
 	"ferrybat": 4.5,
+	"ghost": 3.5,
 }
 
 ## Threat a room aims for. It climbs without ever levelling off, and every
@@ -126,8 +128,11 @@ static func target_threat(depth: int) -> float:
 	return minf(t, THREAT_CEILING)
 
 
-## Build one room. `depth` is 0-based; difficulty ramps with it.
-static func generate(run_seed: int, depth: int) -> Dictionary:
+## Build one room. `depth` is 0-based; difficulty ramps with it. `mods` is the
+## endless run's active modifiers (step 20) — only "brittle" touches the
+## generator itself; "rush", "heavy" and "dark" are Level/Player concerns
+## applied after this dictionary comes back.
+static func generate(run_seed: int, depth: int, mods: Array = []) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = run_seed + depth * 7919
 	var target := target_threat(depth)
@@ -173,6 +178,8 @@ static func generate(run_seed: int, depth: int) -> Dictionary:
 	_scatter_gems(g, spots)
 	_place_secret(g, rng, depth)
 	_flood_milestone(g, depth)
+	if mods.has("brittle"):
+		_make_brittle(g, rng, depth)
 
 	# "name" here is finished text rather than a key. Lang.t() hands back
 	# anything it does not recognise, so the screens that translate story room
@@ -221,6 +228,7 @@ const WIDTHS := {
 	"phase": 9,
 	"laser": 10,
 	"ferrybat": 12,
+	"ghost": 8,
 }
 
 
@@ -257,6 +265,7 @@ const TASTE := {
 	"phase": 1.5,
 	"laser": 1.8,
 	"ferrybat": 1.7,
+	"ghost": 1.3,      # low: the strangest mechanic in the set
 }
 
 
@@ -272,8 +281,15 @@ static func _pick(rng: RandomNumberGenerator, depth: int, previous: String, room
 	var total := 0.0
 	var pool: Array[String] = []
 
+	# Step 21 — ghost blocks punish hesitation, the same axis lava already
+	# owns. Landing in the same milestone room as a flood turns the room into
+	# a pure race with no room to read either hazard; keep the two apart.
+	var is_milestone := depth > 0 and (depth + 1) % MILESTONE == 0
+
 	for kind: String in TASTE.keys():
 		if int(WIDTHS[kind]) > room or int(UNLOCK[kind]) > depth:
+			continue
+		if kind == "ghost" and is_milestone:
 			continue
 		# Overshooting is what made deep rooms swing between trivial and
 		# brutal: one segment worth more than the whole remaining budget is
@@ -477,6 +493,8 @@ static func _paint(g: Array, rng: RandomNumberGenerator, kind: String, x: int,
 			return _laser(g, rng, x, room, spots)
 		"ferrybat":
 			return _ferrybat(g, rng, x, room, spots)
+		"ghost":
+			return _ghost(g, rng, x, room, spots)
 		_:
 			return _flat(g, rng, x, room, spots)
 
@@ -930,6 +948,20 @@ static func _ferrybat(g: Array, rng: RandomNumberGenerator, x: int, room: int,
 	return w
 
 
+## A run of 'H' over an ordinary spike pit. In the endless the player is
+## almost always moving, so this segment is nearly free for anyone in rhythm
+## — and a real bite for anyone who taps the brakes over it. Never placed in
+## a milestone room; see the is_milestone guard in _pick().
+static func _ghost(g: Array, rng: RandomNumberGenerator, x: int, room: int,
+		spots: Array[Vector2i]) -> int:
+	var w := mini(rng.randi_range(8, 11), room)
+	Levels.rect(g, x + 2, FLOOR, w - 4, 3, ".")
+	Levels.rect(g, x + 2, FLOOR + 3, w - 4, 1, "^")
+	Levels.rect(g, x + 2, FLOOR - 1, w - 4, 1, "H")
+	spots.append(Vector2i(x + w / 2, FLOOR - 3))
+	return w
+
+
 ## Every fifth room already spikes in difficulty. Flooding it gives that spike
 ## a face the player recognises from across the room, instead of it being the
 ## same room with more things in it.
@@ -937,6 +969,20 @@ static func _flood_milestone(g: Array, depth: int) -> void:
 	if depth < int(UNLOCK["lava"]) or (depth + 1) % MILESTONE != 0:
 		return
 	Levels.put(g, COLS / 2, ROWS - 2, "A")
+
+
+## Step 20 — the 'brittle' modifier. Turns part of the ordinary floor into
+## crumbling ground. Only the FLOOR row itself is touched — the solid rows
+## beneath it (laid down at the very top of generate()) are never rewritten,
+## so a broken tile drops the player exactly one tile onto real ground, never
+## into a pit the room was not built to have. START_X/END_X already keep the
+## spawn and exit aprons out of every segment; the same bound keeps this pass
+## off them too.
+static func _make_brittle(g: Array, rng: RandomNumberGenerator, depth: int) -> void:
+	var chance := clampf(0.25 + float(depth) * 0.01, 0.25, 0.5)
+	for x in range(START_X, END_X):
+		if rng.randf() < chance and g[FLOOR][x] == "#":
+			Levels.put(g, x, FLOOR, "c")
 
 
 ## One secret per room, as high as the room will take it. It never blocks

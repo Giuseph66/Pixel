@@ -21,6 +21,9 @@ var _run_gems := 0
 var _run_deaths := 0
 var _run_score := 0
 var _run_best_combo := 0
+## Step 20 — endless modifiers, chosen once at the picker and applied to every
+## room the run generates.
+var _mods: Array[String] = []
 
 # The room just cleared, held back until the player leaves the results screen.
 # Replaying it from there has to not count twice.
@@ -374,7 +377,7 @@ func _on_play_chosen(id: String) -> void:
 			var index := _first_unfinished()
 			_go(func(): _start_room(index))
 		"endless":
-			_go(_start_run)
+			_go(_show_modifier_picker)
 		"sandbox":
 			_go(_show_sandbox)
 
@@ -509,12 +512,26 @@ func _start_room(index: int, remix: bool = false) -> void:
 
 # --------------------------------------------------------------- endless ---
 
+## Step 20 — where a run picks its modifiers, before a single room exists.
+func _show_modifier_picker() -> void:
+	_clear_all()
+	var screen := ModifierScreen.new()
+	screen.chosen.connect(_on_modifier_chosen)
+	screen.cancelled.connect(func(): _go(_show_play_select))
+	_set_screen(screen)
+
+
+func _on_modifier_chosen(id: String) -> void:
+	_go(func(): _start_run(ModifierScreen.mods_from_key(id)))
+
+
 ## Begin a fresh endless run. One seed decides the whole run, so a death drops
 ## you back into the same room rather than a new one.
-func _start_run() -> void:
+func _start_run(mods: Array[String] = []) -> void:
 	_endless = true
 	_sandbox = false
 	_remix = false
+	_mods = mods
 	_run_seed = randi()
 	_depth = 0
 	_run_time = 0.0
@@ -523,17 +540,21 @@ func _start_run() -> void:
 	_run_score = 0
 	_run_best_combo = 0
 	_pending = {}
-	_build_room(_depth, LevelGen.generate(_run_seed, _depth))
+	_build_room(_depth, LevelGen.generate(_run_seed, _depth, _mods))
 
 
 func _next_endless_room() -> void:
-	_build_room(_depth, LevelGen.generate(_run_seed, _depth))
+	_build_room(_depth, LevelGen.generate(_run_seed, _depth, _mods))
 
 
-## Close the run, bank the record and show the summary.
+## Close the run, bank the record and show the summary. A modified run's
+## score is scaled up by whatever it made harder — a hard twist with nothing
+## to show for it on the scoreboard is only punishment, not a real choice.
 func _end_run() -> void:
-	var record := Save.record_endless(_depth, _run_gems)
-	Save.record_endless_score(_run_score, _run_best_combo)
+	var mods_key := ModifierScreen.combo_key(_mods)
+	var scaled_score := int(round(float(_run_score) * ModifierScreen.score_multiplier(_mods)))
+	var record := Save.record_endless(_depth, _run_gems, mods_key)
+	Save.record_endless_score(scaled_score, _run_best_combo)
 	_clear_all()
 
 	var screen := EndingScreen.new()
@@ -542,11 +563,12 @@ func _end_run() -> void:
 	screen.total_time = _run_time
 	screen.total_gems = _run_gems
 	screen.deaths = _run_deaths
-	screen.score = _run_score
+	screen.score = scaled_score
 	screen.new_record = record
 	screen.chosen.connect(_on_ending_chosen)
 	_set_screen(screen)
 	_endless = false
+	_mods = []
 
 
 func _build_room(index: int, data: Dictionary) -> void:
@@ -566,6 +588,11 @@ func _build_room(index: int, data: Dictionary) -> void:
 	else:
 		_level.dash_unlocked = Session.is_active() or _endless or _remix or Save.can_dash()
 		_level.pound_unlocked = Session.is_active() or _endless or _remix or Save.can_pound()
+	# Step 20 — endless modifiers. "brittle" needs nothing here: LevelGen
+	# already baked it into data["rows"] before this room existed.
+	_level.player_speed_scale = 1.2 if _endless and _mods.has("rush") else 1.0
+	_level.player_gravity_scale = 1.15 if _endless and _mods.has("heavy") else 1.0
+	_level.dark = _endless and _mods.has("dark")
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)
 	add_child(_level)
@@ -879,8 +906,9 @@ func _on_pause_chosen(id: String) -> void:
 			_sandbox = false
 			Save.tracking = true
 			if _endless:
-				Save.record_endless(_depth, _run_gems)
+				Save.record_endless(_depth, _run_gems, ModifierScreen.combo_key(_mods))
 				_endless = false
+				_mods = []
 			_go(_show_title)
 
 

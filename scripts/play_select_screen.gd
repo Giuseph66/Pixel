@@ -114,7 +114,7 @@ func _draw_endless_panel(rect: Rect2, selected: bool) -> void:
 	PixelFont.draw_text_centered(self, Lang.t("play.endless"), cx, rect.position.y + 58.0,
 		Palette.WHITE if selected else Palette.GREY, 2)
 
-	var best := int(Save.data["endless_best"])
+	var best := Save.best_of(Save.data["endless_best"])
 	var y := rect.position.y + rect.size.y - 40.0
 	if best <= 0:
 		PixelFont.draw_text_centered(self, Lang.t("play.endless_new"), cx, y, Palette.GREY_DARK, 1)

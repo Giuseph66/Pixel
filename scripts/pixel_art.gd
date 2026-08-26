@@ -622,6 +622,31 @@ const GRIDS := {
 	# Diagonal purple stripes inside instead of scattered dots: caution-tape
 	# language for "not always solid," on a shape you can still tell is one.
 	# Level dims it further (modulate.a) while it is actually passable.
+	# Step 21 — ghost blocks. Body colour marks which rule the block obeys —
+	# grey-blue for 'h' (still), amber for 'H' (moving) — so the pause bars and
+	# the arrows are backup reading, not the only signal. GhostBlock itself
+	# fades the whole sprite's alpha for the intangible state; the art here
+	# never changes, only how solid it looks.
+	"ghost_h": [
+		"########",
+		"#111111#",
+		"#1c##c1#",
+		"#1c##c1#",
+		"#1c##c1#",
+		"#1c##c1#",
+		"#111111#",
+		"########",
+	],
+	"ghost_H": [
+		"########",
+		"#222222#",
+		"#2y2y22#",
+		"#22y2y2#",
+		"#2y2y22#",
+		"#22y2y2#",
+		"#222222#",
+		"########",
+	],
 	"phase_block": [
 		"########",
 		"#p.p.p.#",
