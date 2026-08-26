@@ -1547,6 +1547,10 @@ func _on_roster_changed(roster: Dictionary) -> void:
 		player.queue_free()
 		_players.erase(peer_id)
 		_door_arrivals.erase(peer_id)
+	for peer_id: int in roster.keys():
+		if _players.has(peer_id):
+			continue
+		_spawn_player(peer_id)
 
 
 ## Rebuild everything that can be interacted with. Terrain and collision are

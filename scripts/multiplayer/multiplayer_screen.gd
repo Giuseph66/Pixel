@@ -7,12 +7,12 @@ extends Menu
 func _ready() -> void:
 	super()
 	title = "MULTIPLAYER"
-	subtitle = "JOGUE EM MAQUINAS DIFERENTES"
+	subtitle = "ONLINE POR CODIGO OU LAN"
 	footer = "ESC VOLTA"
 	allow_cancel = true
 	list_top = 128.0
 	items = [
-		{"id": "host", "label": "CRIAR SALA LAN"},
-		{"id": "join", "label": "ENTRAR POR IP"},
+		{"id": "host", "label": "CRIAR SALA"},
+		{"id": "join", "label": "ENTRAR NA SALA"},
 		{"id": "back", "label": "VOLTAR"},
 	]

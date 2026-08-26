@@ -19,6 +19,7 @@ signal host_left
 
 const PROTOCOL_VERSION := 4
 const DEFAULT_PORT := 27816
+const DEFAULT_SIGNAL_URL := "http://127.0.0.1:8787"
 
 enum State { OFFLINE, CONNECTING, LOBBY, LOADING, PLAYING, FAILED }
 enum Role { NONE, HOST, CLIENT }
@@ -35,6 +36,8 @@ var _server_nonce := ""
 var _nonces: Dictionary = {}
 var _inputs: Dictionary = {}
 var _transport: NetworkTransport
+var _signal: SignalingClient
+var _online := false
 var _event_id := 0
 var _received_events: Dictionary = {}
 var _server_capacity := 0
@@ -43,11 +46,23 @@ var _server_capacity := 0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_transport = EnetTransport.new()
+	_signal = SignalingClient.new()
+	_signal.endpoint = online_endpoint()
+	add_child(_signal)
+	_signal.room_created.connect(_on_online_room_created)
+	_signal.room_joined.connect(_on_online_room_joined)
+	_signal.signals_received.connect(_on_online_signals_received)
+	_signal.failed.connect(_on_online_failed)
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
 	multiplayer.server_disconnected.connect(_on_server_disconnected)
+
+
+func _process(_delta: float) -> void:
+	if _transport is WebRtcTransport:
+		(_transport as WebRtcTransport).poll()
 
 
 func is_active() -> bool:
@@ -62,12 +77,25 @@ func is_client() -> bool:
 	return role == Role.CLIENT
 
 
+func is_online() -> bool:
+	return _online
+
+
 func local_peer_id() -> int:
 	return multiplayer.get_unique_id() if is_active() else 1
 
 
+func online_endpoint() -> String:
+	var from_environment := OS.get_environment("PIXEL_SIGNAL_URL").strip_edges()
+	if not from_environment.is_empty():
+		return from_environment
+	var configured := str(ProjectSettings.get_setting("network/multiplayer/signal_url", "")).strip_edges()
+	return configured if not configured.is_empty() else DEFAULT_SIGNAL_URL
+
+
 func host_lan(values: Dictionary, password: String = "") -> Error:
 	leave()
+	_transport = EnetTransport.new()
 	var max_players := clampi(int(values.get("max_players", 4)),
 		SessionConfig.MIN_PLAYERS, SessionConfig.MAX_PLAYERS)
 	var port := clampi(int(values.get("port", DEFAULT_PORT)), 1024, 65535)
@@ -98,6 +126,7 @@ func host_lan(values: Dictionary, password: String = "") -> Error:
 
 func join_lan(address: String, port: int, profile: Dictionary, password: String = "") -> Error:
 	leave()
+	_transport = EnetTransport.new()
 	var err := _transport.join(address.strip_edges(), clampi(port, 1024, 65535))
 	if err != OK:
 		_fail("CONNECT_FAILED")
@@ -111,7 +140,46 @@ func join_lan(address: String, port: int, profile: Dictionary, password: String 
 	return OK
 
 
+func host_online(values: Dictionary, password: String = "", endpoint: String = "") -> Error:
+	leave()
+	var signal_url := endpoint.strip_edges()
+	_signal.endpoint = signal_url if not signal_url.is_empty() else online_endpoint()
+	if not _signal.is_configured():
+		_fail("ONLINE_NOT_CONFIGURED")
+		return ERR_UNAVAILABLE
+	var max_players := clampi(int(values.get("max_players", 4)),
+		SessionConfig.MIN_PLAYERS, SessionConfig.MAX_PLAYERS)
+	role = Role.HOST
+	_online = true
+	_password_digest = _hash(password)
+	config = SessionConfig.make(values)
+	config["max_players"] = max_players
+	config["content_hash"] = content_hash()
+	_server_capacity = max_players
+	if config.get("room_data", {}) is Dictionary and not config["room_data"].is_empty():
+		config["room_data_hash"] = _hash(JSON.stringify(config["room_data"]))
+	_set_state(State.CONNECTING)
+	return _signal.create_room(str(config.get("room_name", "SALA")), password, max_players)
+
+
+func join_online(code: String, profile: Dictionary, password: String = "", endpoint: String = "") -> Error:
+	leave()
+	var signal_url := endpoint.strip_edges()
+	_signal.endpoint = signal_url if not signal_url.is_empty() else online_endpoint()
+	if not _signal.is_configured():
+		_fail("ONLINE_NOT_CONFIGURED")
+		return ERR_UNAVAILABLE
+	local_profile = _profile(profile)
+	_join_password = password
+	role = Role.CLIENT
+	_online = true
+	_set_state(State.CONNECTING)
+	return _signal.join_room(code, str(local_profile.get("name", "JOGADOR")), password)
+
+
 func leave() -> void:
+	if _online and _signal != null:
+		_signal.leave()
 	if _transport != null:
 		_transport.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
@@ -127,6 +195,7 @@ func leave() -> void:
 	_event_id = 0
 	_received_events = {}
 	_server_capacity = 0
+	_online = false
 	state_changed.emit(state, "")
 
 
@@ -432,6 +501,100 @@ func _on_peer_connected(peer_id: int) -> void:
 	var nonce := _hash("%s:%d:%d" % [Time.get_ticks_usec(), peer_id, randi()])
 	_nonces[peer_id] = nonce
 	server_hello.rpc_id(peer_id, nonce, config)
+
+
+func _on_online_room_created(session: Dictionary) -> void:
+	if not is_host() or not _online:
+		return
+	var web_rtc := WebRtcTransport.new()
+	web_rtc.signal_outgoing.connect(_on_online_signal_outgoing)
+	var err := web_rtc.open_host(_signal.ice_servers)
+	if err != OK:
+		_abort_online("WEBRTC_UNAVAILABLE")
+		return
+	_transport = web_rtc
+	multiplayer.multiplayer_peer = _transport.peer
+	web_rtc.register_member(Dictionary(session.get("member", {})))
+	var room: Dictionary = session.get("room", {})
+	config["room_code"] = str(room.get("code", ""))
+	participants = {1: _participant(local_profile, true)}
+	_inputs = {1: {}}
+	_event_id = 0
+	_received_events = {}
+	_set_state(State.LOBBY)
+	NetworkLog.event("host", 1, state, "online lobby opened")
+	roster_changed.emit(participants.duplicate(true))
+
+
+func _on_online_room_joined(session: Dictionary) -> void:
+	if not is_client() or not _online:
+		return
+	var room: Dictionary = session.get("room", {})
+	var raw_members: Variant = room.get("members", [])
+	var members: Array = []
+	if raw_members is Array:
+		members.assign(raw_members)
+	var host_member: Dictionary = {}
+	for raw_member: Variant in members:
+		var candidate := Dictionary(raw_member)
+		if bool(candidate.get("host", false)):
+			host_member = candidate
+			break
+	if host_member.is_empty():
+		_abort_online("HOST_NOT_FOUND")
+		return
+	var local_member: Dictionary = session.get("member", {})
+	var web_rtc := WebRtcTransport.new()
+	web_rtc.signal_outgoing.connect(_on_online_signal_outgoing)
+	for raw_member: Variant in members:
+		web_rtc.register_member(Dictionary(raw_member))
+	var err := web_rtc.open_client(int(local_member.get("peer_id", 0)), host_member, _signal.ice_servers)
+	if err != OK:
+		_abort_online("WEBRTC_UNAVAILABLE")
+		return
+	_transport = web_rtc
+	multiplayer.multiplayer_peer = _transport.peer
+
+
+func _on_online_signals_received(messages: Array) -> void:
+	if not _online or not (_transport is WebRtcTransport):
+		return
+	var web_rtc := _transport as WebRtcTransport
+	for raw_message: Variant in messages:
+		var message := Dictionary(raw_message)
+		var signal_type := str(message.get("type", ""))
+		var sender := str(message.get("from", ""))
+		var data := Dictionary(message.get("data", {}))
+		match signal_type:
+			"peer_joined":
+				if is_host():
+					var err := web_rtc.host_peer_joined(data)
+					if err != OK:
+						NetworkLog.event("host", int(data.get("peer_id", 0)), state, "webrtc peer failed")
+			"peer_left":
+				web_rtc.handle_signal(str(data.get("id", sender)), "bye", {})
+			"offer", "answer", "candidate", "bye":
+				web_rtc.handle_signal(sender, signal_type, data)
+
+
+func _on_online_signal_outgoing(to: String, signal_type: String, data: Dictionary) -> void:
+	if _online:
+		_signal.send_signal(to, signal_type, data)
+
+
+func _on_online_failed(reason: String) -> void:
+	if not _online:
+		return
+	if is_client() and state != State.CONNECTING:
+		host_left.emit()
+		leave()
+		return
+	_abort_online(reason)
+
+
+func _abort_online(reason: String) -> void:
+	leave()
+	_fail(reason)
 
 
 func _on_peer_disconnected(peer_id: int) -> void:

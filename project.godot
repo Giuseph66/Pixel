@@ -36,6 +36,10 @@ window/stretch/mode="canvas_items"
 3d/physics_engine="Jolt Physics"
 2d/default_gravity=900.0
 
+[network]
+
+multiplayer/signal_url="https://pixel-signal.neurelix.com.br"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

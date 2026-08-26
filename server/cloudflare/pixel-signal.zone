@@ -1,0 +1,6 @@
+$ORIGIN neurelix.com.br.
+$TTL 300
+
+; Cloudflare Tunnel: neurelix-tunel
+; Import this file in DNS > Records > Import.
+pixel-signal IN CNAME 995cc9df-74c2-4c62-b746-0e0e8b8845af.cfargotunnel.com.

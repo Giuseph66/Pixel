@@ -8,7 +8,7 @@ var message := ""
 
 func _ready() -> void:
 	super()
-	title = "LOBBY LAN"
+	title = "LOBBY ONLINE" if Session.is_online() else "LOBBY LAN"
 	footer = "TODOS PRONTOS PARA INICIAR"
 	allow_cancel = true
 	list_top = 154.0
@@ -126,7 +126,9 @@ func _mode_label(mode: String) -> String:
 func draw_header() -> void:
 	var room_name := str(Session.config.get("room_name", "SALA"))
 	PixelFont.draw_text_centered(self, "SALA: " + room_name, SCREEN.x * 0.5, 58.0, Palette.CYAN, 1)
-	PixelFont.draw_text_centered(self, "%d/%d JOGADORES" % [Session.participants.size(), int(Session.config.get("max_players", 0))], SCREEN.x * 0.5, 72.0, Palette.GREY, 1)
+	var code := str(Session.config.get("room_code", ""))
+	var status := "CODIGO: %s  %d/%d JOGADORES" % [code, Session.participants.size(), int(Session.config.get("max_players", 0))] if not code.is_empty() else "%d/%d JOGADORES" % [Session.participants.size(), int(Session.config.get("max_players", 0))]
+	PixelFont.draw_text_centered(self, status, SCREEN.x * 0.5, 72.0, Palette.GREY, 1)
 	var peer_ids: Array = Session.participants.keys()
 	peer_ids.sort()
 	var y := 88.0

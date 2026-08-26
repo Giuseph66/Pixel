@@ -106,6 +106,21 @@ const CHAIN_MAX := 1.45
 const CHARGE_TIME := 0.35
 const CHARGE_BOOST := 1.3
 
+## Step 22 — gravity zones, hysteresis. A zone's own edge is a stable
+## equilibrium: inside, gravity pushes you toward the edge and out; outside,
+## it pushes you straight back in. Anything that drifts to that seam parks on
+## it, and a per-frame reading then alternates forever. See
+## _update_gravity_zone() for what that costs the player.
+##
+## Entering is the exact tile read it always was, so a zone one tile tall
+## still has an inside; leaving needs the zone a clear GRAV_EXIT_MARGIN away.
+## That margin has to beat the distance gravity carries the player during
+## GRAV_DWELL (~8px at these constants), or the dwell alone throws them clear
+## of a narrower band and re-arms the very transition the band exists to
+## suppress.
+const GRAV_EXIT_MARGIN := 12.0
+const GRAV_DWELL := 0.12
+
 var alive := true
 var frozen := false             # set once the room is won; control is over
 var has_dash := true
@@ -128,6 +143,8 @@ var _was_on_floor := false
 ## _update_gravity_zone() for the only place it changes, and up_direction for
 ## the one thing that keeps is_on_floor() and friends honest about it.
 var gravity_dir := 1.0
+## Seconds left before gravity_dir may change again — see GRAV_DWELL.
+var _grav_dwell := 0.0
 var _wall_dir := 0
 ## How long the current wall contact has held, measured as of the start of
 ## this frame — so a wall jump thrown on the very frame contact begins reads
@@ -253,7 +270,7 @@ func _physics_process(delta: float) -> void:
 	if not alive or frozen:
 		return
 
-	_update_gravity_zone()
+	_update_gravity_zone(delta)
 	previous_bottom = global_position.y + HEIGHT * 0.5 * gravity_dir
 	_anim += delta
 	_coyote = maxf(_coyote - delta, 0.0)
@@ -489,15 +506,24 @@ func _try_pound(controls: Dictionary) -> void:
 
 ## The falling half sets velocity to a fixed POUND_SPEED every tick — unlike
 ## everywhere else, nothing here lets normal deceleration carry the player
-## through a gravity flip encountered mid-plunge. Grazing a zone boundary
-## while committed to POUND_SPEED the old way instantly reverses to
-## POUND_SPEED the new way, which sends the player straight back across the
-## same boundary at the same fixed speed, flips again, and repeats forever —
-## the exact oscillation _update_gravity_zone() no longer causes on its own,
-## reintroduced through a path that ignores its fix. A pound is already a
-## committed, uninterruptible action (nothing else runs while _pound > 0), so
-## it plunges toward the direction it started in — _pound_dir — and a flip
-## encountered along the way quietly cancels it instead of fighting it.
+## through a gravity flip encountered mid-plunge. So the plunge is committed
+## to _pound_dir, the direction it started in, and simply ignores a flip it
+## meets on the way down. Reading the live gravity_dir instead reversed the
+## plunge the instant it grazed a zone edge, firing it back across that same
+## edge at the same fixed speed, forever.
+##
+## Cancelling on a flip is no better, and is what "hold down near a zone"
+## used to hit: the cancel drops the player mid-air still carrying
+## POUND_SPEED, they cross back out, and the held key re-arms the pound —
+## a ping-pong at exactly ±POUND_SPEED that never settles. Committing
+## outright ends it, because a committed plunge always terminates: it runs
+## until it hits something.
+##
+## Which is why landing is floor *or* ceiling. is_on_floor() alone is a
+## statement about up_direction, and up_direction is the thing a flip just
+## changed — plunging "down" under inverted gravity ends on what physics now
+## calls a ceiling, and a pound that only ever watched for a floor would
+## grind into that surface at POUND_SPEED and never land at all.
 func _tick_pound(delta: float) -> void:
 	if _pound == 1:
 		_pound_hang -= delta
@@ -506,16 +532,12 @@ func _tick_pound(delta: float) -> void:
 			_pound = 2
 		return
 
-	if gravity_dir != _pound_dir:
-		cancel_pound()
-		return
-
 	velocity = Vector2(0.0, POUND_SPEED * _pound_dir)
 	if fx != null and randf() < 0.6:
 		fx.emit(_fx_at(Vector2(0, -4 * _pound_dir)), 1, Palette.CYAN_MID, 26.0,
 			Vector2.UP * _pound_dir, 0.7, 0.2, 40.0)
 
-	if is_on_floor():
+	if is_on_floor() or is_on_ceiling():
 		_land_pound()
 
 
@@ -864,16 +886,57 @@ func _in_zone(cb: Callable) -> bool:
 	return cb.call(tx, ty)
 
 
-func _update_gravity_zone() -> void:
-	var inside := false
-	if gravity_zone_at.is_valid():
-		var tx := floori(position.x / TILE)
-		var ty := floori(position.y / TILE)
-		inside = gravity_zone_at.call(tx, ty)
-	gravity_dir = -1.0 if inside else 1.0
+## A zone's edge is a stable equilibrium — inside, gravity pushes you toward
+## the edge and out; outside, it pushes you back in — so anything that drifts
+## there parks on it. Read exactly, gravity_dir then alternates every single
+## frame, and because half this file is written as `something * gravity_dir`,
+## an alternating sign is worse than a wrong one: a jump cancels itself frame
+## to frame, is_on_floor() disagrees with itself, and the player is left
+## unable to walk, jump or dash back out of the seam they are stuck on.
+##
+## So neither direction is decided at the edge itself. Flipping needs the
+## body a clear GRAV_MARGIN inside the zone, unflipping needs it that far
+## outside, and in the band between the two nothing changes at all — the
+## player simply keeps the gravity they arrived with. That is what breaks the
+## equilibrium rather than merely slowing it down: whatever they keep is
+## pushing them off the seam, so they leave it instead of settling onto it.
+## GRAV_DWELL then puts a floor under how long any one direction lasts, so
+## every `* gravity_dir` downstream means one steady thing for a stretch of
+## frames long enough to walk, jump or dash inside.
+func _update_gravity_zone(delta: float) -> void:
+	_grav_dwell = maxf(_grav_dwell - delta, 0.0)
+
+	if _grav_dwell <= 0.0:
+		var was := gravity_dir
+		if gravity_dir > 0.0:
+			if _zone_at_offset(0.0):
+				gravity_dir = -1.0
+				_grav_dwell = GRAV_DWELL
+		elif not _zone_at_offset(0.0) \
+				and not _zone_at_offset(-GRAV_EXIT_MARGIN) \
+				and not _zone_at_offset(GRAV_EXIT_MARGIN):
+			gravity_dir = 1.0
+			_grav_dwell = GRAV_DWELL
+		if gravity_dir != was:
+			# The footless box hangs off whichever side is currently the head
+			# (_apply_body_height()), so its offset is written in terms of
+			# gravity_dir. Leave it stale across a flip and the box sits on
+			# the wrong side of centre until footless next changes — then it
+			# snaps back the full HEIGHT - FOOTLESS_HEIGHT at once, which is
+			# how a player tucked against a surface ended up standing four
+			# pixels inside it, stuck.
+			_apply_body_height()
 	# Has to land before move_and_slide() for is_on_floor()/is_on_wall() to
 	# read the right surface as "floor" this same frame.
 	up_direction = Vector2(0.0, -gravity_dir)
+
+
+func _zone_at_offset(dy: float) -> bool:
+	if not gravity_zone_at.is_valid():
+		return false
+	var tx := floori(position.x / TILE)
+	var ty := floori((position.y + dy) / TILE)
+	return gravity_zone_at.call(tx, ty)
 
 
 ## Once you touch a wall you stay on it. Letting go of the stick does not drop
@@ -1259,6 +1322,7 @@ func respawn(at: Vector2) -> void:
 	# flip zone, so a respawn always resets the player right side up rather
 	# than carrying an inversion across a death.
 	gravity_dir = 1.0
+	_grav_dwell = 0.0
 	up_direction = Vector2.UP
 	has_dash = true
 	_dash = 0.0

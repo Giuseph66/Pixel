@@ -32,14 +32,26 @@ const MULTIPLIER := {
 	"dark": 1.4,
 }
 
+## Every mod gets a fixed hue rather than sharing the grid's one grey — the
+## dot beside a name and the card's own idle border both read off this, so a
+## card says what it does before its text is even read. MAGENTA is left out:
+## it is the cursor's colour everywhere else in the game, and a mod wearing
+## it would look selected when it is not.
+const MOD_COLOR := {
+	"rush": Palette.CYAN,
+	"heavy": Palette.GOLD,
+	"brittle": Palette.GREEN,
+	"dark": Palette.PURPLE,
+}
+
 const COLUMNS := 3
 const ROWS := 3
-const CARD := Vector2(140, 36)
+const CARD := Vector2(140, 40)
 const GAP := Vector2(10, 8)
-const GRID_TOP := 104.0
+const GRID_TOP := 106.0
 const ORIGIN_X := (SCREEN.x - (CARD.x * COLUMNS + GAP.x * (COLUMNS - 1))) * 0.5
 ## Same width as the grid beneath it, so the two read as one column of shapes.
-const CLASSIC_RECT := Rect2(ORIGIN_X, 74.0, CARD.x * COLUMNS + GAP.x * (COLUMNS - 1), 20.0)
+const CLASSIC_RECT := Rect2(ORIGIN_X, 76.0, CARD.x * COLUMNS + GAP.x * (COLUMNS - 1), 18.0)
 
 ## 0 is CLASSIC; 1..9 is VALID_COMBOS[selected - 1].
 var _selected := 0
@@ -168,33 +180,58 @@ func _draw() -> void:
 		Palette.GREY_DARK, 1)
 
 
-func _blink_border(selected: bool) -> Color:
+func _blink_border(selected: bool, idle: Color) -> Color:
 	if not selected:
-		return Palette.FRAME
+		return idle
 	return Palette.MAGENTA if fmod(_time, 0.8) < 0.4 else Palette.WHITE
+
+
+## A pair's idle border sits between its two mods' colours — close enough to
+## either that picking the card up reads as "these two", not a third thing.
+func _combo_color(combo: Array) -> Color:
+	if combo.size() == 1:
+		return MOD_COLOR[combo[0]]
+	return (MOD_COLOR[combo[0]] as Color).lerp(MOD_COLOR[combo[1]], 0.5)
 
 
 func _draw_classic() -> void:
 	var selected := _selected == 0
-	Util.draw_panel(self, CLASSIC_RECT, Palette.BG_SOFT, _blink_border(selected))
-	PixelFont.draw_text_centered(self, Lang.t("mod.none.name"),
-		CLASSIC_RECT.position.x + CLASSIC_RECT.size.x * 0.5, CLASSIC_RECT.position.y + 6.0,
-		Palette.WHITE if selected else Palette.GREY, 1)
+	var idle: Color = Palette.GREY_DARK
+	Util.draw_panel(self, CLASSIC_RECT, Palette.BG_SOFT, _blink_border(selected, idle))
+	var cx := CLASSIC_RECT.position.x + CLASSIC_RECT.size.x * 0.5
+	var y := CLASSIC_RECT.position.y + 5.0
+	var label := Lang.t("mod.none.name")
+	var w := PixelFont.measure(label, 1).x
+	draw_rect(Rect2(cx - w * 0.5 - 9.0, y + 1.0, 3.0, 3.0), Palette.WHITE if selected else Palette.GREY)
+	PixelFont.draw_text_centered(self, label, cx, y, Palette.WHITE if selected else Palette.GREY, 1)
 
 
 func _draw_card(index: int) -> void:
 	var rect := _card_rect(index)
 	var selected := _selected == index + 1
-	Util.draw_panel(self, rect, Palette.BG_SOFT, _blink_border(selected))
-
 	var combo: Array = VALID_COMBOS[index]
+	var idle: Color = _combo_color(combo).darkened(0.35)
+	Util.draw_panel(self, rect, Palette.BG_SOFT, _blink_border(selected, idle))
+
 	var cx := rect.position.x + rect.size.x * 0.5
-	var color := Palette.WHITE if selected else Palette.GREY
+	var text_color := Palette.WHITE if selected else Palette.GREY
 	if combo.size() == 1:
-		PixelFont.draw_text_centered(self, Lang.t("mod.%s.name" % combo[0]),
-			cx, rect.position.y + rect.size.y * 0.5 - 3.0, color, 1)
+		var mult := float(MULTIPLIER.get(combo[0], 1.0))
+		_dotted_line(cx, rect.position.y + 11.0, Lang.t("mod.%s.name" % combo[0]),
+			MOD_COLOR[combo[0]], text_color)
+		PixelFont.draw_text_centered(self, "x%.2f" % mult,
+			cx, rect.position.y + 25.0, Palette.GOLD if selected else Palette.GOLD_DARK, 1)
 	else:
-		PixelFont.draw_text_centered(self, Lang.t("mod.%s.name" % combo[0]),
-			cx, rect.position.y + 10.0, color, 1)
-		PixelFont.draw_text_centered(self, Lang.t("mod.%s.name" % combo[1]),
-			cx, rect.position.y + 21.0, color, 1)
+		_dotted_line(cx, rect.position.y + 8.0, Lang.t("mod.%s.name" % combo[0]),
+			MOD_COLOR[combo[0]], text_color)
+		_dotted_line(cx, rect.position.y + 24.0, Lang.t("mod.%s.name" % combo[1]),
+			MOD_COLOR[combo[1]], text_color)
+
+
+## A name with a small filled square riding beside it in the mod's own
+## colour — the one cue that survives even when the card is not selected and
+## its text has faded to grey.
+func _dotted_line(cx: float, y: float, label: String, dot: Color, text_color: Color) -> void:
+	var w := PixelFont.measure(label, 1).x
+	draw_rect(Rect2(cx - w * 0.5 - 9.0, y + 1.0, 3.0, 3.0), dot)
+	PixelFont.draw_text_centered(self, label, cx, y, text_color, 1)

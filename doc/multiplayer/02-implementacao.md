@@ -218,7 +218,7 @@ Aceite:
 - Todos retornam ao mesmo lobby/resultados.
 - Save offline não é contaminado por sessão incompleta.
 
-## Etapa 6 — código de sala e internet (bloqueada por infraestrutura externa)
+## Etapa 6 — código de sala e internet (implementada; deploy necessário)
 
 Backend/sinalização:
 
@@ -236,14 +236,14 @@ scripts/network/signaling_client.gd
 scripts/network/webrtc_transport.gd
 ```
 
-Tarefas:
+Implementado:
 
-- Adicionar WebRTC native GDExtension aprovada.
-- Configurar STUN.
-- Configurar TURN opcional/fallback.
-- Trocar formulário IP/porta por código da sala.
-- Manter entrada LAN como ferramenta de diagnóstico.
-- Não expor IP na UI ou no código.
+- `addons/webrtc_native`: GDExtension oficial WebRTC Native 1.2.1.
+- `server/`: sinalização Go com código, senha, TTL, tokens e SDP/ICE.
+- `server/compose.yaml`: coturn com credenciais temporárias e Caddy HTTPS.
+- Formulários ONLINE por código, mantendo LAN como diagnóstico.
+- Dados de jogo seguem pelo `WebRTCMultiplayerPeer`; o sinalizador não carrega
+  gameplay.
 
 Aceite:
 
@@ -251,6 +251,9 @@ Aceite:
 - Senha opcional funciona.
 - Sala expira quando host desaparece.
 - Falha de P2P tenta relay e produz erro claro se relay indisponível.
+
+Operação: preencher `server/.env` a partir de `.env.example`, publicar o
+domínio e configurar o cliente com a URL HTTPS. Ver `server/DEPLOY.md`.
 
 ## Etapa 7 — segurança e robustez
 

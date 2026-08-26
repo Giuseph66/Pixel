@@ -1,0 +1,1 @@
+signal.pixel IN CNAME 995cc9df-74c2-4c62-b746-0e0e8b8845af.cfargotunnel.com.

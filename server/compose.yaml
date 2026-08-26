@@ -1,0 +1,59 @@
+services:
+  signal:
+    build:
+      context: .
+    restart: unless-stopped
+    environment:
+      PIXEL_SIGNAL_ADDR: ":8787"
+      PIXEL_STUN_URLS: "stun:${TURN_PUBLIC_HOST}:3478"
+      PIXEL_TURN_URLS: "turn:${TURN_PUBLIC_HOST}:3478?transport=udp,turn:${TURN_PUBLIC_HOST}:3478?transport=tcp"
+      PIXEL_TURN_SECRET: "${TURN_SHARED_SECRET}"
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  turn:
+    image: coturn/coturn:4.6.3
+    restart: unless-stopped
+    command:
+      - -n
+      - --log-file=stdout
+      - --fingerprint
+      - --realm=${TURN_REALM}
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SHARED_SECRET}
+      - --external-ip=${TURN_EXTERNAL_IP}
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+      - --no-tls
+      - --no-dtls
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["cloudflare"]
+    restart: unless-stopped
+    depends_on:
+      - signal
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+
+  caddy:
+    image: caddy:2.8-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    environment:
+      PIXEL_SIGNAL_DOMAIN: "${PIXEL_SIGNAL_DOMAIN}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+
+volumes:
+  caddy_data:
+  caddy_config:

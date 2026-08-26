@@ -2,8 +2,9 @@
 
 Status: MVP LAN implementado. O jogo já possui sessão autoritativa ENet,
 lobby, handshake, senha, capacidade, sincronização básica e modos separados.
-O código de sala pela internet continua dependente de um serviço de
-sinalização/WebRTC/TURN publicado; o cliente deixa esse ponto explícito e não
+O código de sala pela internet usa o serviço próprio em `server/` e a extensão
+WebRTC em `addons/webrtc_native`. Ainda é necessário publicar a infraestrutura
+HTTPS/TURN conforme `server/DEPLOY.md`; o cliente deixa esse ponto explícito e não
 finge que IP de LAN é um código online.
 
 ## Visão

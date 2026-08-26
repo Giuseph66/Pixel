@@ -1116,7 +1116,7 @@ static func paint_no_pound_zone(img: Image, tx: int, ty: int, up: bool, down: bo
 		left: bool, right: bool) -> void:
 	var ox := tx * TILE
 	var oy := ty * TILE
-	var checker := Palette.BG_SOFT.lerp(Palette.CYAN_DARK, 0.4)
+	var checker := Palette.BG_SOFT.lerp(Palette.CYAN_DARK, 0.12)
 	for y in TILE:
 		for x in TILE:
 			if (x + y) % 2 == 0:
