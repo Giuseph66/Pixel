@@ -68,13 +68,26 @@ const DASH_KEEP := 0.55         # share of dash speed kept when it ends
 const DASH_COOLDOWN := 0.09
 
 # --- ground pound -----------------------------------------------------------
-# Down plus jump in mid-air. It commits: no steering on the way down and a beat
-# of recovery on landing, paid for with the ability to break blocks, clear
+# Down in mid-air, on its own. It commits: no steering on the way down and a
+# beat of recovery on landing, paid for with the ability to break blocks, clear
 # anything standing where you land, and get the dash back.
 const POUND_SPEED := 430.0
 const POUND_HANG := 0.08        # a held breath before the drop, so it reads
 const POUND_RECOVER := 0.13
 const POUND_REACH := 13.0       # pixels around the landing that get cleared
+
+# --- footless ---------------------------------------------------------------
+# What the landing costs. For two seconds the legs are gone: no walking, no
+# jumping, and the body is short enough to fit through a one-tile gap. The dash
+# still works, which is what keeps the state a move rather than a punishment —
+# it is the only way to travel while it lasts.
+#
+# The collision box shrinks from the top down. Its bottom edge stays exactly
+# where a standing player's is, so "feet" everywhere else in the game — lava's
+# waterline, a slime reading whether it was stomped — keeps meaning the same
+# thing and needs no idea that this state exists.
+const FOOTLESS_TIME := 2.0
+const FOOTLESS_HEIGHT := 6.0
 
 ## Stomping enemies without touching the ground pays more each time.
 const CHAIN_STEP := 0.09
@@ -109,6 +122,12 @@ var _dash_dir := Vector2.ZERO
 var _dash_cool := 0.0
 var _pound := 0                 # 0 none, 1 hanging, 2 falling
 var _pound_hang := 0.0
+## Legs gone since the last pound landed. The timer running out is necessary
+## but not sufficient: standing back up inside a one-tile gap would leave the
+## body embedded in terrain, so the state also waits for headroom.
+var _footless := false
+var _footless_left := 0.0
+var _shape: CollisionShape2D
 var _recover := 0.0
 var _chain := 0
 var combo := 0
@@ -157,11 +176,11 @@ func _ready() -> void:
 	floor_snap_length = 4.0
 	floor_max_angle = deg_to_rad(46.0)
 
-	var shape := CollisionShape2D.new()
+	_shape = CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(WIDTH, HEIGHT)
-	shape.shape = rect
-	add_child(shape)
+	_shape.shape = rect
+	add_child(_shape)
 
 	sprite = Sprite2D.new()
 	sprite.texture = _player_texture("player_idle", color_index)
@@ -190,6 +209,7 @@ func _physics_process(delta: float) -> void:
 	_lock = maxf(_lock - delta, 0.0)
 	_dash_cool = maxf(_dash_cool - delta, 0.0)
 	_recover = maxf(_recover - delta, 0.0)
+	_tick_footless(delta)
 
 	var controls := _read_controls()
 
@@ -207,9 +227,22 @@ func _physics_process(delta: float) -> void:
 		_tick_pound(delta)
 	elif _dash > 0.0:
 		_tick_dash(delta)
-	else:
-		_try_pound(controls)
+	elif _footless:
+		# Dash reads the real stick — it is the one thing that still answers,
+		# and steering it is the whole of the state's movement. Everything that
+		# needs legs gets a zero instead: walking, and the charge that turns a
+		# stand into a jump.
 		_try_dash(input, controls)
+		_try_pound(controls)
+		_apply_horizontal(0.0, delta)
+		_apply_gravity(0.0, delta)
+	else:
+		# Dash gets asked first, and a pound will not interrupt one. Down is
+		# how you aim a dash downward as well as how you pound now, and the
+		# pound outranks the dash once it starts — asked the other way round,
+		# holding down to dash down would only ever produce a pound.
+		_try_dash(input, controls)
+		_try_pound(controls)
 		_apply_horizontal(input, delta)
 		_apply_gravity(input, delta)
 		_tick_charge(input, delta)
@@ -374,7 +407,12 @@ func _try_pound(controls: Dictionary) -> void:
 		return
 	if is_on_floor() or _wall_dir != 0:
 		return
-	if not (_held(controls, "down") and _pressed(controls, "jump_pressed")):
+	if _dash > 0.0:
+		return
+	# Down alone. It used to want jump on top of that, which made the game's
+	# most committal move also its most fiddly — two buttons in an order, in
+	# the air, under time pressure.
+	if not _held(controls, "down"):
 		return
 
 	_found("pound")
@@ -407,6 +445,7 @@ func _land_pound() -> void:
 	_pound = 0
 	_recover = POUND_RECOVER
 	_chain = 0
+	_enter_footless()
 	refill_dash()
 	velocity = Vector2.ZERO
 	_squash(Vector2(1.5, 0.5))
@@ -421,6 +460,72 @@ func _land_pound() -> void:
 
 func is_pounding() -> bool:
 	return _pound == 2
+
+
+func is_footless() -> bool:
+	return _footless
+
+
+# --------------------------------------------------------------- footless ---
+
+func _enter_footless() -> void:
+	_footless_left = FOOTLESS_TIME
+	if _footless:
+		return
+	_footless = true
+	_apply_body_height()
+
+
+## Only ever called once the timer is spent AND there is somewhere to stand up
+## into — see _tick_footless().
+func _leave_footless() -> void:
+	if not _footless:
+		return
+	_footless = false
+	_footless_left = 0.0
+	_apply_body_height()
+
+
+## The box shrinks off the top: its lower edge sits at the same offset either
+## way, so the feet stay put and only the head comes down.
+func _apply_body_height() -> void:
+	if _shape == null:
+		return
+	var rect := _shape.shape as RectangleShape2D
+	if rect == null:
+		return
+	var h := FOOTLESS_HEIGHT if _footless else float(HEIGHT)
+	rect.size = Vector2(WIDTH, h)
+	_shape.position.y = (float(HEIGHT) - h) * 0.5
+
+
+func _tick_footless(delta: float) -> void:
+	if not _footless:
+		return
+	_footless_left = maxf(_footless_left - delta, 0.0)
+	if _footless_left <= 0.0 and _has_headroom():
+		_leave_footless()
+
+
+## Whether a full-height body would fit where the short one currently is. Reads
+## the grid rather than asking physics: a shape query would have to grow the box
+## first to learn that growing it was a mistake.
+func _has_headroom() -> bool:
+	if not surface_at.is_valid():
+		return true
+	# Same framing as ground_tile(): surface_at reads Level's own grid, so the
+	# node-local position is the one that lines up with it.
+	var bottom := position.y + HEIGHT * 0.5
+	var standing_top := bottom - HEIGHT + 1.0
+	var crouched_top := bottom - FOOTLESS_HEIGHT
+	var left := floori((position.x - WIDTH * 0.5 + 1.0) / TILE)
+	var right := floori((position.x + WIDTH * 0.5 - 1.0) / TILE)
+	for ty in range(floori(standing_top / TILE), floori(crouched_top / TILE) + 1):
+		for tx in range(left, right + 1):
+			var ch: String = surface_at.call(tx, ty)
+			if ch == "#" or ch == "~" or ch == ">" or ch == "<":
+				return false
+	return true
 
 
 func is_dashing() -> bool:
@@ -676,6 +781,10 @@ func _update_sprite(input: float) -> void:
 		key = "player_jump"
 	if _pound > 0:
 		key = "player_fall"
+	# Last word: while the legs are gone the body is the read, whatever else
+	# it happens to be doing — including dashing on stumps.
+	if _footless:
+		key = "player_stump"
 
 	_sprite_key = key
 	var charge_ratio := clampf(_charge / CHARGE_TIME, 0.0, 1.0)
@@ -890,6 +999,12 @@ func respawn(at: Vector2) -> void:
 	has_dash = true
 	_dash = 0.0
 	_pound = 0
+	# A respawn puts the legs back regardless of headroom: the spawn point is
+	# somewhere a standing player fits by definition, and carrying the state
+	# across a death would hand it out for free at the start of the next try.
+	_footless = false
+	_footless_left = 0.0
+	_apply_body_height()
 	_recover = 0.0
 	_charge = 0.0
 	_network_charge = 0.0

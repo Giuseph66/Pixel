@@ -68,6 +68,23 @@ const GRIDS := {
 		"#D#..#D#",
 		".#....#.",
 	],
+	# The two seconds after a pound lands. Legs gone: the body keeps the same
+	# ground line every other frame stands on — the bottom row is where the
+	# feet were — and loses its height off the top instead, which is the shape
+	# the collision box takes too. Squarer eyes because there is no walk cycle
+	# to carry the expression while it lasts.
+	"player_stump": [
+		"........",
+		"........",
+		"........",
+		"..####..",
+		".#cccc#.",
+		"#wwccww#",
+		"#w#cc#w#",
+		"#cccccc#",
+		"#CCCCCC#",
+		"..####..",
+	],
 	"player_wall": [
 		"..####..",
 		".#cccc#.",

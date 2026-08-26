@@ -33,6 +33,7 @@ func _ready() -> void:
 	failures += await _check_laser()
 	failures += await _check_ferry()
 	failures += await _check_charge()
+	failures += await _check_pound()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -1134,6 +1135,129 @@ func _check_charge() -> int:
 	player._on_land()
 	if player._charge != 0.0:
 		bad += _fail("landing did not clear an in-progress charge")
+
+	player.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+## The pound fires on down alone, and the landing takes the legs: two seconds
+## with no walking and no jumping, dash still live, and a body short enough to
+## fit through a one-tile gap without its feet ever leaving the ground line
+## everything else in the game measures from.
+func _check_pound() -> int:
+	var bad := 0
+	var player := Player.new()
+	add_child(player)
+	await get_tree().process_frame
+
+	# Down on its own, with jump never touched.
+	player._try_pound({"down": true})
+	if player._pound == 0:
+		bad += _fail("holding down in the air did not start a pound")
+	player._pound = 0
+	player._try_pound({"down": false, "jump_pressed": true})
+	if player._pound != 0:
+		bad += _fail("jump with no down started a pound")
+
+	# Down is now both "pound" and "aim the dash downward". Held together with
+	# dash it has to still dash, or the down-dash is gone from the game.
+	player._pound = 0
+	player._dash = 0.0
+	player.has_dash = true
+	player._dash_cool = 0.0
+	player.velocity = Vector2.ZERO
+	player.input_provider = func() -> Dictionary:
+		return {"right": false, "left": false, "up": false, "down": true,
+			"jump": false, "dash": true, "jump_pressed": false, "jump_released": false}
+	player._physics_process(1.0 / 60.0)
+	if player._pound != 0:
+		bad += _fail("down plus dash started a pound instead of a dash")
+	if player._dash <= 0.0:
+		bad += _fail("down plus dash did not dash")
+	elif player._dash_dir.y <= 0.0:
+		bad += _fail("down plus dash did not aim downward")
+	player.input_provider = Callable()
+	player._dash = 0.0
+	player._pound = 0
+
+	# Landing hands out the state, and the box shrinks off the top only.
+	var rect := player._shape.shape as RectangleShape2D
+	var standing_bottom := player._shape.position.y + rect.size.y * 0.5
+	player._pound = 2
+	player._land_pound()
+	if not player.is_footless():
+		bad += _fail("landing a pound did not take the legs")
+	if not is_equal_approx(player._footless_left, Player.FOOTLESS_TIME):
+		bad += _fail("the footless timer started at %s" % player._footless_left)
+	if not is_equal_approx(rect.size.y, Player.FOOTLESS_HEIGHT):
+		bad += _fail("a footless body is %s tall, wanted %s"
+			% [rect.size.y, Player.FOOTLESS_HEIGHT])
+	if rect.size.y >= 8.0:
+		bad += _fail("a footless body does not fit through a one-tile gap")
+	var footless_bottom := player._shape.position.y + rect.size.y * 0.5
+	if not is_equal_approx(footless_bottom, standing_bottom):
+		bad += _fail("shrinking moved the feet: bottom went from %s to %s"
+			% [standing_bottom, footless_bottom])
+
+	# No walking, and the dash still answers the stick.
+	player._recover = 0.0
+	player.velocity = Vector2.ZERO
+	player.input_provider = func() -> Dictionary:
+		return {"right": true, "left": false, "up": false, "down": false,
+			"jump": false, "dash": false, "jump_pressed": false, "jump_released": false}
+	for i in 10:
+		player._physics_process(1.0 / 60.0)
+	if absf(player.velocity.x) > 1.0:
+		bad += _fail("a footless player walked: vx %s" % player.velocity.x)
+
+	player.velocity = Vector2.ZERO
+	player.has_dash = true
+	player._dash_cool = 0.0
+	player.input_provider = func() -> Dictionary:
+		return {"right": false, "left": true, "up": false, "down": false,
+			"jump": false, "dash": true, "jump_pressed": false, "jump_released": false}
+	player._physics_process(1.0 / 60.0)
+	if player._dash <= 0.0:
+		bad += _fail("a footless player could not dash")
+	elif player._dash_dir.x >= 0.0:
+		bad += _fail("a footless dash ignored the direction held")
+
+	# No jumping, with a buffered press and coyote time both wide open.
+	player._dash = 0.0
+	player._lock = 0.0
+	player._recover = 0.0
+	player.velocity = Vector2.ZERO
+	player._buffer = 0.2
+	player._coyote = 0.2
+	player.input_provider = func() -> Dictionary:
+		return {"right": false, "left": false, "up": false, "down": false,
+			"jump": true, "dash": false, "jump_pressed": true, "jump_released": false}
+	player._physics_process(1.0 / 60.0)
+	if player.velocity.y < 0.0:
+		bad += _fail("a footless player jumped: vy %s" % player.velocity.y)
+
+	# The timer running out is not enough on its own — a ceiling one tile up
+	# has to keep the legs off, or standing up would embed the body in it.
+	player.input_provider = Callable()
+	player.surface_at = func(_tx: int, _ty: int) -> String: return "#"
+	player._footless_left = 0.0
+	player._tick_footless(1.0 / 60.0)
+	if not player.is_footless():
+		bad += _fail("a footless player stood up into solid rock")
+
+	player.surface_at = func(_tx: int, _ty: int) -> String: return "."
+	player._tick_footless(1.0 / 60.0)
+	if player.is_footless():
+		bad += _fail("the legs never came back with the way clear")
+	if not is_equal_approx(rect.size.y, float(Player.HEIGHT)):
+		bad += _fail("standing back up left the body %s tall" % rect.size.y)
+
+	# A death resets it outright rather than carrying it into the next try.
+	player._enter_footless()
+	player.respawn(Vector2(40.0, 40.0))
+	if player.is_footless():
+		bad += _fail("a respawn kept the legs off")
 
 	player.queue_free()
 	await get_tree().process_frame
