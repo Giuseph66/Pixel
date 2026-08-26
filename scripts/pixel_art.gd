@@ -352,6 +352,30 @@ const GRIDS := {
 		".....c..",
 		"1.......",
 	],
+	# Step 23 — echo. A loop closing on itself: the one pictogram in the set
+	# that reads as "return" rather than "go".
+	# Step 24 — clone. A footprint trailing off from the figure: the same
+	# shape, one step behind.
+	"icon_clone": [
+		"..pp....",
+		".p..p...",
+		".p..p...",
+		".pppp...",
+		"....p...",
+		"...pp...",
+		"........",
+		"11111111",
+	],
+	"icon_echo": [
+		"..pp....",
+		".p..p...",
+		"p....p..",
+		"p....p..",
+		".p..p...",
+		"..pp....",
+		"........",
+		"11111111",
+	],
 	"icon_charge": [
 		"...cc...",
 		"..cccc..",
@@ -573,6 +597,29 @@ const GRIDS := {
 		".222222.",
 		"........",
 	],
+	# Step 24 — clone fantasma. A plate that reads as pressed or not: taller and
+	# grey when idle, squashed and glowing cyan the instant real weight sits on
+	# it — same "flat is inactive, lit is active" language switch_on/off use.
+	"sensor_off": [
+		"........",
+		"........",
+		"..####..",
+		".#1111#.",
+		"#111111#",
+		"#GGGGGG#",
+		"########",
+		"........",
+	],
+	"sensor_on": [
+		"........",
+		"........",
+		"........",
+		"..####..",
+		".#cccc#.",
+		"#CCCCCC#",
+		"########",
+		"........",
+	],
 	"gate_solid": [
 		"########",
 		"#yyyyyy#",
@@ -646,6 +693,46 @@ const GRIDS := {
 		"#22y2y2#",
 		"#222222#",
 		"########",
+	],
+	# Step 22 — gravity zones. Codex icon only — the real in-room zone is its
+	# own backdrop layer now (see Level._bake_gravity_zones()), a tinted wall
+	# with a lit edge rather than this checker; the icon stays a simple
+	# pictogram of the same idea for the book page.
+	"grav_zone": [
+		"b.b.b.b.",
+		".b.b.b.b",
+		"b.b.b.b.",
+		".b.b.b.b",
+		"b.b.b.b.",
+		".b.b.b.b",
+		"b.b.b.b.",
+		".b.b.b.b",
+	],
+	# Fundo — no-dash. Codex/palette icon only, same split as grav_zone: the
+	# real in-room zone is its own backdrop layer (Level._bake_mod_zones()).
+	# A dash arrow with a bar through it, gold like the crystal that refills
+	# the move it cancels here.
+	"no_dash_zone": [
+		"........",
+		"..y..y..",
+		".yyyyy..",
+		"yyyyyyyy",
+		".yyyyy..",
+		"..y..y..",
+		"........",
+		"........",
+	],
+	# Fundo — no-pound. Same idea, a downward stomp arrow with a bar through
+	# it, cyan-dark to sit apart from no-dash's gold.
+	"no_pound_zone": [
+		"..D..D..",
+		"..D..D..",
+		"..DDD...",
+		"DDDDDDDD",
+		"..DDD...",
+		"...D....",
+		"........",
+		"........",
 	],
 	"phase_block": [
 		"########",
@@ -959,6 +1046,96 @@ static func paint_platform(img: Image, tx: int, ty: int) -> void:
 		img.set_pixel(ox + x, oy, Palette.CYAN_MID)
 		img.set_pixel(ox + x, oy + 1, Palette.CYAN_DARK)
 		img.set_pixel(ox + x, oy + 2, Palette.OUTLINE)
+
+
+## Step 22 — gravity zone. The BACKDROP category's first member: painted onto
+## its own layer behind the terrain (Level._bake_gravity_zones()), never the
+## terrain texture itself, so a creature, a gem or the player's own sprite —
+## anything in _entities — draws over it exactly as if it were not there.
+## The checker is the same mark it always was; only the layer it lives on
+## changed, so it never again gets mistaken for a texture on a real block.
+static func paint_gravity_zone(img: Image, tx: int, ty: int, up: bool, down: bool,
+		left: bool, right: bool) -> void:
+	var ox := tx * TILE
+	var oy := ty * TILE
+	for y in TILE:
+		for x in TILE:
+			if (x + y) % 2 == 0:
+				img.set_pixel(ox + x, oy + y, Palette.BG_SOFT)
+
+	var edge := Palette.PURPLE
+	edge.a = 0.5
+	if not up:
+		for x in TILE:
+			img.set_pixel(ox + x, oy, edge)
+	if not down:
+		for x in TILE:
+			img.set_pixel(ox + x, oy + TILE - 1, edge)
+	if not left:
+		for y in TILE:
+			img.set_pixel(ox, oy + y, edge)
+	if not right:
+		for y in TILE:
+			img.set_pixel(ox + TILE - 1, oy + y, edge)
+
+
+## Fundo — no-dash zone. Same checker as paint_gravity_zone, same technique,
+## only the colour moves: the faintest gold wash on the checker itself, not
+## just the edge, so it still reads as "the same kind of thing as the
+## gravity zone" at a glance — the checker stays close to unlit, and the
+## edge is what actually says which Fundo tile this is.
+static func paint_no_dash_zone(img: Image, tx: int, ty: int, up: bool, down: bool,
+		left: bool, right: bool) -> void:
+	var ox := tx * TILE
+	var oy := ty * TILE
+	var checker := Palette.BG_SOFT.lerp(Palette.GOLD_DARK, 0.12)
+	for y in TILE:
+		for x in TILE:
+			if (x + y) % 2 == 0:
+				img.set_pixel(ox + x, oy + y, checker)
+
+	var edge := Palette.GOLD
+	edge.a = 0.5
+	if not up:
+		for x in TILE:
+			img.set_pixel(ox + x, oy, edge)
+	if not down:
+		for x in TILE:
+			img.set_pixel(ox + x, oy + TILE - 1, edge)
+	if not left:
+		for y in TILE:
+			img.set_pixel(ox, oy + y, edge)
+	if not right:
+		for y in TILE:
+			img.set_pixel(ox + TILE - 1, oy + y, edge)
+
+
+## Fundo — no-pound zone. Same as paint_no_dash_zone, cyan instead of gold so
+## it never gets mistaken for it when the two overlap.
+static func paint_no_pound_zone(img: Image, tx: int, ty: int, up: bool, down: bool,
+		left: bool, right: bool) -> void:
+	var ox := tx * TILE
+	var oy := ty * TILE
+	var checker := Palette.BG_SOFT.lerp(Palette.CYAN_DARK, 0.4)
+	for y in TILE:
+		for x in TILE:
+			if (x + y) % 2 == 0:
+				img.set_pixel(ox + x, oy + y, checker)
+
+	var edge := Palette.CYAN_MID
+	edge.a = 0.5
+	if not up:
+		for x in TILE:
+			img.set_pixel(ox + x, oy, edge)
+	if not down:
+		for x in TILE:
+			img.set_pixel(ox + x, oy + TILE - 1, edge)
+	if not left:
+		for y in TILE:
+			img.set_pixel(ox, oy + y, edge)
+	if not right:
+		for y in TILE:
+			img.set_pixel(ox + TILE - 1, oy + y, edge)
 
 
 ## Ice tile: flat frozen body with a hard frost crust on any face you can land

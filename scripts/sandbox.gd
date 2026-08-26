@@ -61,6 +61,12 @@ static func blank_room() -> Dictionary:
 		"seed": randi() % 100000,
 		"author": "",
 		"rows": Levels.bake(g),
+		# Plain dots, not Levels.blank(): that seals a border of '#' for the
+		# main grid's walls, which a backdrop grid has no use for and would
+		# otherwise read as a no-dash/no-pound zone around the whole room.
+		"backdrop_gravity": _pad_grid([]),
+		"backdrop_no_dash": _pad_grid([]),
+		"backdrop_no_pound": _pad_grid([]),
 	}
 
 
@@ -70,17 +76,17 @@ static func new_id() -> String:
 
 ## Fill in anything a room is missing, so a file written by an older build — or
 ## by hand — still loads. Rows are the one field with no sensible default.
-static func normalise(room: Dictionary) -> Dictionary:
+## A short or ragged grid is padded rather than rejected: half a room is
+## still worth opening in the editor. Shared by "rows" and the Fundo backdrop
+## grids, which are the same shape and miss the same way in an old save.
+static func _pad_grid(raw) -> PackedStringArray:
 	var rows := PackedStringArray()
-	var raw = room.get("rows", [])
 	if raw is PackedStringArray:
 		rows = raw
 	elif raw is Array:
 		for line in raw:
 			rows.append(str(line))
 
-	# A short or ragged grid is padded rather than rejected: half a room is
-	# still worth opening in the editor.
 	while rows.size() < Levels.ROWS:
 		rows.append("".lpad(Levels.COLS, "."))
 	rows.resize(Levels.ROWS)
@@ -89,7 +95,10 @@ static func normalise(room: Dictionary) -> Dictionary:
 		if line.length() < Levels.COLS:
 			line = line + "".lpad(Levels.COLS - line.length(), ".")
 		rows[i] = line.substr(0, Levels.COLS)
+	return rows
 
+
+static func normalise(room: Dictionary) -> Dictionary:
 	return {
 		"id": str(room.get("id", new_id())),
 		"name": clean_name(str(room.get("name", "ROOM"))),
@@ -100,7 +109,10 @@ static func normalise(room: Dictionary) -> Dictionary:
 		"pound": bool(room.get("pound", true)),
 		"seed": int(room.get("seed", 0)),
 		"author": clean_name(str(room.get("author", ""))),
-		"rows": rows,
+		"rows": _pad_grid(room.get("rows", [])),
+		"backdrop_gravity": _pad_grid(room.get("backdrop_gravity", [])),
+		"backdrop_no_dash": _pad_grid(room.get("backdrop_no_dash", [])),
+		"backdrop_no_pound": _pad_grid(room.get("backdrop_no_pound", [])),
 	}
 
 
@@ -167,6 +179,9 @@ static func to_level_data(room: Dictionary) -> Dictionary:
 		"intensity": float(room.get("intensity", 1.0)),
 		"seed": int(room.get("seed", 0)),
 		"rows": room["rows"],
+		"backdrop_gravity": room.get("backdrop_gravity", PackedStringArray()),
+		"backdrop_no_dash": room.get("backdrop_no_dash", PackedStringArray()),
+		"backdrop_no_pound": room.get("backdrop_no_pound", PackedStringArray()),
 	}
 
 
@@ -190,6 +205,9 @@ static func from_level(data: Dictionary, fallback_seed: int = 0) -> Dictionary:
 		# to its index — so the caller passes that index in.
 		"seed": int(data.get("seed", fallback_seed)),
 		"rows": data["rows"],
+		"backdrop_gravity": data.get("backdrop_gravity", PackedStringArray()),
+		"backdrop_no_dash": data.get("backdrop_no_dash", PackedStringArray()),
+		"backdrop_no_pound": data.get("backdrop_no_pound", PackedStringArray()),
 	})
 
 
@@ -241,6 +259,12 @@ static func save() -> void:
 static func _as_json(room: Dictionary) -> Dictionary:
 	var copy := room.duplicate()
 	copy["rows"] = Array(room["rows"] as PackedStringArray)
+	if room.has("backdrop_gravity"):
+		copy["backdrop_gravity"] = Array(room["backdrop_gravity"] as PackedStringArray)
+	if room.has("backdrop_no_dash"):
+		copy["backdrop_no_dash"] = Array(room["backdrop_no_dash"] as PackedStringArray)
+	if room.has("backdrop_no_pound"):
+		copy["backdrop_no_pound"] = Array(room["backdrop_no_pound"] as PackedStringArray)
 	return copy
 
 

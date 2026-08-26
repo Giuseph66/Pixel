@@ -1700,6 +1700,256 @@ static func _level_ghost_gems() -> PackedStringArray:
 	return bake(g)
 
 
+## Step 22 — gravidade invertida. 'V' fills an area; is_air() already treats
+## it as open air, so the zone is never solid, only a rule about which way
+## gravity points while the player's centre sits inside it. A capital-letter
+## chapter of its own, last in the campaign: every one of these five rooms
+## has a full ceiling as well as a floor, which none of the other 96 do, and
+## none of them puts an enemy inside a zone — Slime, Bat and the rest never
+## learned to read one, on purpose (see docs/Passos/22).
+
+## Nothing here kills. Floor at the bottom, a matching ceiling at the top, one
+## zone in the middle deciding which is which — the whole room is a
+## demonstration, walked once each way.
+static func _level_grav_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 0, 1, COLS, 4, "#")
+	rect(g, 24, 5, 12, 22, "V")
+	puts(g, [Vector2i(30, 6), Vector2i(30, 25)], "o")
+	put(g, 4, 26, "P")
+	put(g, 50, 26, "X")
+	return bake(g)
+
+
+## The floor stops; the ceiling never does. The zone sits exactly over the
+## gap, so the only way across is upside down.
+static func _level_grav_gap() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, 20, 5, "#")
+	rect(g, 40, 27, 20, 5, "#")
+	rect(g, 0, 1, COLS, 4, "#")
+	rect(g, 20, 5, 20, 22, "V")
+	puts(g, [Vector2i(30, 6), Vector2i(10, 26), Vector2i(50, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Spikes on the floor before the zone and spikes on the ceiling inside it —
+## the same two rows of hazard the whole way across, except which one can
+## actually touch you changes the instant gravity does.
+static func _level_grav_spike() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 0, 1, COLS, 4, "#")
+	rect(g, 8, 26, 3, 1, "^")
+	rect(g, 48, 26, 3, 1, "^")
+	rect(g, 18, 5, 24, 22, "V")
+	rect(g, 26, 5, 3, 1, "v")
+	rect(g, 36, 5, 3, 1, "v")
+	puts(g, [Vector2i(30, 6), Vector2i(14, 26), Vector2i(52, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A wall-jump chimney built entirely inside a zone: the jump's kick is still
+## WALL_JUMP.y flipped by gravity_dir, so here it throws you toward the
+## ceiling-turned-floor — which, in world terms the room was built in, reads
+## as down.
+## Rebuilt in the sandbox editor and brought back in wholesale (see
+## docs/Passos/README.md's note on ice_parkour for the same pattern) — three
+## chimneys side by side, sharing one zone across the top so the wall-jump
+## climb is real inside all three, not just the middle one.
+static func _level_grav_wall() -> PackedStringArray:
+	return PackedStringArray([
+		"############################################################",
+		"############################################################",
+		"############################################################",
+		"############################################################",
+		"############################################################",
+		"#...............VVVVVVVVVVVVVVVVVVVVVVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVoVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVoVVVV##VVVVVVVV...............#",
+		"#...............VVVVVVVV##VVVVVVVV##VVVVVVVV...............#",
+		"#...P...........VVVVVVVV##VVVVVVVV##VVVVVVVV..........X....#",
+		"############################################################",
+		"############################################################",
+		"############################################################",
+		"############################################################",
+		"############################################################",
+	])
+
+
+## A breakable block set into the ceiling, with a gem hidden behind it. Only a
+## ground pound thrown while inverted ever touches it — the pound is aimed by
+## holding whichever key faces the current floor, and inside this zone that
+## key is up, not down.
+static func _level_grav_pound() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 0, 1, COLS, 4, "#")
+	rect(g, 20, 5, 20, 22, "V")
+	rect(g, 28, 4, 4, 1, "k")
+	rect(g, 28, 1, 4, 3, ".")
+	put(g, 29, 2, "o")
+	puts(g, [Vector2i(24, 26), Vector2i(48, 26)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Step 23 — eco temporal. The ability itself lives only in these four rooms —
+## Level.echo_max reads level_data["echo"], which every other room in the game
+## leaves absent, so the button does nothing anywhere else. The world never
+## rewinds with the player: a gem stays taken, a broken block stays broken.
+## That contract is the whole codex entry, in four words, on purpose.
+
+## A vault, one bail. The pit is wider than a single jump reaches; echoing
+## mid-air undoes a doomed attempt instead of paying for it, and a slab well
+## below catches anyone who forgets to.
+static func _level_echo_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 22, 27, 14, 3, ".")
+	rect(g, 22, 30, 14, 1, "-")
+	put(g, 29, 24, "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 26, "X")
+	return bake(g)
+
+
+## A nine-tile vault with nothing at all underneath. One echo is still one
+## bail, not a bridge — the crossing is a real running jump; the tool is only
+## there for the attempt that was not going to land.
+static func _level_echo_reach() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 20, 27, 18, 3, ".")
+	rect(g, 20, 30, 18, 1, "^")
+	put(g, 29, 22, "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 26, "X")
+	return bake(g)
+
+
+## A breakable floor tile with a gem in the drop it opens. There is no ladder
+## back up — only an echo to whenever you were still standing on top of it,
+## which still works once the tile itself is gone for good. That is the whole
+## lesson: the room remembers the hole. Only you go back.
+static func _level_echo_break() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	rect(g, 26, 27, 4, 1, "k")
+	rect(g, 26, 28, 4, 3, ".")
+	put(g, 27, 30, "o")
+	put(g, 4, 26, "P")
+	put(g, 48, 26, "X")
+	return bake(g)
+
+
+## Three spiked pits, two echoes. Every miss here is real — no rescue slab —
+## so the room is an economy problem: which two attempts are worth saving,
+## and which one gets committed to cold.
+static func _level_echo_two() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	for gx in [14, 28, 42]:
+		rect(g, gx, 27, 8, 3, ".")
+		rect(g, gx, 30, 8, 1, "^")
+	puts(g, [Vector2i(18, 24), Vector2i(32, 24), Vector2i(46, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Step 24 — clone fantasma. 'y' starts a recording of wherever the player
+## goes for the next few seconds; when it ends, a clone is born at that same
+## start point and walks the exact path recorded, solid on top the whole way.
+## 'Y' is a pressure plate reading switch_state live: the same gates step 12
+## already built open for a clone's weight exactly as they would for the
+## player's. Depends on step 12 for that reason, and sits after it.
+
+## A sensor, a gate, a clone. Walk to the plate, stand on it while the
+## recording finishes, and the clone born from that walk holds it down for
+## you — the whole room is that one sentence.
+static func _level_clone_first() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 12, 26, "y")
+	put(g, 24, 26, "Y")
+	rect(g, 40, 20, 2, 7, "G")
+	puts(g, [Vector2i(32, 25), Vector2i(46, 25), Vector2i(50, 22)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## A ledge just past a normal jump's reach. Record yourself standing under it
+## and the clone parks there solid — one more body's height of ground to jump
+## from, which is exactly what closes the gap.
+static func _level_clone_step() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 14, 26, "y")
+	rect(g, 30, 21, 10, 1, "#")
+	put(g, 34, 20, "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## Two record points, two plates, two gates — recorded and used one at a
+## time. The second clone does not need the first to still be running; it
+## only needs its own sensor held when its own gate matters.
+static func _level_clone_two() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 10, 26, "y")
+	put(g, 18, 26, "Y")
+	rect(g, 26, 19, 2, 8, "G")
+	put(g, 32, 26, "y")
+	put(g, 40, 26, "Y")
+	rect(g, 48, 19, 2, 8, "G")
+	puts(g, [Vector2i(22, 25), Vector2i(44, 25), Vector2i(52, 18)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
+## The plate is far from the door, and the clone only crosses it in transit —
+## it does not stop there. Reading the recording well enough to know when the
+## gate will be open, and being there when it is, is the room.
+static func _level_clone_race() -> PackedStringArray:
+	var g := blank()
+	rect(g, 0, 27, COLS, 5, "#")
+	put(g, 8, 26, "y")
+	put(g, 24, 26, "Y")
+	rect(g, 40, 18, 2, 9, "G")
+	puts(g, [Vector2i(16, 25), Vector2i(48, 24)], "o")
+	put(g, 4, 26, "P")
+	put(g, 54, 26, "X")
+	return bake(g)
+
+
 ## "name" and "hint" are translation keys, not text — every screen that shows
 ## them runs them through Lang.t() so a language switch needs no rebuild here.
 static func all() -> Array:
@@ -2323,6 +2573,105 @@ static func _campaign() -> Array:
 			"hint": "level.ghost_gems.hint",
 			"par": 58.0,
 			"rows": _level_ghost_gems(),
+		},
+		{
+			"id": "grav_first",
+			"name": "level.grav_first.name",
+			"hint": "level.grav_first.hint",
+			"par": 30.0,
+			"rows": _level_grav_first(),
+		},
+		{
+			"id": "grav_gap",
+			"name": "level.grav_gap.name",
+			"hint": "level.grav_gap.hint",
+			"par": 45.0,
+			"rows": _level_grav_gap(),
+		},
+		{
+			"id": "grav_spike",
+			"name": "level.grav_spike.name",
+			"hint": "level.grav_spike.hint",
+			"par": 55.0,
+			"rows": _level_grav_spike(),
+		},
+		{
+			"id": "grav_wall",
+			"name": "level.grav_wall.name",
+			"hint": "level.grav_wall.hint",
+			"par": 60.0,
+			"rows": _level_grav_wall(),
+		},
+		{
+			"id": "grav_pound",
+			"name": "level.grav_pound.name",
+			"hint": "level.grav_pound.hint",
+			"par": 55.0,
+			"rows": _level_grav_pound(),
+		},
+		{
+			"id": "echo_first",
+			"name": "level.echo_first.name",
+			"hint": "level.echo_first.hint",
+			"par": 30.0,
+			"echo": 1,
+			"rows": _level_echo_first(),
+		},
+		{
+			"id": "echo_reach",
+			"name": "level.echo_reach.name",
+			"hint": "level.echo_reach.hint",
+			"par": 42.0,
+			"echo": 1,
+			"rows": _level_echo_reach(),
+		},
+		{
+			"id": "echo_break",
+			"name": "level.echo_break.name",
+			"hint": "level.echo_break.hint",
+			"par": 46.0,
+			"echo": 1,
+			"rows": _level_echo_break(),
+		},
+		{
+			"id": "echo_two",
+			"name": "level.echo_two.name",
+			"hint": "level.echo_two.hint",
+			"par": 55.0,
+			"echo": 2,
+			"rows": _level_echo_two(),
+		},
+		{
+			# Step 24 — clone. par is deliberately 0: first contact with a
+			# puzzle room is always slow, and a time medal here would either
+			# punish the discovery or have to assume the solution already
+			# known — neither is the point of these four.
+			"id": "clone_first",
+			"name": "level.clone_first.name",
+			"hint": "level.clone_first.hint",
+			"par": 0.0,
+			"rows": _level_clone_first(),
+		},
+		{
+			"id": "clone_step",
+			"name": "level.clone_step.name",
+			"hint": "level.clone_step.hint",
+			"par": 0.0,
+			"rows": _level_clone_step(),
+		},
+		{
+			"id": "clone_two",
+			"name": "level.clone_two.name",
+			"hint": "level.clone_two.hint",
+			"par": 0.0,
+			"rows": _level_clone_two(),
+		},
+		{
+			"id": "clone_race",
+			"name": "level.clone_race.name",
+			"hint": "level.clone_race.hint",
+			"par": 0.0,
+			"rows": _level_clone_race(),
 		},
 	]
 

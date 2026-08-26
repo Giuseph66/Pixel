@@ -123,6 +123,11 @@ var _buffer := 0.0
 var _lock := 0.0
 var _anim := 0.0
 var _was_on_floor := false
+## Step 22 — gravity zones. 1.0 normal, -1.0 inside a 'V' zone. Every place
+## that sets or compares velocity.y multiplies by this first — see
+## _update_gravity_zone() for the only place it changes, and up_direction for
+## the one thing that keeps is_on_floor() and friends honest about it.
+var gravity_dir := 1.0
 var _wall_dir := 0
 ## How long the current wall contact has held, measured as of the start of
 ## this frame — so a wall jump thrown on the very frame contact begins reads
@@ -133,6 +138,9 @@ var _dash_dir := Vector2.ZERO
 var _dash_cool := 0.0
 var _pound := 0                 # 0 none, 1 hanging, 2 falling
 var _pound_hang := 0.0
+## gravity_dir at the moment the pound committed. _tick_pound() plunges
+## toward this, not the live gravity_dir — see its own comment.
+var _pound_dir := 1.0
 ## Legs gone since the last pound landed. The timer running out is necessary
 ## but not sufficient: standing back up inside a one-tile gap would leave the
 ## body embedded in terrain, so the state also waits for headroom.
@@ -149,6 +157,20 @@ var _charge_particle_t := 0.0
 var sprite: Sprite2D
 var fx: Fx
 
+# --- echo --------------------------------------------------------------------
+# Step 23. Off everywhere by default — echo_max is set by Level from the
+# room's own data, and stays 0 outside the four rooms built for it. The world
+# does not rewind with the player: a gem stays taken, a block stays broken. A
+# ring buffer of one second of physics is cheap enough to keep running
+# whether or not the room ever uses it.
+const ECHO_FRAMES := 60         # 1s at 60Hz of physics
+var echo_max := 0
+var echo_left := 0
+var _echo_pos: PackedVector2Array = PackedVector2Array()
+var _echo_vel: PackedVector2Array = PackedVector2Array()
+var _echo_head := 0
+var _echo_ghost: Sprite2D
+
 ## Multiplayer keeps the movement code shared with offline. A client runs its
 ## own player immediately; the host trusts that snapshot and relays it to the
 ## other peers, which interpolate remote players.
@@ -164,6 +186,12 @@ var _network_anim := "player_idle"
 var _network_charge := 0.0
 var _network_wall_dir := 0
 var _sprite_key := "player_idle"
+## Step 21 — ghost blocks. Whether any movement-relevant key is currently
+## held, refreshed every physics frame regardless of what it actually did to
+## velocity. GhostBlock reads this instead of speed: falling or getting
+## knocked around by a spring is not a choice to move, and should not read as
+## one just because it happens to have velocity.
+var moving_input := false
 var _door_entering := false
 
 const PLAYER_COLORS := [
@@ -197,10 +225,22 @@ func _ready() -> void:
 	sprite.texture = _player_texture("player_idle", color_index)
 	add_child(sprite)
 
-	previous_bottom = position.y + HEIGHT * 0.5
+	previous_bottom = position.y + HEIGHT * 0.5 * gravity_dir
 	# The two moves you have before the game teaches you anything.
 	Save.discover("run")
 	Save.discover("jump")
+
+	_echo_pos.resize(ECHO_FRAMES)
+	_echo_vel.resize(ECHO_FRAMES)
+	_echo_pos.fill(global_position)
+	_echo_vel.fill(Vector2.ZERO)
+	echo_left = echo_max
+	if echo_max > 0:
+		_echo_ghost = Sprite2D.new()
+		_echo_ghost.modulate = Color(Palette.PURPLE.r, Palette.PURPLE.g, Palette.PURPLE.b, 0.25)
+		_echo_ghost.visible = false
+		_echo_ghost.z_index = -1
+		add_child(_echo_ghost)
 
 
 func _physics_process(delta: float) -> void:
@@ -213,7 +253,8 @@ func _physics_process(delta: float) -> void:
 	if not alive or frozen:
 		return
 
-	previous_bottom = global_position.y + HEIGHT * 0.5
+	_update_gravity_zone()
+	previous_bottom = global_position.y + HEIGHT * 0.5 * gravity_dir
 	_anim += delta
 	_coyote = maxf(_coyote - delta, 0.0)
 	_buffer = maxf(_buffer - delta, 0.0)
@@ -221,8 +262,12 @@ func _physics_process(delta: float) -> void:
 	_dash_cool = maxf(_dash_cool - delta, 0.0)
 	_recover = maxf(_recover - delta, 0.0)
 	_tick_footless(delta)
+	_record_echo()
 
 	var controls := _read_controls()
+	moving_input = _held(controls, "left") or _held(controls, "right") \
+		or _held(controls, "up") or _held(controls, "down") \
+		or _held(controls, "jump") or _held(controls, "dash")
 
 	var input := _axis(controls, "left", "right")
 	if _lock <= 0.0:
@@ -231,9 +276,11 @@ func _physics_process(delta: float) -> void:
 	if _pressed(controls, "jump_pressed"):
 		_buffer = JUMP_BUFFER
 
-	if _recover > 0.0:
+	if _try_echo(controls):
+		pass
+	elif _recover > 0.0:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION_GROUND * delta)
-		velocity.y += GRAVITY_DOWN * gravity_scale * delta
+		velocity.y += GRAVITY_DOWN * gravity_scale * gravity_dir * delta
 	elif _pound > 0:
 		_tick_pound(delta)
 	elif _dash > 0.0:
@@ -278,6 +325,7 @@ func _physics_process(delta: float) -> void:
 	_was_on_floor = is_on_floor()
 
 	_update_sprite(input)
+	_update_echo_ghost()
 	if networked and locally_controlled and Session.is_client():
 		Session.publish_client_state(network_snapshot())
 
@@ -296,6 +344,7 @@ func _read_controls() -> Dictionary:
 		"dash": Input.is_action_pressed("p_dash"),
 		"jump_pressed": Input.is_action_just_pressed("p_jump"),
 		"jump_released": Input.is_action_just_released("p_jump"),
+		"echo_pressed": Input.is_action_just_pressed("p_echo"),
 	}
 
 
@@ -420,21 +469,35 @@ func _try_pound(controls: Dictionary) -> void:
 		return
 	if _dash > 0.0:
 		return
-	# Down alone. It used to want jump on top of that, which made the game's
-	# most committal move also its most fiddly — two buttons in an order, in
-	# the air, under time pressure.
+	# Always the physical down key. Controls never remap with gravity_dir —
+	# only what they do to velocity does; the player's own inputs mean the
+	# same thing inside a flip zone as everywhere else.
 	if not _held(controls, "down"):
+		return
+	if _in_zone(no_pound_zone_at):
 		return
 
 	_found("pound")
 	_pound = 1
 	_pound_hang = POUND_HANG
+	_pound_dir = gravity_dir
 	_buffer = 0.0
 	velocity = Vector2.ZERO
 	_squash(Vector2(0.6, 1.4))
 	Audio.play_varied("pound")
 
 
+## The falling half sets velocity to a fixed POUND_SPEED every tick — unlike
+## everywhere else, nothing here lets normal deceleration carry the player
+## through a gravity flip encountered mid-plunge. Grazing a zone boundary
+## while committed to POUND_SPEED the old way instantly reverses to
+## POUND_SPEED the new way, which sends the player straight back across the
+## same boundary at the same fixed speed, flips again, and repeats forever —
+## the exact oscillation _update_gravity_zone() no longer causes on its own,
+## reintroduced through a path that ignores its fix. A pound is already a
+## committed, uninterruptible action (nothing else runs while _pound > 0), so
+## it plunges toward the direction it started in — _pound_dir — and a flip
+## encountered along the way quietly cancels it instead of fighting it.
 func _tick_pound(delta: float) -> void:
 	if _pound == 1:
 		_pound_hang -= delta
@@ -443,10 +506,14 @@ func _tick_pound(delta: float) -> void:
 			_pound = 2
 		return
 
-	velocity = Vector2(0.0, POUND_SPEED)
+	if gravity_dir != _pound_dir:
+		cancel_pound()
+		return
+
+	velocity = Vector2(0.0, POUND_SPEED * _pound_dir)
 	if fx != null and randf() < 0.6:
-		fx.emit(_fx_at(Vector2(0, -4)), 1, Palette.CYAN_MID, 26.0,
-			Vector2.UP, 0.7, 0.2, 40.0)
+		fx.emit(_fx_at(Vector2(0, -4 * _pound_dir)), 1, Palette.CYAN_MID, 26.0,
+			Vector2.UP * _pound_dir, 0.7, 0.2, 40.0)
 
 	if is_on_floor():
 		_land_pound()
@@ -462,11 +529,11 @@ func _land_pound() -> void:
 	_squash(Vector2(1.5, 0.5))
 	Audio.play("stomp")
 	if fx != null:
-		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN, 14)
-	visual_event.emit("pound_land", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.DOWN)
+		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN, 14)
+	visual_event.emit("pound_land", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.DOWN * gravity_dir)
 	# The level owns what a landing hits — blocks, slimes, bats. It knows where
 	# they all are; the player only knows it hit the ground hard.
-	pounded.emit(global_position + Vector2(0, HEIGHT * 0.5))
+	pounded.emit(global_position + Vector2(0, HEIGHT * 0.5 * gravity_dir))
 
 
 func is_pounding() -> bool:
@@ -507,7 +574,10 @@ func _apply_body_height() -> void:
 		return
 	var h := FOOTLESS_HEIGHT if _footless else float(HEIGHT)
 	rect.size = Vector2(WIDTH, h)
-	_shape.position.y = (float(HEIGHT) - h) * 0.5
+	# Shrinks from the head side, whichever side that currently is: normal
+	# gravity, the head is +y-ward of centre already, so this is unchanged;
+	# inverted, it flips so the feet — now the +y-ward side — still stay put.
+	_shape.position.y = (float(HEIGHT) - h) * 0.5 * gravity_dir
 
 
 func _tick_footless(delta: float) -> void:
@@ -525,13 +595,18 @@ func _has_headroom() -> bool:
 	if not surface_at.is_valid():
 		return true
 	# Same framing as ground_tile(): surface_at reads Level's own grid, so the
-	# node-local position is the one that lines up with it.
-	var bottom := position.y + HEIGHT * 0.5
-	var standing_top := bottom - HEIGHT + 1.0
-	var crouched_top := bottom - FOOTLESS_HEIGHT
+	# node-local position is the one that lines up with it. Mirrored by
+	# gravity_dir same as everywhere else — and the row range is taken
+	# min-to-max rather than assumed ascending, since inverting gravity_dir
+	# flips which end is "top".
+	var bottom := position.y + HEIGHT * 0.5 * gravity_dir
+	var standing_top := bottom - (float(HEIGHT) - 1.0) * gravity_dir
+	var crouched_top := bottom - FOOTLESS_HEIGHT * gravity_dir
 	var left := floori((position.x - WIDTH * 0.5 + 1.0) / TILE)
 	var right := floori((position.x + WIDTH * 0.5 - 1.0) / TILE)
-	for ty in range(floori(standing_top / TILE), floori(crouched_top / TILE) + 1):
+	var row_a := floori(standing_top / TILE)
+	var row_b := floori(crouched_top / TILE)
+	for ty in range(mini(row_a, row_b), maxi(row_a, row_b) + 1):
 		for tx in range(left, right + 1):
 			var ch: String = surface_at.call(tx, ty)
 			if ch == "#" or ch == "~" or ch == ">" or ch == "<":
@@ -590,11 +665,16 @@ func _try_dash(input: float, controls: Dictionary) -> void:
 	if not dash_unlocked or not has_dash or _dash_cool > 0.0 \
 			or not _held(controls, "dash"):
 		return
+	if _in_zone(no_dash_zone_at):
+		return
 
 	# Eight-way, taken from whatever is held. Nothing held dashes the way you
 	# are already facing, so it never fires into a wall you were backing away
-	# from.
-	var vertical := _axis(controls, "up", "down")
+	# from. The "up" key stays the physical up key — same rule as pound — but
+	# same as jump, what it produces is gravity-relative: holding it dashes
+	# toward whatever "away from the floor" currently means, not toward
+	# world -y specifically.
+	var vertical := _axis(controls, "up", "down") * gravity_dir
 	var dir := Vector2(input, vertical)
 	if dir.length_squared() < 0.04:
 		dir = Vector2(facing, 0.0)
@@ -624,8 +704,14 @@ func _tick_dash(delta: float) -> void:
 		# Keep some of it: a dash that dumps you to a standstill kills every
 		# chain the move exists to enable.
 		velocity = _dash_dir * DASH_SPEED * DASH_KEEP
-		if _dash_dir.y < 0.0:
-			velocity.y = maxf(velocity.y, JUMP_VELOCITY * 0.5)
+		# _dash_dir is already gravity-relative from the moment _try_dash()
+		# built it (same fix as the axis it was built from), so "aimed
+		# roughly at effective up" is this comparison multiplied through by
+		# gravity_dir once, same as every other rising/falling check in this
+		# file — and the clamp itself gets converted to the local frame and
+		# back the same way _apply_gravity()'s wall-slide clamp does.
+		if _dash_dir.y * gravity_dir < 0.0:
+			velocity.y = maxf(velocity.y * gravity_dir, JUMP_VELOCITY * 0.5) * gravity_dir
 		_dash_cool = DASH_COOLDOWN
 		dash_changed.emit(false)
 
@@ -633,6 +719,87 @@ func _tick_dash(delta: float) -> void:
 ## Give the charge back. Ground, walls, stomps, springs and crystals all do.
 func refill_dash() -> void:
 	has_dash = true
+
+
+# ------------------------------------------------------------------ echo ---
+
+## Called every physics frame regardless of echo_max — the buffer stays warm
+## whether or not the room ever reads it, which is cheaper than branching on
+## whether to bother.
+func _record_echo() -> void:
+	_echo_pos[_echo_head] = global_position
+	_echo_vel[_echo_head] = velocity
+	_echo_head = (_echo_head + 1) % ECHO_FRAMES
+
+
+## Returns true the instant it fires, so the physics_process branch above it
+## can skip every other state for this one frame — the point of the move is
+## that it interrupts anything, dash and pound included.
+func _try_echo(controls: Dictionary) -> bool:
+	if echo_left <= 0 or not _pressed(controls, "echo_pressed"):
+		return false
+	# _echo_head already points at the OLDEST sample: _record_echo() just
+	# wrote this frame's position over what used to be the oldest one and
+	# moved the head past it, so this slot is exactly ECHO_FRAMES-1 frames
+	# behind — one second, minus this frame.
+	var target := _echo_pos[_echo_head]
+	var target_vel := _echo_vel[_echo_head]
+	if _overlaps_solid(target):
+		# Refusing costs nothing: dying to a correction tool would make the
+		# tool the thing players learn to fear.
+		Audio.play("menu_back")
+		return false
+
+	_found("echo")
+	echo_left -= 1
+	global_position = target
+	velocity = target_vel
+	_dash = 0.0
+	_dash_cool = 0.0
+	dash_changed.emit(false)
+	_pound = 0
+	_pound_hang = 0.0
+	_recover = 0.0
+	refill_dash()
+	Audio.play("echo")
+	if fx != null:
+		fx.emit(_fx_at(), 12, Palette.PURPLE, 100.0, Vector2.ZERO, TAU, 0.5, 220.0)
+	visual_event.emit("echo", _fx_at(), Vector2.ZERO)
+	return true
+
+
+## Whether a body-sized box at `pos` would sit inside solid terrain. Echoing
+## into a wall that closed after the sample was taken (a gate, a phase block
+## mid-dash) has to be refused, not resolved by shoving the player somewhere
+## move_and_slide() never agreed to.
+func _overlaps_solid(pos: Vector2) -> bool:
+	if not surface_at.is_valid():
+		return false
+	var left := floori((pos.x - WIDTH * 0.5 + 1.0) / TILE)
+	var right := floori((pos.x + WIDTH * 0.5 - 1.0) / TILE)
+	var top := floori((pos.y - HEIGHT * 0.5 + 1.0) / TILE)
+	var bottom := floori((pos.y + HEIGHT * 0.5 - 1.0) / TILE)
+	for ty in range(top, bottom + 1):
+		for tx in range(left, right + 1):
+			var ch: String = surface_at.call(tx, ty)
+			if ch == "#" or ch == "~" or ch == ">" or ch == "<":
+				return true
+	return false
+
+
+## The trail is the sample echoing would use right now, drawn a beat behind
+## the player — seeing the destination before spending the use is what keeps
+## this a decision instead of a blind stab.
+func _update_echo_ghost() -> void:
+	if _echo_ghost == null:
+		return
+	if echo_left <= 0:
+		_echo_ghost.visible = false
+		return
+	_echo_ghost.visible = true
+	_echo_ghost.texture = sprite.texture
+	_echo_ghost.flip_h = sprite.flip_h
+	_echo_ghost.global_position = _echo_pos[_echo_head]
 
 
 ## The ground under your feet decides two things: how fast you can change your
@@ -671,6 +838,44 @@ func _apply_horizontal(input: float, delta: float) -> void:
 		facing = -1 if input < 0.0 else 1
 
 
+## Step 22 — gravity zones. Read like ground_tile(): terrain, not an event, so
+## it is checked every physics frame rather than fired once on entry.
+##
+## velocity.y is left exactly as it was on a flip — no reset, no reversal.
+## An earlier version flipped its sign to keep the fall's arc "continuous"
+## into the new gravity direction, but that aims the player back out through
+## the exact edge they just crossed, at full speed, the instant they cross
+## it. gravity_dir's own new sign then keeps accelerating them that way, so
+## they re-cross, flip back, and repeat every physics frame: stuck
+## oscillating right at the seam, unable to act. Zeroing velocity.y instead
+## of flipping it has the same failure: with no solid floor right at the
+## seam to catch them, they drift back over the boundary a frame or two
+## later and flip again, just slower. Leaving velocity.y untouched lets the
+## new gravity decelerate whatever fall speed they entered with — the same
+## way normal gravity always has — so they keep travelling deeper into the
+## zone before it ever reverses them, and the boundary they entered through
+## is far behind them by the time it does.
+## Same tile lookup gravity zones use, shared by the two Fundo callables.
+func _in_zone(cb: Callable) -> bool:
+	if not cb.is_valid():
+		return false
+	var tx := floori(position.x / TILE)
+	var ty := floori(position.y / TILE)
+	return cb.call(tx, ty)
+
+
+func _update_gravity_zone() -> void:
+	var inside := false
+	if gravity_zone_at.is_valid():
+		var tx := floori(position.x / TILE)
+		var ty := floori(position.y / TILE)
+		inside = gravity_zone_at.call(tx, ty)
+	gravity_dir = -1.0 if inside else 1.0
+	# Has to land before move_and_slide() for is_on_floor()/is_on_wall() to
+	# read the right surface as "floor" this same frame.
+	up_direction = Vector2(0.0, -gravity_dir)
+
+
 ## Once you touch a wall you stay on it. Letting go of the stick does not drop
 ## you — only steering away from the wall, jumping, or running out of wall
 ## does. Holding a direction to avoid falling is busywork, not difficulty.
@@ -693,19 +898,28 @@ func _apply_gravity(input: float, delta: float) -> void:
 				_wall_dir = dir
 				_found("wall")
 
-	var g := GRAVITY_UP if velocity.y < 0.0 else GRAVITY_DOWN
-	velocity.y += g * gravity_scale * delta
+	# "Rising" and "falling" both mean relative to gravity_dir, not to world
+	# +y — that is the one substitution this whole function makes.
+	var rising := velocity.y * gravity_dir < 0.0
+	var g := GRAVITY_UP if rising else GRAVITY_DOWN
+	velocity.y += g * gravity_scale * gravity_dir * delta
 
-	if _wall_dir != 0 and velocity.y > 0.0:
-		velocity.y = minf(velocity.y, WALL_SLIDE_SPEED)
+	var falling := velocity.y * gravity_dir > 0.0
+	if _wall_dir != 0 and falling:
+		if gravity_dir > 0.0:
+			velocity.y = minf(velocity.y, WALL_SLIDE_SPEED)
+		else:
+			velocity.y = maxf(velocity.y, -WALL_SLIDE_SPEED)
 		# Air friction would otherwise peel you off the wall within a few
 		# frames, which is what made the slide feel like it kept dropping you.
 		velocity.x = _wall_dir * WALL_CLING
 		if fx != null and randf() < 0.25:
-			fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 2.0)), 1,
-				Palette.CYAN_DARK, 22.0, Vector2(-_wall_dir, -0.4), 0.9, 0.28, 90.0)
-	else:
+			fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 2.0 * gravity_dir)), 1,
+				Palette.CYAN_DARK, 22.0, Vector2(-_wall_dir, -0.4 * gravity_dir), 0.9, 0.28, 90.0)
+	elif gravity_dir > 0.0:
 		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale)
+	else:
+		velocity.y = maxf(velocity.y, -MAX_FALL * gravity_scale)
 
 
 ## Standing still with no input on the ground charges the next jump. It
@@ -720,8 +934,8 @@ func _tick_charge(input: float, delta: float) -> void:
 			_charge_particle_t += delta
 			if _charge_particle_t >= 0.08:
 				_charge_particle_t = 0.0
-				fx.emit(_fx_at(Vector2(0, HEIGHT * 0.5)), 1, Palette.GOLD, 20.0,
-					Vector2.UP, 0.3, 0.3, 40.0)
+				fx.emit(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), 1, Palette.GOLD, 20.0,
+					Vector2.UP * gravity_dir, 0.3, 0.3, 40.0)
 		if not was_full and _charge >= CHARGE_TIME:
 			_found("charge")
 			_squash(Vector2(1.15, 0.85))
@@ -737,21 +951,21 @@ func _handle_jump(controls: Dictionary) -> void:
 	if _buffer > 0.0:
 		if _coyote > 0.0:
 			var boost := CHARGE_BOOST if _charge >= CHARGE_TIME else 1.0
-			velocity.y = JUMP_VELOCITY * boost
+			velocity.y = JUMP_VELOCITY * boost * gravity_dir
 			_charge = 0.0
 			_buffer = 0.0
 			_coyote = 0.0
 			Audio.play_varied("jump")
 			if fx != null:
-				fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 6)
-			visual_event.emit("jump", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.UP)
+				fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN_DARK, 6)
+			visual_event.emit("jump", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
 		elif _wall_dir != 0:
 			# Step 19 — wall boost. Only the horizontal component scales: a
 			# taller wall jump would quietly change what every existing room's
 			# reachability was built against, but a faster one barely matters
 			# in a chimney narrow enough to wall-jump in the first place.
 			var perfect := _wall_time <= WALL_WINDOW
-			velocity.y = WALL_JUMP.y
+			velocity.y = WALL_JUMP.y * gravity_dir
 			velocity.x = -_wall_dir * WALL_JUMP.x * (WALL_BOOST if perfect else 1.0)
 			facing = -_wall_dir
 			_lock = WALL_LOCK
@@ -764,20 +978,20 @@ func _handle_jump(controls: Dictionary) -> void:
 			var boost_color := Palette.WHITE if perfect else Palette.CYAN
 			if fx != null:
 				fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 0.0)), 6 if not perfect else 10,
-					boost_color, 70.0, Vector2(-_wall_dir, -0.5), 1.2, 0.3, 200.0)
+					boost_color, 70.0, Vector2(-_wall_dir, -0.5 * gravity_dir), 1.2, 0.3, 200.0)
 			visual_event.emit("wall_jump", _fx_at(Vector2(_wall_dir * 4.0, 0.0)),
-				Vector2(-_wall_dir, -0.5))
+				Vector2(-_wall_dir, -0.5 * gravity_dir))
 
 	# Releasing the button early cuts the rise short.
-	if _pressed(controls, "jump_released") and velocity.y < 0.0:
+	if _pressed(controls, "jump_released") and velocity.y * gravity_dir < 0.0:
 		velocity.y *= JUMP_CUT
 
 
 func _on_land() -> void:
 	Audio.play_varied("land", 0.1)
 	if fx != null:
-		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 7)
-	visual_event.emit("land", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.UP)
+		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN_DARK, 7)
+	visual_event.emit("land", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
 	_squash(Vector2(1.25, 0.75))
 	_charge = 0.0
 
@@ -798,9 +1012,9 @@ func _update_sprite(input: float) -> void:
 	if not is_on_floor():
 		if _wall_dir != 0:
 			key = "player_wall"
-		elif velocity.y < -20.0:
+		elif velocity.y * gravity_dir < -20.0:
 			key = "player_jump"
-		elif velocity.y > 40.0:
+		elif velocity.y * gravity_dir > 40.0:
 			key = "player_fall"
 	elif absf(input) > 0.01 and absf(velocity.x) > 12.0:
 		key = "player_run_a" if fmod(_anim * 9.0, 2.0) < 1.0 else "player_run_b"
@@ -833,6 +1047,7 @@ func _update_sprite(input: float) -> void:
 		sprite.flip_h = _wall_dir > 0
 	else:
 		sprite.flip_h = facing < 0
+	sprite.flip_v = gravity_dir < 0.0
 
 
 func _update_remote_sprite() -> void:
@@ -916,7 +1131,7 @@ func spring_bounce() -> void:
 	_add_verb(Verb.SPRING)
 	refill_dash()
 	_dash = 0.0
-	velocity.y = SPRING_VELOCITY
+	velocity.y = SPRING_VELOCITY * gravity_dir
 	_buffer = 0.0
 	_squash(Vector2(0.7, 1.35))
 	Audio.play("spring")
@@ -935,7 +1150,7 @@ func stomp() -> void:
 	_pound = 0
 	_chain += 1
 	var boost := minf(1.0 + float(_chain - 1) * CHAIN_STEP, CHAIN_MAX)
-	velocity.y = JUMP_VELOCITY * 0.78 * boost
+	velocity.y = JUMP_VELOCITY * 0.78 * boost * gravity_dir
 	_squash(Vector2(1.3, 0.7))
 	Audio.play_varied("stomp")
 
@@ -944,6 +1159,20 @@ func stomp() -> void:
 ## before the player enters the tree; without it the player still runs, it just
 ## treats every surface as ordinary ground.
 var surface_at: Callable
+## Step 22 — whether a tile sits inside a gravity zone. A separate callable
+## from surface_at rather than one more character surface_at() might return:
+## Level computes a zone's real extent once, as a rect, precisely so a gem or
+## any other entity sitting on one of the zone's own tiles cannot punch a
+## grid-shaped hole in it — checking the single character at that tile would
+## have exactly that hole built back in.
+var gravity_zone_at: Callable
+## Fundo backdrops. Each is its own callable, and its own parallel grid on
+## Level's side, rather than another gravity_zone_at-style rect: unlike a
+## gravity zone these never need to survive a gem punching a hole in them
+## (nothing overwrites this grid but the zone itself), so a direct per-tile
+## read is enough — no bounding rect to compute.
+var no_dash_zone_at: Callable
+var no_pound_zone_at: Callable
 ## Cleared every frame, so two things pushing at once add up for one frame
 ## rather than accumulating forever.
 var external_force := Vector2.ZERO
@@ -959,8 +1188,10 @@ func ground_tile() -> String:
 		return "."
 	# surface_at reads Level's local grid. The level sits below the HUD, so
 	# global_position samples roughly two rows too low and misses ~, > and <.
+	# Under inverted gravity the feet — and so the ground — are on the other
+	# side of centre, hence the gravity_dir on the offset.
 	var tx := floori(position.x / TILE)
-	var ty := floori((position.y + HEIGHT * 0.5 + 2.0) / TILE)
+	var ty := floori((position.y + (HEIGHT * 0.5 + 2.0) * gravity_dir) / TILE)
 	return surface_at.call(tx, ty)
 
 
@@ -1024,6 +1255,11 @@ func respawn(at: Vector2) -> void:
 	velocity = Vector2.ZERO
 	alive = true
 	frozen = false
+	# Step 22 — every spawn tile is built on ordinary ground, never inside a
+	# flip zone, so a respawn always resets the player right side up rather
+	# than carrying an inversion across a death.
+	gravity_dir = 1.0
+	up_direction = Vector2.UP
 	has_dash = true
 	_dash = 0.0
 	_pound = 0
@@ -1035,6 +1271,9 @@ func respawn(at: Vector2) -> void:
 	_apply_body_height()
 	_recover = 0.0
 	_charge = 0.0
+	echo_left = echo_max
+	_echo_pos.fill(at)
+	_echo_vel.fill(Vector2.ZERO)
 	_network_charge = 0.0
 	_network_wall_dir = 0
 	_network_anim = "player_idle"

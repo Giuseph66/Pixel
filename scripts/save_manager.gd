@@ -23,6 +23,8 @@ const POUND_ROOM_ID := "slam"
 var settings := {
 	"music": true,
 	"sfx": true,
+	"music_volume": 70,
+	"sfx_volume": 100,
 	"lang": "",             # empty means "guess from the system locale"
 }
 
@@ -261,6 +263,10 @@ func reset_slot(index: int) -> void:
 	if index == active:
 		data = slots[index]
 	save_game()
+	# Step 25 — the one place the save leaves anything outside saves.json.
+	# A wiped slot with its old ghosts still on disk would race a new best
+	# time against a run from a campaign that no longer exists.
+	GhostStore.delete_all(index)
 
 
 func slot_is_empty(index: int) -> bool:
@@ -554,6 +560,18 @@ func set_music(on: bool) -> void:
 
 func set_sfx(on: bool) -> void:
 	settings["sfx"] = on
+	save_game()
+
+
+func set_music_volume(percent: int) -> void:
+	settings["music_volume"] = clampi(percent, 0, 100)
+	settings["music"] = int(settings["music_volume"]) > 0
+	save_game()
+
+
+func set_sfx_volume(percent: int) -> void:
+	settings["sfx_volume"] = clampi(percent, 0, 100)
+	settings["sfx"] = int(settings["sfx_volume"]) > 0
 	save_game()
 
 

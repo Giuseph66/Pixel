@@ -150,6 +150,12 @@ static func library() -> Dictionary:
 			tone(240.0, 0.04, Wave.PULSE, 0.22, 1.0, 0.001, 0.02),
 			tone(560.0, 0.08, Wave.PULSE, 0.24, 1.4, 0.001, 0.05),
 		])),
+		# A downward sweep, the mirror of the portal's upward one — arriving
+		# from your own past reads as an unwinding, not an arrival.
+		"echo": to_stream(concat([
+			tone(700.0, 0.05, Wave.TRIANGLE, 0.22, 0.5, 0.001, 0.02),
+			tone(350.0, 0.10, Wave.TRIANGLE, 0.24, 0.6, 0.001, 0.06),
+		])),
 		# Rising whine for the warning, a short harsh burst for the shot — the
 		# ear gets the same telegraph the eye does.
 		"laser_warn": to_stream(tone(300.0, 0.4, Wave.PULSE, 0.14, 1.6, 0.05, 0.1)),

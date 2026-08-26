@@ -8,7 +8,6 @@ extends Node2D
 ## card is always the empty one that makes a new room, so "how do I start" has
 ## the same answer as "what is this screen".
 
-signal play_room(index: int)
 signal edit_room(index: int)
 ## A room that is not on the shelf yet — blank, or copied from somewhere. It
 ## stays unsaved until the editor writes it, so backing out of a copy you did
@@ -118,21 +117,16 @@ func _handle_list() -> void:
 		_accept()
 
 
+## Picking a room from the shelf opens it in the editor, never straight into
+## play — the editor's own P/Enter is the one place "play this" lives now,
+## so getting there is never more than one extra key from here.
 func _accept() -> void:
 	Audio.play("menu_select")
 	if cursor == 0:
 		_open_source()
 		return
-	var room: Dictionary = Sandbox.all()[_room_index()]
-	if not Sandbox.is_playable(room):
-		# An unfinishable room opens in the editor instead of failing to start:
-		# the fix is always one tile away.
-		_toast_key("sandbox.err.unplayable")
-		_done = true
-		edit_room.emit(_room_index())
-		return
 	_done = true
-	play_room.emit(_room_index())
+	edit_room.emit(_room_index())
 
 
 func _unhandled_input(event: InputEvent) -> void:

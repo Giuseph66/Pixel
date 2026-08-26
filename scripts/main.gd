@@ -54,8 +54,11 @@ func _ready() -> void:
 
 	_levels = Levels.all()
 
-	Audio.sfx_enabled = bool(Save.settings["sfx"])
-	Audio.music_enabled = bool(Save.settings["music"])
+	Audio.set_sfx_volume(float(Save.settings.get("sfx_volume", 100)) / 100.0)
+	Audio.set_music_volume(float(Save.settings.get("music_volume", 70)) / 100.0)
+	# Legacy mute state still wins over a remembered non-zero volume.
+	Audio.set_sfx_enabled(bool(Save.settings["sfx"]))
+	Audio.set_music_enabled(bool(Save.settings["music"]))
 
 	_transition = Transition.new()
 	add_child(_transition)
@@ -100,6 +103,10 @@ func _setup_input() -> void:
 	# Only ever read on a menu screen (title, pause), never in a live room, so
 	# reusing the C key p_dash already owns causes no real conflict.
 	_action("p_codex", [KEY_C, KEY_TAB], [JOY_BUTTON_LEFT_SHOULDER])
+	# Step 23 — echo. Only ever read where Player.echo_max > 0, which the
+	# story hands out to four rooms and nowhere else, so the left shoulder
+	# button is free to double up the same way p_codex's key already does.
+	_action("p_echo", [KEY_E, KEY_L], [JOY_BUTTON_LEFT_SHOULDER])
 
 
 func _parse_network_args() -> void:
@@ -389,18 +396,10 @@ func _show_sandbox() -> void:
 	_sandbox = false
 	Save.tracking = true
 	var screen := SandboxScreen.new()
-	screen.play_room.connect(_on_sandbox_play)
 	screen.edit_room.connect(_on_sandbox_edit)
 	screen.new_room.connect(_on_sandbox_new)
 	screen.cancelled.connect(func(): _go(_show_play_select))
 	_set_screen(screen)
-
-
-func _on_sandbox_play(index: int) -> void:
-	_sandbox_index = index
-	_sandbox_room = Sandbox.all()[index]
-	_from_editor = false
-	_go(_start_sandbox)
 
 
 func _on_sandbox_edit(index: int) -> void:
@@ -593,6 +592,12 @@ func _build_room(index: int, data: Dictionary) -> void:
 	_level.player_speed_scale = 1.2 if _endless and _mods.has("rush") else 1.0
 	_level.player_gravity_scale = 1.15 if _endless and _mods.has("heavy") else 1.0
 	_level.dark = _endless and _mods.has("dark")
+	# Step 25 — personal-best ghost. Story and remix only: endless rooms are
+	# never the same room twice, a sandbox room has no record to compare
+	# against, and a networked room has more than one player's position to
+	# be a ghost of.
+	_level.ghost_enabled = not _sandbox and not _endless and not Session.is_active()
+	_level.is_remix = _remix
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)
 	add_child(_level)
@@ -651,6 +656,13 @@ func _on_room_completed(time: float, gems: int, total: int, score: int, best_com
 			total, _level.deaths, current_par)
 		best = Save.best_time(_current)
 		held = Save.medals(_current)
+	# Step 25 — record's own "record" flag is false on a first-ever clear
+	# (best_time has nothing to have been better than yet), which would
+	# silently skip the one run most worth a ghost. Comparing against the
+	# freshly-written best instead catches both cases the same way.
+	if time <= best:
+		GhostStore.save(Save.active, str(_levels[_current].get("id", "")), _remix,
+			_level.last_recording, _level.last_recording_pounds)
 	var deaths := _level.deaths
 	await get_tree().create_timer(0.45).timeout
 	var earned := Save.last_awarded
@@ -801,8 +813,8 @@ func _on_ending_chosen(id: String) -> void:
 	match id:
 		"levels":
 			_go(_show_select)
-		"endless":
-			_go(_start_run)
+		"choose_mode":
+			_go(_show_modifier_picker)
 		_:
 			_go(_show_title)
 

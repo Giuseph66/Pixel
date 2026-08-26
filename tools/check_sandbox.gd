@@ -34,6 +34,7 @@ func _ready() -> void:
 	failures += await _check_ferry()
 	failures += await _check_charge()
 	failures += await _check_pound()
+	failures += await _check_modifier_grid()
 	failures += _check_wrap()
 
 	if failures == 0:
@@ -422,6 +423,77 @@ func _press(key: Key) -> InputEventKey:
 ## game whose length nobody controls — a deep home directory plus a long room
 ## name used to run off both edges of the panel. Wrapping is what holds it in,
 ## so the wrapper gets checked rather than trusted.
+## Step 20 — the modifier grid replaced a shuffled three-of-nine with all nine
+## combos on screen, fixed order, no draw. What has to hold: every combo is
+## reachable, CLASSIC sits outside the 3x3 and is reachable from either edge
+## of it, a row wraps left/right internally rather than spilling into CLASSIC,
+## and the column is remembered across a trip through CLASSIC rather than
+## reset to 0 every time.
+func _check_modifier_grid() -> int:
+	var bad := 0
+	if ModifierScreen.VALID_COMBOS.size() != ModifierScreen.COLUMNS * ModifierScreen.ROWS:
+		bad += _fail("the grid is %dx%d but there are %d combos"
+			% [ModifierScreen.COLUMNS, ModifierScreen.ROWS, ModifierScreen.VALID_COMBOS.size()])
+
+	var m := ModifierScreen.new()
+	add_child(m)
+	await get_tree().process_frame
+
+	if m._selected != 0 or m._id_for(0) != "":
+		bad += _fail("the grid did not start on classic")
+
+	# Right, all the way across a row and one step past, has to land back
+	# where it started — a row is a loop, not a line that dumps you off the
+	# grid's own edge.
+	var start := m._selected
+	for i in ModifierScreen.COLUMNS:
+		m._move(1, 0)
+	if m._selected != start:
+		bad += _fail("a full row of right presses did not return to the start")
+
+	# Down from row 0, across every row, has to reach classic on the far side
+	# — every combo sits between two trips through classic, never stranded.
+	m._selected = 1
+	for i in ModifierScreen.ROWS:
+		m._move(0, 1)
+	if m._selected != 0:
+		bad += _fail("moving down through every row did not reach classic")
+
+	# The column survives a trip through classic: right twice from the top
+	# row, down into classic, back down into the grid, should land on the
+	# same column it left, not column 0.
+	m._selected = 1
+	m._move(1, 0)
+	m._move(1, 0)
+	var col_before := (m._selected - 1) % ModifierScreen.COLUMNS
+	m._move(0, -1)
+	if m._selected != 0:
+		bad += _fail("up from the top row did not reach classic")
+	m._move(0, 1)
+	var col_after := (m._selected - 1) % ModifierScreen.COLUMNS
+	if col_after != col_before:
+		bad += _fail("classic did not remember the column: left %d, returned on %d"
+			% [col_before, col_after])
+
+	# Every combo is reachable and its id round-trips through mods_from_key —
+	# what chosen(id) actually hands main.gd.
+	var seen := {}
+	for combo: Array in ModifierScreen.VALID_COMBOS:
+		var key := ModifierScreen.combo_key(combo)
+		if seen.has(key):
+			bad += _fail("two combos share the key '%s'" % key)
+		seen[key] = true
+		var back := ModifierScreen.mods_from_key(key)
+		var sorted_combo: Array = combo.duplicate()
+		sorted_combo.sort()
+		if back != sorted_combo:
+			bad += _fail("mods_from_key('%s') returned %s, wanted %s" % [key, back, sorted_combo])
+
+	m.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
 func _check_wrap() -> int:
 	var bad := 0
 	var width := 408.0

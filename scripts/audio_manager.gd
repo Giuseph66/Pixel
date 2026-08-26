@@ -12,6 +12,8 @@ var _music_stream: AudioStreamWAV
 
 var sfx_enabled := true
 var music_enabled := true
+var sfx_volume := 1.0
+var music_volume := 0.7
 
 
 func _ready() -> void:
@@ -26,7 +28,7 @@ func _ready() -> void:
 
 	_music_player = AudioStreamPlayer.new()
 	_music_player.process_mode = Node.PROCESS_MODE_ALWAYS
-	_music_player.volume_db = -7.0
+	_music_player.volume_db = _volume_db(music_volume)
 	add_child(_music_player)
 
 
@@ -37,7 +39,7 @@ func play(key: String, pitch: float = 1.0, volume_db: float = 0.0) -> void:
 	_next_voice = (_next_voice + 1) % _voices.size()
 	p.stream = _sounds[key]
 	p.pitch_scale = pitch
-	p.volume_db = volume_db
+	p.volume_db = volume_db + _volume_db(sfx_volume)
 	p.play()
 
 
@@ -71,3 +73,18 @@ func set_music_enabled(on: bool) -> void:
 
 func set_sfx_enabled(on: bool) -> void:
 	sfx_enabled = on
+
+
+func set_music_volume(value: float) -> void:
+	music_volume = clampf(value, 0.0, 1.0)
+	_music_player.volume_db = _volume_db(music_volume)
+	set_music_enabled(music_volume > 0.0)
+
+
+func set_sfx_volume(value: float) -> void:
+	sfx_volume = clampf(value, 0.0, 1.0)
+	sfx_enabled = sfx_volume > 0.0
+
+
+func _volume_db(value: float) -> float:
+	return linear_to_db(value) if value > 0.001 else -80.0

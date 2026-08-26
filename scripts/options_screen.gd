@@ -7,6 +7,8 @@ extends Menu
 ## Every entry here toggles in place rather than opening anything, so the screen
 ## rebuilds its own labels instead of asking Main to do it.
 
+const VOLUME_STEP := 10
+
 
 func _ready() -> void:
 	super()
@@ -21,8 +23,10 @@ func _ready() -> void:
 	refresh_labels()
 
 
-func _on_off(value: bool) -> String:
-	return Lang.t("ui.on") if value else Lang.t("ui.off")
+func _volume_percent(kind: String) -> int:
+	if not bool(Save.settings.get(kind, true)):
+		return 0
+	return clampi(int(Save.settings.get("%s_volume" % kind, 100)), 0, 100)
 
 
 func refresh_labels() -> void:
@@ -33,10 +37,34 @@ func refresh_labels() -> void:
 	set_item_label("language", Lang.t("title.language"))
 	set_item_label("back", Lang.t("options.back"))
 
-	set_item_value("music", _on_off(Save.settings["music"]))
-	set_item_value("sfx", _on_off(Save.settings["sfx"]))
+	set_item_value("music", "%d%%" % _volume_percent("music"))
+	set_item_value("sfx", "%d%%" % _volume_percent("sfx"))
 	set_item_value("language", Lang.language_name())
 	queue_redraw()
+
+
+func _handle_input() -> void:
+	var id := str(items[cursor]["id"]) if not items.is_empty() else ""
+	if id == "music" or id == "sfx":
+		if Input.is_action_just_pressed("p_left"):
+			_change_volume(id, -VOLUME_STEP)
+			return
+		if Input.is_action_just_pressed("p_right"):
+			_change_volume(id, VOLUME_STEP)
+			return
+	super()
+
+
+func _change_volume(kind: String, delta: int) -> void:
+	var value := clampi(_volume_percent(kind) + delta, 0, 100)
+	if kind == "music":
+		Save.set_music_volume(value)
+		Audio.set_music_volume(float(value) / 100.0)
+	else:
+		Save.set_sfx_volume(value)
+		Audio.set_sfx_volume(float(value) / 100.0)
+		Audio.play("menu_move")
+	refresh_labels()
 
 
 ## Apply the entry under the cursor. Returns true when the screen handled it,
@@ -44,13 +72,9 @@ func refresh_labels() -> void:
 func apply(id: String) -> bool:
 	match id:
 		"music":
-			var on := not bool(Save.settings["music"])
-			Save.set_music(on)
-			Audio.set_music_enabled(on)
+			_change_volume("music", VOLUME_STEP)
 		"sfx":
-			var on := not bool(Save.settings["sfx"])
-			Save.set_sfx(on)
-			Audio.set_sfx_enabled(on)
+			_change_volume("sfx", VOLUME_STEP)
 		"language":
 			Lang.cycle()
 		_:

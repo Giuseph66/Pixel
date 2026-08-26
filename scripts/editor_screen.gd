@@ -61,6 +61,13 @@ var brush := "#"
 var tool := TOOL_BRUSH
 
 var _grid: Array = []
+## Fundo backdrops. One grid per layer, parallel to _grid rather than sharing
+## it, so painting one never touches the room's main tile or another Fundo
+## layer — see _set_tile()'s layer branch and TilePalette.layer_of().
+const MOD_LAYERS := ["gravity", "no_dash", "no_pound"]
+var _mod_grids: Dictionary = {}
+var _mods_img: Image
+var _mods_tex: ImageTexture
 var _mode := MODE_PAINT
 var _dirty := false
 var _time := 0.0
@@ -103,9 +110,12 @@ func _ready() -> void:
 	if room.is_empty():
 		room = Sandbox.blank_room()
 	_grid = _to_grid(room["rows"])
+	for layer in MOD_LAYERS:
+		_mod_grids[layer] = _to_grid(room.get("backdrop_%s" % layer, PackedStringArray()))
 	_name_field.text = str(room["name"])
 	_author_field.text = str(room.get("author", ""))
 	_bake_all()
+	_bake_mods()
 	_snapshot_baseline()
 
 
@@ -148,6 +158,8 @@ func _is_solid(tx: int, ty: int) -> bool:
 
 func _commit_rows() -> void:
 	room["rows"] = Levels.bake(_grid)
+	for layer in MOD_LAYERS:
+		room["backdrop_%s" % layer] = Levels.bake(_mod_grids[layer])
 
 
 func _find(ch: String) -> Vector2i:
@@ -160,9 +172,43 @@ func _find(ch: String) -> Vector2i:
 
 ## Paint one cell. Unique tiles evict the old one first, so there is never a
 ## room with two spawns to explain to the player.
+##
+## A Fundo character (TilePalette.layer_of() non-empty) never reaches the
+## main grid at all: it toggles its own parallel grid instead, which is what
+## lets it share a cell with a wall, a creature, a gem, or another Fundo tile
+## without either one evicting the other. The eraser is the one brush that
+## still reaches everywhere — clearing a cell clears every backdrop on it
+## too, since "erase this tile" reads as "nothing is here" to a room author.
 func _set_tile(tx: int, ty: int, ch: String) -> void:
 	if tx < 0 or ty < 0 or tx >= Levels.COLS or ty >= Levels.ROWS:
 		return
+
+	if ch == ".":
+		var cleared_mod := false
+		for layer_name in MOD_LAYERS:
+			var g: Array = _mod_grids[layer_name]
+			if g[ty][tx] != ".":
+				g[ty][tx] = "."
+				cleared_mod = true
+		if cleared_mod:
+			_repaint_mods_around(tx, ty)
+			_dirty = true
+		if _grid[ty][tx] == ".":
+			return
+		_grid[ty][tx] = "."
+		_repaint_around(tx, ty)
+		_dirty = true
+		return
+
+	var layer := TilePalette.layer_of(ch)
+	if layer != "":
+		var g: Array = _mod_grids[layer]
+		if g[ty][tx] != ch:
+			g[ty][tx] = ch
+			_repaint_mods_around(tx, ty)
+			_dirty = true
+		return
+
 	if _grid[ty][tx] == ch:
 		return
 
@@ -223,8 +269,24 @@ func _snapshot_baseline() -> void:
 	_redo.clear()
 
 
+## Every grid together — a Fundo paint is a stroke like any other, and
+## undoing it should not leave a backdrop grid one step ahead of _grid.
+func _snapshot() -> Dictionary:
+	var snap := {"rows": Levels.bake(_grid)}
+	for layer in MOD_LAYERS:
+		snap[layer] = Levels.bake(_mod_grids[layer])
+	return snap
+
+
+func _restore(snap: Dictionary) -> void:
+	_grid = _to_grid(snap["rows"])
+	for layer in MOD_LAYERS:
+		_mod_grids[layer] = _to_grid(snap[layer])
+	_bake_mods()
+
+
 func _push_undo() -> void:
-	_undo.append(Levels.bake(_grid))
+	_undo.append(_snapshot())
 	if _undo.size() > UNDO_LIMIT:
 		_undo.pop_front()
 	_redo.clear()
@@ -234,8 +296,8 @@ func _undo_step() -> void:
 	if _undo.is_empty():
 		_toast_key("editor.nothing_undo")
 		return
-	_redo.append(Levels.bake(_grid))
-	_grid = _to_grid(_undo.pop_back())
+	_redo.append(_snapshot())
+	_restore(_undo.pop_back())
 	_bake_all()
 	_dirty = true
 	Audio.play("menu_back")
@@ -245,8 +307,8 @@ func _redo_step() -> void:
 	if _redo.is_empty():
 		_toast_key("editor.nothing_redo")
 		return
-	_undo.append(Levels.bake(_grid))
-	_grid = _to_grid(_redo.pop_back())
+	_undo.append(_snapshot())
+	_restore(_redo.pop_back())
 	_bake_all()
 	_dirty = true
 	Audio.play("menu_select")
@@ -287,6 +349,57 @@ func _paint_cell(tx: int, ty: int) -> void:
 			_is_solid(tx, ty + 1), _is_solid(tx - 1, ty), _is_solid(tx + 1, ty))
 	elif ch == "-":
 		PixelArt.paint_platform(_terrain_img, tx, ty)
+
+
+## A Fundo layer's own cell, true wherever that layer's grid is set. Bounds
+## are treated as "not set" rather than clamped, same as Level._mod_row() —
+## a border tile has no neighbour to borrow a flag from.
+func _mod_at(layer: String, tx: int, ty: int) -> bool:
+	if tx < 0 or ty < 0 or tx >= Levels.COLS or ty >= Levels.ROWS:
+		return false
+	return (_mod_grids[layer] as Array)[ty][tx] != "."
+
+
+## The whole Fundo stack, baked the same way Level._bake_mod_zones() bakes the
+## real room: one call to the matching PixelArt paint for every layer active
+## on the cell, so a room author sees the exact tint and border play will
+## show, not a placeholder icon standing in for it.
+func _bake_mods() -> void:
+	var w := Levels.COLS * TILE
+	var h := Levels.ROWS * TILE
+	_mods_img = Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	_mods_img.fill(Color(0, 0, 0, 0))
+	for ty in Levels.ROWS:
+		for tx in Levels.COLS:
+			_paint_mod_cell(tx, ty)
+	_mods_tex = ImageTexture.create_from_image(_mods_img)
+
+
+## Repaint a Fundo cell and its four neighbours — same reasoning as
+## _repaint_around(): the border PixelArt draws depends on what is next to it.
+func _repaint_mods_around(tx: int, ty: int) -> void:
+	for p: Vector2i in [Vector2i(tx, ty), Vector2i(tx + 1, ty), Vector2i(tx - 1, ty),
+			Vector2i(tx, ty + 1), Vector2i(tx, ty - 1)]:
+		if p.x >= 0 and p.y >= 0 and p.x < Levels.COLS and p.y < Levels.ROWS:
+			_paint_mod_cell(p.x, p.y)
+	if _mods_tex != null:
+		_mods_tex.update(_mods_img)
+
+
+func _paint_mod_cell(tx: int, ty: int) -> void:
+	_mods_img.fill_rect(Rect2i(tx * TILE, ty * TILE, TILE, TILE), Color(0, 0, 0, 0))
+	if _mod_at("gravity", tx, ty):
+		PixelArt.paint_gravity_zone(_mods_img, tx, ty,
+			_mod_at("gravity", tx, ty - 1), _mod_at("gravity", tx, ty + 1),
+			_mod_at("gravity", tx - 1, ty), _mod_at("gravity", tx + 1, ty))
+	if _mod_at("no_dash", tx, ty):
+		PixelArt.paint_no_dash_zone(_mods_img, tx, ty,
+			_mod_at("no_dash", tx, ty - 1), _mod_at("no_dash", tx, ty + 1),
+			_mod_at("no_dash", tx - 1, ty), _mod_at("no_dash", tx + 1, ty))
+	if _mod_at("no_pound", tx, ty):
+		PixelArt.paint_no_pound_zone(_mods_img, tx, ty,
+			_mod_at("no_pound", tx, ty - 1), _mod_at("no_pound", tx, ty + 1),
+			_mod_at("no_pound", tx - 1, ty), _mod_at("no_pound", tx + 1, ty))
 
 
 # ---------------------------------------------------------------- input ---
@@ -700,6 +813,10 @@ func _draw_room() -> void:
 	var origin := Vector2(0, BAND)
 	draw_rect(Rect2(origin, Vector2(Levels.COLS * TILE, Levels.ROWS * TILE)), Palette.BG)
 	_draw_grid_dots(origin)
+	# Fundo behind terrain, same order Level._ready() builds its own layers in
+	# — a backdrop, not a texture on a real block, so it never gets mistaken
+	# for a wall the way a small icon over a wall's own texture could.
+	draw_texture(_mods_tex, origin)
 	draw_texture(_terrain_tex, origin)
 
 	_draw_flood(origin)

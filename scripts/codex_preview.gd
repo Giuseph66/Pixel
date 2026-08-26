@@ -28,6 +28,8 @@ static func draw(ci: CanvasItem, id: String, rect: Rect2, t: float) -> bool:
 		"pound": _pound(ci, rect, cx, floor_y, t)
 		"combo": _combo(ci, rect, cx, floor_y, t)
 		"charge": _charge(ci, rect, cx, floor_y, t)
+		"echo": _echo(ci, rect, cx, floor_y, t)
+		"clone": _clone(ci, rect, cx, floor_y, t)
 
 		"slime": _patrol(ci, rect, cx, floor_y, t, "slime_a", "slime_b", 0.45)
 		"bat": _bat(ci, rect, cx, floor_y, t)
@@ -317,6 +319,48 @@ static func _charge(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: f
 		if p < 0.06:
 			_burst(ci, Vector2(cx, floor_y - 5.0), p * 5.0, 0.3, 8, Palette.GOLD, 60.0, 180.0,
 				1.0, -PI * 0.5, TAU)
+
+
+## Runs forward, then snaps back to a faint purple copy of itself standing
+## where it was a moment ago — the trail is the destination shown before the
+## snap, same as the real ghost trail in player.gd's _update_echo_ghost().
+static func _echo(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
+	_ground(ci, rect, floor_y)
+	var span := rect.size.x * 0.5 - 18.0
+	var run_frac := 0.7
+	var u := _cycle(t, 2.0)
+	var travel := u / run_frac if u < run_frac else 0.0
+	var frame := "player_run_a" if fmod(t * 9.0, 2.0) < 1.0 else "player_run_b"
+
+	# The trail: a fixed beat behind the runner, always — exactly what echoing
+	# right now would return to.
+	var trail_travel := maxf(travel - 0.35, 0.0)
+	_stand(ci, frame, cx - span + span * 2.0 * trail_travel, floor_y, SCALE, false, 0.35,
+		Palette.PURPLE)
+	_stand(ci, frame, cx - span + span * 2.0 * travel, floor_y)
+
+	# The snap itself, at the instant travel resets to 0.
+	_burst(ci, Vector2(cx - span, floor_y - 8.0), u - run_frac, 0.3, 10, Palette.PURPLE, 55.0,
+		120.0, 1.0, 0.0, TAU)
+
+
+## Two runners on the same path, the second exactly half a beat behind the
+## first — Clone.gd replaying a finished recording while the room keeps
+## going, not a copy standing still.
+static func _clone(ci: CanvasItem, rect: Rect2, cx: float, floor_y: float, t: float) -> void:
+	_ground(ci, rect, floor_y)
+	var span := rect.size.x * 0.5 - 18.0
+	var lag := 0.55
+
+	var walk := _pingpong(t, 1.6)
+	var frame := "player_run_a" if fmod(t * 9.0, 2.0) < 1.0 else "player_run_b"
+	_stand(ci, frame, cx - span + span * 2.0 * float(walk[0]), floor_y, SCALE, int(walk[1]) < 0)
+
+	var t2 := maxf(t - lag, 0.0)
+	var walk2 := _pingpong(t2, 1.6)
+	var frame2 := "player_run_a" if fmod(t2 * 9.0, 2.0) < 1.0 else "player_run_b"
+	_stand(ci, frame2, cx - span + span * 2.0 * float(walk2[0]), floor_y, SCALE,
+		int(walk2[1]) < 0, 0.6, Palette.PURPLE)
 
 
 # ----------------------------------------------------------------- creatures ---

@@ -17,6 +17,7 @@ const HAZARD := "hazard"
 const CREATURE := "creature"
 const ITEM := "item"
 const MARKER := "marker"
+const BACKDROP := "backdrop"
 
 ## Drawer order in the palette popup. Each: id, name key, accent colour.
 const GROUPS := [
@@ -25,6 +26,9 @@ const GROUPS := [
 	{"id": CREATURE, "label": "pal.group.creature", "color": Palette.GREEN},
 	{"id": ITEM, "label": "pal.group.item", "color": Palette.GOLD},
 	{"id": MARKER, "label": "pal.group.marker", "color": Palette.PURPLE},
+	# Fundo. Tiles that stack instead of replacing whatever is on the cell —
+	# a wall, a creature, a gem, another Fundo tile — see layer_of() below.
+	{"id": BACKDROP, "label": "pal.group.backdrop", "color": Palette.CYAN_DARK},
 ]
 
 ## One entry per paintable character.
@@ -66,7 +70,6 @@ const ENTRIES := [
 	{"char": "o", "group": ITEM, "sprite": "gem", "unique": false, "run": false},
 	{"char": "O", "group": ITEM, "sprite": "gem_secret", "unique": false, "run": false},
 	{"char": "d", "group": ITEM, "sprite": "crystal", "unique": false, "run": false},
-	{"char": "J", "group": ITEM, "sprite": "spring", "unique": false, "run": false},
 
 	{"char": "P", "group": MARKER, "sprite": "player_idle", "unique": true, "run": false},
 	{"char": "X", "group": MARKER, "sprite": "icon_door", "unique": true, "run": false},
@@ -84,6 +87,24 @@ const ENTRIES := [
 	{"char": "K", "group": HAZARD, "sprite": "laser_idle", "unique": false, "run": false},
 	{"char": "h", "group": TERRAIN, "sprite": "ghost_h", "unique": false, "run": true},
 	{"char": "H", "group": TERRAIN, "sprite": "ghost_H", "unique": false, "run": true},
+	{"char": "y", "group": MARKER, "sprite": "icon_clone", "unique": false, "run": false},
+	{"char": "Y", "group": TERRAIN, "sprite": "sensor_off", "unique": false, "run": false},
+	{"char": "J", "group": TERRAIN, "sprite": "spring", "unique": false, "run": false},
+
+	# Fundo. `layer` routes the brush to its own parallel grid instead of the
+	# room's main one — see EditorScreen._set_tile() — which is what lets any
+	# number of these share a cell with each other and with an ordinary tile:
+	# a wall, a creature, a gem, none of them fight a Fundo tile for the same
+	# character slot, because a Fundo tile was never in that slot to begin
+	# with. Level.gd still also honours 'V' the old way, in the main grid —
+	# see is_in_gravity_zone() — for the campaign rooms built before this
+	# grid existed.
+	{"char": "V", "group": BACKDROP, "sprite": "grav_zone", "unique": false,
+		"run": false, "layer": "gravity"},
+	{"char": "N", "group": BACKDROP, "sprite": "no_dash_zone", "unique": false,
+		"run": false, "layer": "no_dash"},
+	{"char": "M", "group": BACKDROP, "sprite": "no_pound_zone", "unique": false,
+		"run": false, "layer": "no_pound"},
 ]
 
 ## Character -> i18n suffix. The name and the one-line note under the palette
@@ -106,6 +127,11 @@ const KEYS := {
 	"F": "ferrybat",
 	"h": "ghost_still",
 	"H": "ghost_move",
+	"V": "gravity",
+	"y": "clone_pad",
+	"Y": "sensor",
+	"N": "no_dash",
+	"M": "no_pound",
 }
 
 ## Painted over the icon where two tiles share a sprite. Three of the moving
@@ -156,6 +182,12 @@ static func note_of(ch: String) -> String:
 
 static func group_of(ch: String) -> String:
 	return str(entry(ch).get("group", TERRAIN))
+
+
+## Which parallel grid a Fundo character paints onto, or "" for the room's
+## main grid (every non-backdrop tile, plus 'V' — see the ENTRIES comment).
+static func layer_of(ch: String) -> String:
+	return str(entry(ch).get("layer", ""))
 
 
 ## Every character in one drawer, in the order written above.

@@ -39,7 +39,7 @@ func _ready() -> void:
 			_make("endless.score", str(score), Palette.GOLD),
 		]
 		items = [
-			{"id": "endless", "label": Lang.t("title.endless")},
+			{"id": "choose_mode", "label": Lang.t("ending.choose_mode")},
 			{"id": "title", "label": Lang.t("ending.menu")},
 		]
 	else:

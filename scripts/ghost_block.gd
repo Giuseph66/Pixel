@@ -1,11 +1,13 @@
 class_name GhostBlock
 extends StaticBody2D
 
-## Step 21 — ghost blocks. Solidity depends on the player's speed, not a clock
-## or a switch: 'h' is solid while everyone in the room is nearly still and
-## vanishes the moment someone runs; 'H' is the opposite. Runs of tiles are one
-## strip node, the same aggregation _spawn_conveyors() and _spawn_platforms()
-## already do — a six-tile run is one node, not six.
+## Step 21 — ghost blocks. Solidity depends on whether the player is pressing
+## anything, not a clock or a switch — and not raw speed either: reading
+## velocity meant falling off a ledge or getting thrown by a spring counted as
+## "moving" whether the player asked for it or not. 'h' is solid while nobody
+## is holding a key and vanishes the instant someone is; 'H' is the opposite.
+## Runs of tiles are one strip node, the same aggregation _spawn_conveyors()
+## and _spawn_platforms() already do — a six-tile run is one node, not six.
 ##
 ## Never solidifies on top of someone already standing inside it — it waits
 ## for them to leave instead. That is more permissive than a step-12 gate
@@ -18,8 +20,7 @@ extends StaticBody2D
 ## that can flip several times a second.
 
 const TILE := 8.0
-const MOVING := 18.0        # px/s: over this, a player counts as moving
-const HYSTERESIS := 6.0     # margin so the state can't flicker at the edge
+const COMMIT_TIME := 0.15   # the read has to hold before the state actually flips
 const FADE := 0.1           # seconds — a cut reads as a glitch, not a rule
 
 var inverted := false        # false = 'h', solid while still; true = 'H'
@@ -27,7 +28,8 @@ var length := 1
 var players: Array[Player] = []
 
 var _solid := true
-var _moving := false
+var _moving := false        # committed state — this, not the raw read, decides solidity
+var _commit_t := 0.0
 var _sprite: Sprite2D
 var _shape: CollisionShape2D
 
@@ -56,12 +58,22 @@ func _ready() -> void:
 	_apply(true, true)
 
 
-func _physics_process(_delta: float) -> void:
-	var speed := _max_player_speed()
-	# Hysteresis around whichever way the block last decided, so a player
-	# holding almost exactly the threshold speed does not make it stutter.
-	var threshold := MOVING - HYSTERESIS if _moving else MOVING + HYSTERESIS
-	_moving = speed > threshold
+func _physics_process(delta: float) -> void:
+	var raw_moving := _any_player_pressing_input()
+
+	# The read has to hold steady for COMMIT_TIME before it actually changes
+	# the block's state. Without this, tapping a key for two frames on the
+	# way past was enough to make an 'h' block vanish under a foot that was
+	# really just passing through — the state changed faster than the player
+	# could react to having caused it.
+	if raw_moving == _moving:
+		_commit_t = 0.0
+	else:
+		_commit_t += delta
+		if _commit_t >= COMMIT_TIME:
+			_moving = raw_moving
+			_commit_t = 0.0
+
 	var wants_solid := _moving if inverted else not _moving
 	if wants_solid == _solid:
 		return
@@ -73,12 +85,14 @@ func _physics_process(_delta: float) -> void:
 	_apply(wants_solid)
 
 
-func _max_player_speed() -> float:
-	var best := 0.0
+## Whether the player is doing anything, not whether they currently have
+## velocity — falling off a ledge or getting thrown by a spring is not a
+## choice to move, and reading raw speed counted it as one anyway.
+func _any_player_pressing_input() -> bool:
 	for p: Player in players:
-		if is_instance_valid(p) and p.alive:
-			best = maxf(best, absf(p.velocity.x) + absf(p.velocity.y) * 0.5)
-	return best
+		if is_instance_valid(p) and p.alive and p.moving_input:
+			return true
+	return false
 
 
 func _any_player_inside() -> bool:

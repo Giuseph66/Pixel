@@ -34,6 +34,9 @@ const ENTRIES := [
 	{"id": "pound", "kind": ABILITY, "sprite": "icon_pound"},
 	{"id": "combo", "kind": ABILITY, "sprite": "icon_combo"},
 	{"id": "charge", "kind": ABILITY, "sprite": "icon_charge"},
+	{"id": "echo", "kind": ABILITY, "sprite": "icon_echo"},
+	{"id": "clone", "kind": ABILITY, "sprite": "icon_clone"},
+	{"id": "sensor", "kind": WORLD, "sprite": "sensor_off"},
 
 	{"id": "slime", "kind": CREATURE, "sprite": "slime_a"},
 	{"id": "bat", "kind": CREATURE, "sprite": "bat_a"},
@@ -64,6 +67,7 @@ const ENTRIES := [
 	{"id": "laser", "kind": WORLD, "sprite": "laser_idle"},
 	{"id": "ferrybat", "kind": CREATURE, "sprite": "ferry_a"},
 	{"id": "ghost", "kind": WORLD, "sprite": "ghost_h"},
+	{"id": "gravity", "kind": WORLD, "sprite": "grav_zone"},
 ]
 
 ## Which entry a level tile reveals, for the pass that runs when a room builds.
@@ -106,6 +110,9 @@ const BY_TILE := {
 	"F": "ferrybat",
 	"h": "ghost",
 	"H": "ghost",
+	"V": "gravity",
+	"y": "clone",
+	"Y": "sensor",
 }
 
 

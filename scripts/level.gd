@@ -37,6 +37,15 @@ var best_combo := 0
 var switch_state := false
 var _gates: Array = []
 var _switches: Array = []
+## Step 24 — clone fantasma. Recording is level-wide state, not the player's:
+## it starts on touching 'y' and runs a fixed span regardless of what the
+## player does with it, so it lives here rather than on Player the way echo's
+## own buffer does.
+const RECORD_TIME := 5.0        # seconds captured before the clone is born
+var _recording := false
+var _record_buffer: PackedVector2Array = PackedVector2Array()
+var _record_t := 0.0
+var _sensors: Array = []
 ## Step 14 — phase blocks. A block is intangible while anyone in the room is
 ## mid-dash, so this tracks who currently is rather than trusting a single
 ## player's state in a mode where more than one can exist.
@@ -55,6 +64,10 @@ var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
 var dash_unlocked := true
 var pound_unlocked := true
+## Step 23 — echo. Read from the room's own data in setup(), not set by
+## main.gd like the two above: the ability belongs to specific rooms, not to
+## story progress, so there is no mode-wide rule to apply here.
+var echo_max := 0
 ## Step 20 — endless modifiers. main.gd sets these before add_child(); Level
 ## only has to forward them to whatever player it spawns, and to build the
 ## darkness overlay when asked. "brittle" needs none of this — it is baked
@@ -63,6 +76,20 @@ var player_speed_scale := 1.0
 var player_gravity_scale := 1.0
 var dark := false
 var _darkness: Darkness
+## Step 25 — personal-best ghost. main.gd sets both before add_child(), the
+## same way it hands over dash_unlocked: ghost_enabled is false for endless
+## and sandbox rooms (Save.record_endless()/sandbox results never compare to
+## a ghost), and is_remix picks the "r"-prefixed namespace GhostStore keeps
+## separate from the campaign's own.
+var ghost_enabled := false
+var is_remix := false
+var last_recording: PackedVector2Array = PackedVector2Array()
+## Sample indices (into last_recording) where the player landed a ground
+## pound — the one ghost pose that is a one-shot event, not something a
+## flip_v read off the room's own gravity zones can reconstruct on its own.
+var last_recording_pounds: PackedInt32Array = PackedInt32Array()
+var _ghost_player: GhostPlayer
+var _ghost_sample_t := 0.0
 var running := false
 var finished := false
 
@@ -71,6 +98,24 @@ var fx: Fx
 var _base_position := Vector2.ZERO
 var _shake := 0.0
 var _terrain: Sprite2D
+var _gravity_layer: Sprite2D
+## Step 22 — the BACKDROP category. A zone's real extent, one rect per
+## contiguous patch of 'V' the room's grid has — see _find_gravity_zones().
+var _gravity_zones: Array[Rect2i] = []
+## Fundo backdrops added after gravity: their own parallel grids instead of a
+## character sharing the main one, so a no-dash zone, a no-pound zone, a
+## gravity zone and an ordinary wall/creature/gem can all sit on the same
+## cell at once — see _bake_mod_zones().
+var _mod_layer: Sprite2D
+## The sandbox editor's own gravity zones — painted onto their own grid same
+## as no_dash/no_pound, so a room built there can stack 'V' with a wall, a
+## creature or another Fundo tile in one cell. is_in_gravity_zone() checks
+## this in addition to _gravity_zones (the legacy rect mechanism below),
+## which stays exactly as it was for the campaign rooms built before this
+## grid existed.
+var _gravity_rows: PackedStringArray = PackedStringArray()
+var _no_dash_rows: PackedStringArray = PackedStringArray()
+var _no_pound_rows: PackedStringArray = PackedStringArray()
 var _background: Sprite2D
 var _entities: Node2D
 var _bodies: Node2D
@@ -90,6 +135,12 @@ func setup(level_index: int, level_data: Dictionary) -> void:
 	rows = level_data["rows"]
 	intensity = float(level_data.get("intensity", 1.0))
 	art_seed = int(level_data.get("seed", level_index))
+	# Step 23 — echo. Absent everywhere except the four rooms built for it;
+	# 0 there means the ability does not exist, not that it is merely unused.
+	echo_max = int(level_data.get("echo", 0))
+	_gravity_rows = level_data.get("backdrop_gravity", PackedStringArray())
+	_no_dash_rows = level_data.get("backdrop_no_dash", PackedStringArray())
+	_no_pound_rows = level_data.get("backdrop_no_pound", PackedStringArray())
 
 
 func _ready() -> void:
@@ -99,6 +150,34 @@ func _ready() -> void:
 	_background.centered = false
 	_background.texture = _bake_background()
 	add_child(_background)
+
+	# Step 22 — computed once, before anything paints over a 'V' cell: a gem
+	# or any other entity character landing inside the zone's own tiles
+	# overwrites that cell in the room's baked string, and a check that only
+	# ever asked "is this exact tile still 'V'" would lose the zone right
+	# there — gravity flips back off for one tile-sized patch, exactly under
+	# whatever is sitting on it. The bounding box of each contiguous patch of
+	# 'V' survives that hole, so the zone's real extent is what a room author
+	# drew, not whatever characters happen to still say 'V' after every gem
+	# and marker has landed on top of it.
+	_gravity_zones = _find_gravity_zones()
+
+	# Its own layer, between the background and the terrain, so a gravity
+	# zone reads as a tinted wall sitting behind the room instead of a
+	# texture painted onto the same layer real solid blocks are — and filled
+	# from _gravity_zones rather than from individual 'V' tiles, for the same
+	# hole-under-a-gem reason.
+	_gravity_layer = Sprite2D.new()
+	_gravity_layer.centered = false
+	_gravity_layer.texture = _bake_gravity_zones()
+	add_child(_gravity_layer)
+
+	# Same layer depth as gravity, for the same reason: a backdrop, not a
+	# texture on a real block.
+	_mod_layer = Sprite2D.new()
+	_mod_layer.centered = false
+	_mod_layer.texture = _bake_mod_zones()
+	add_child(_mod_layer)
 
 	_terrain = Sprite2D.new()
 	_terrain.centered = false
@@ -121,6 +200,14 @@ func _ready() -> void:
 		_darkness.player = _player
 		_darkness.glow_provider = Callable(self, "_dark_glow_positions")
 		add_child(_darkness)
+	if ghost_enabled:
+		var loaded := GhostStore.load(Save.active, str(data.get("id", "")), is_remix)
+		var recorded: PackedVector2Array = loaded["samples"]
+		if not recorded.is_empty():
+			_ghost_player = GhostPlayer.new()
+			_ghost_player.setup(recorded, loaded["pounds"])
+			_ghost_player.gravity_zone_at = Callable(self, "is_in_gravity_zone")
+			add_child(_ghost_player)
 	if Session.is_active():
 		Session.snapshot_received.connect(_on_network_snapshot)
 		Session.world_event_received.connect(_on_network_world_event)
@@ -135,6 +222,8 @@ func _process(delta: float) -> void:
 	if running and not finished:
 		time += delta
 
+	_update_sensors()
+
 	if _shake > 0.0:
 		_shake = maxf(_shake - delta * 26.0, 0.0)
 		position = _base_position + Vector2(
@@ -146,6 +235,30 @@ func _process(delta: float) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	# Recording runs unconditionally — offline, online, host or not — because
+	# it is sampling the local player's own position, the same thing every
+	# other per-frame read in this file (previous_bottom, ground_tile) does.
+	if _recording and running and not finished:
+		_record_t += delta
+		if _record_t <= RECORD_TIME:
+			var player := get_player()
+			if player != null:
+				_record_buffer.append(player.global_position)
+		else:
+			_recording = false
+			_spawn_clone()
+
+	# Step 25 — sampled far coarser than physics (20Hz, not 60) because a
+	# ghost is a background read, not a hitbox; a run under the 90s cap this
+	# buys back in file size instead is the whole reason GhostStore exists.
+	if ghost_enabled and running and not finished:
+		_ghost_sample_t += delta
+		if _ghost_sample_t >= 1.0 / float(GhostStore.SAMPLE_HZ):
+			_ghost_sample_t = 0.0
+			var player := get_player()
+			if player != null and last_recording.size() < GhostStore.MAX_SAMPLES:
+				last_recording.append(player.global_position)
+
 	if not Session.is_active() or not Session.is_host() or not running:
 		return
 	_snapshot_time += delta
@@ -201,7 +314,7 @@ func tile_at(tx: int, ty: int) -> String:
 ## else in the grid.
 func is_air(tx: int, ty: int) -> bool:
 	var ch := tile_at(tx, ty)
-	return ch == "." or ch == "u" or ch == "U"
+	return ch == "." or ch == "u" or ch == "U" or ch == "V"
 
 
 ## Terrain that gets baked into the static collision. Ice and conveyors are
@@ -331,6 +444,130 @@ func _bake_background() -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+## Step 22 — gravity zones, on their own layer behind the terrain. 'V' is air
+## as far as physics is concerned (is_air() already says so) — this is only
+## the backdrop that tells the player where the rule is about to change.
+func _bake_gravity_zones() -> ImageTexture:
+	var w := Levels.COLS * TILE
+	var h := Levels.ROWS * TILE
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	for zone: Rect2i in _gravity_zones:
+		for ty in range(zone.position.y, zone.end.y):
+			for tx in range(zone.position.x, zone.end.x):
+				PixelArt.paint_gravity_zone(img, tx, ty,
+					zone.has_point(Vector2i(tx, ty - 1)),
+					zone.has_point(Vector2i(tx, ty + 1)),
+					zone.has_point(Vector2i(tx - 1, ty)),
+					zone.has_point(Vector2i(tx + 1, ty)))
+
+	return ImageTexture.create_from_image(img)
+
+
+## Whether (tx, ty) sits inside any gravity zone — the check Player runs
+## every physics frame. Two sources, checked together: the legacy rect
+## mechanism built for campaign rooms (rect containment, not a grid read, for
+## the reason _bake_gravity_zones() no longer reads the grid either), and the
+## sandbox editor's own backdrop_gravity grid, which never needs a hole
+## worked around in the first place — see _mod_row().
+func is_in_gravity_zone(tx: int, ty: int) -> bool:
+	var p := Vector2i(tx, ty)
+	for zone: Rect2i in _gravity_zones:
+		if zone.has_point(p):
+			return true
+	return _mod_row(_gravity_rows, ty, tx)
+
+
+## One rect per contiguous patch of 'V' cells still present in the room's
+## baked string. Flood fill rather than a single global bounding box, so two
+## separate zones in the same room never merge into one that also covers the
+## ordinary floor between them; and a bounding box rather than exact cell
+## membership, so a gem or any other entity character sitting on one of the
+## zone's own tiles — puts() overwrites whatever was there — never carves a
+## hole out of the zone it landed inside. A hole that does not touch the
+## zone's own edge cannot disconnect the fill around it, so the rect comes
+## back whole either way.
+func _find_gravity_zones() -> Array[Rect2i]:
+	var visited: Dictionary = {}
+	var zones: Array[Rect2i] = []
+	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+	for ty in Levels.ROWS:
+		for tx in Levels.COLS:
+			var here := Vector2i(tx, ty)
+			if tile_at(tx, ty) != "V" or visited.has(here):
+				continue
+			var stack: Array[Vector2i] = [here]
+			visited[here] = true
+			var min_p := here
+			var max_p := here
+			while not stack.is_empty():
+				var p: Vector2i = stack.pop_back()
+				min_p.x = mini(min_p.x, p.x)
+				min_p.y = mini(min_p.y, p.y)
+				max_p.x = maxi(max_p.x, p.x)
+				max_p.y = maxi(max_p.y, p.y)
+				for d: Vector2i in dirs:
+					var np := p + d
+					if visited.has(np):
+						continue
+					if tile_at(np.x, np.y) == "V":
+						visited[np] = true
+						stack.append(np)
+			zones.append(Rect2i(min_p, max_p - min_p + Vector2i.ONE))
+	return zones
+
+
+## Fundo — no-dash and no-pound zones. Unlike gravity's 'V', these live on
+## their own grids that nothing else ever writes to, so a direct read of
+## (tx, ty) is the whole check: no hole-under-a-gem problem to route around,
+## because the gem's char lives in `rows`, not here.
+func is_no_dash_zone(tx: int, ty: int) -> bool:
+	return _mod_row(_no_dash_rows, ty, tx)
+
+
+func is_no_pound_zone(tx: int, ty: int) -> bool:
+	return _mod_row(_no_pound_rows, ty, tx)
+
+
+func _mod_row(grid: PackedStringArray, ty: int, tx: int) -> bool:
+	if ty < 0 or ty >= grid.size():
+		return false
+	var line: String = grid[ty]
+	return tx >= 0 and tx < line.length() and line[tx] != "."
+
+
+## The sandbox editor's own Fundo grids, painted onto one backdrop layer,
+## tinted apart so two zones stacked on the same cell still read as two
+## things, not one. Gravity here is _gravity_rows only, deliberately not
+## is_in_gravity_zone() — a legacy campaign room's rect gets its checker from
+## _gravity_layer already, and painting it a second time here would just be
+## the same pattern drawn twice.
+func _bake_mod_zones() -> ImageTexture:
+	var w := Levels.COLS * TILE
+	var h := Levels.ROWS * TILE
+	var img := Image.create_empty(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+
+	for ty in Levels.ROWS:
+		for tx in Levels.COLS:
+			if _mod_row(_gravity_rows, ty, tx):
+				PixelArt.paint_gravity_zone(img, tx, ty,
+					_mod_row(_gravity_rows, ty - 1, tx), _mod_row(_gravity_rows, ty + 1, tx),
+					_mod_row(_gravity_rows, ty, tx - 1), _mod_row(_gravity_rows, ty, tx + 1))
+			if is_no_dash_zone(tx, ty):
+				PixelArt.paint_no_dash_zone(img, tx, ty,
+					is_no_dash_zone(tx, ty - 1), is_no_dash_zone(tx, ty + 1),
+					is_no_dash_zone(tx - 1, ty), is_no_dash_zone(tx + 1, ty))
+			if is_no_pound_zone(tx, ty):
+				PixelArt.paint_no_pound_zone(img, tx, ty,
+					is_no_pound_zone(tx, ty - 1), is_no_pound_zone(tx, ty + 1),
+					is_no_pound_zone(tx - 1, ty), is_no_pound_zone(tx + 1, ty))
+
+	return ImageTexture.create_from_image(img)
+
+
 func _bake_terrain() -> ImageTexture:
 	var w := Levels.COLS * TILE
 	var h := Levels.ROWS * TILE
@@ -431,6 +668,10 @@ func _spawn_entities() -> void:
 	_lasers = []
 	_portal_a = null
 	_portal_b = null
+	_recording = false
+	_record_buffer = PackedVector2Array()
+	_record_t = 0.0
+	_sensors = []
 
 	for ty in Levels.ROWS:
 		for tx in Levels.COLS:
@@ -552,6 +793,16 @@ func _spawn_entities() -> void:
 					pad.pressed.connect(_on_switch_pressed)
 					_entities.add_child(pad)
 					_switches.append(pad)
+				"y":
+					var record_pad := RecordPad.new()
+					record_pad.position = tile_center(tx, ty)
+					record_pad.touched.connect(_on_record_pad_touched.bind(record_pad))
+					_entities.add_child(record_pad)
+				"Y":
+					var sensor := Sensor.new()
+					sensor.position = tile_center(tx, ty)
+					_entities.add_child(sensor)
+					_sensors.append(sensor)
 				"g", "G":
 					var gate := GateBlock.new()
 					gate.inverted = ch == "G"
@@ -773,7 +1024,11 @@ func _spawn_player(peer_id: int) -> void:
 	player.pound_unlocked = pound_unlocked
 	player.speed_scale = player_speed_scale
 	player.gravity_scale = player_gravity_scale
+	player.echo_max = echo_max
 	player.surface_at = Callable(self, "tile_at")
+	player.gravity_zone_at = Callable(self, "is_in_gravity_zone")
+	player.no_dash_zone_at = Callable(self, "is_no_dash_zone")
+	player.no_pound_zone_at = Callable(self, "is_no_pound_zone")
 	player.died.connect(_on_player_died.bind(player))
 	player.pounded.connect(_on_player_pounded.bind(player))
 	player.combo_changed.connect(_on_combo_changed.bind(player))
@@ -854,6 +1109,10 @@ func _collect_gem(gem: Gem) -> void:
 ## standing right there is squashed. The player does not know what is nearby,
 ## so the level answers for it.
 func _on_player_pounded(at: Vector2, player: Player) -> void:
+	if ghost_enabled and player == get_player() and last_recording.size() < GhostStore.MAX_SAMPLES:
+		# The nearest 20Hz sample not yet appended — up to one tick (50ms) off
+		# the real landing, which a flash of squash never shows.
+		last_recording_pounds.append(last_recording.size())
 	if Session.is_active() and not Session.is_host():
 		if player.locally_controlled:
 			Session.publish_player_event("POUND", {"x": at.x, "y": at.y})
@@ -917,6 +1176,61 @@ func toggle_switch() -> void:
 	_apply_switch_state(not switch_state)
 	if Session.is_active() and Session.is_host():
 		Session.publish_world_event("SWITCH_STATE", {"state": switch_state})
+
+
+# ------------------------------------------------------------------- clone ---
+
+## One-shot: touching the pad a second time (a clone standing on it counts as
+## touching nothing, since only the player triggers this signal) never
+## restarts a recording already running.
+func _on_record_pad_touched(pad: RecordPad) -> void:
+	if _recording or not is_instance_valid(pad):
+		return
+	_recording = true
+	_record_t = 0.0
+	_record_buffer = PackedVector2Array()
+	pad.queue_free()
+
+
+func _spawn_clone() -> void:
+	if _record_buffer.is_empty():
+		return
+	var clone := Clone.new()
+	clone.setup(_record_buffer)
+	_entities.add_child(clone)
+
+
+## Sensors hold switch_state the way a step-12 button toggles it — the only
+## difference is a sensor's value is read fresh every frame instead of
+## flipped once on a press, so a gate it opens closes again the instant
+## nothing is left standing on it.
+func _update_sensors() -> void:
+	if _sensors.is_empty():
+		return
+	var any_pressed := false
+	for sensor: Sensor in _sensors:
+		var pressed := _weight_on(sensor.global_position)
+		sensor.set_pressed(pressed)
+		any_pressed = any_pressed or pressed
+	if any_pressed != switch_state:
+		_apply_switch_state(any_pressed)
+
+
+func _weight_on(center: Vector2) -> bool:
+	var half := Vector2(4.0, 4.0)
+	var body_half := Vector2(Player.WIDTH, Player.HEIGHT) * 0.5
+	for player: Player in get_players():
+		if player.alive and _aabb_overlap(player.global_position, body_half, center, half):
+			return true
+	for child in _entities.get_children():
+		if child is Clone and _aabb_overlap((child as Node2D).global_position, body_half, center, half):
+			return true
+	return false
+
+
+func _aabb_overlap(pos_a: Vector2, half_a: Vector2, pos_b: Vector2, half_b: Vector2) -> bool:
+	var d := pos_a - pos_b
+	return absf(d.x) < half_a.x + half_b.x and absf(d.y) < half_a.y + half_b.y
 
 
 func _apply_switch_state(value: bool) -> void:
@@ -1255,4 +1569,11 @@ func restart() -> void:
 	# needs pointing at the player restart() rebuilt.
 	if _darkness != null:
 		_darkness.player = _player
+	# The recording is of the attempt that just ended, not the accumulated
+	# time since the room first opened — a fresh attempt starts a fresh trace.
+	last_recording = PackedVector2Array()
+	last_recording_pounds = PackedInt32Array()
+	_ghost_sample_t = 0.0
+	if _ghost_player != null:
+		_ghost_player.restart()
 	running = true
