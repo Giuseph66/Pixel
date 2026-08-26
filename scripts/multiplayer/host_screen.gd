@@ -224,9 +224,13 @@ func _rebuild_items() -> void:
 	cursor = clampi(cursor, 0, maxi(items.size() - 1, 0))
 
 
+## draw_header() runs before the title (see Menu._draw()), and the title
+## sits scale-3 across y 34-55 — a status line inside that band draws behind
+## the title's own glyphs instead of above or below them. The band above the
+## title is otherwise empty, so the message goes there instead.
 func draw_header() -> void:
 	if not message.is_empty():
-		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 42.0, Palette.MAGENTA, 1)
+		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 8.0, Palette.MAGENTA, 1)
 
 
 func _draw_item(i: int) -> void:

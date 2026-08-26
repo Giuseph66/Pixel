@@ -242,6 +242,10 @@ func _ready() -> void:
 	sprite.texture = _player_texture("player_idle", color_index)
 	add_child(sprite)
 
+	# A remote player ticks before its first network packet can arrive. Starting
+	# at the spawn position prevents that first frame from snapping it to (0, 0).
+	_network_target = position
+	_network_age = 0.0
 	previous_bottom = position.y + HEIGHT * 0.5 * gravity_dir
 	# The two moves you have before the game teaches you anything.
 	Save.discover("run")

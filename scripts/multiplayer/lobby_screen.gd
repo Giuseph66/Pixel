@@ -119,6 +119,41 @@ func _on_error(_reason: String) -> void:
 	_refresh()
 
 
+func _copy_button_rect() -> Rect2:
+	return Rect2(SCREEN.x - 34.0, 61.0, 18.0, 18.0)
+
+
+func _copy_room_code() -> void:
+	var code := str(Session.config.get("room_code", ""))
+	if code.is_empty():
+		message = "CODIGO INDISPONIVEL"
+		return
+	DisplayServer.clipboard_set(code)
+	message = "CODIGO COPIADO"
+
+
+func _input(event: InputEvent) -> void:
+	super(event)
+	if not Session.is_online() or not (event is InputEventMouseButton):
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or not event.pressed:
+		return
+	if _copy_button_rect().grow(3.0).has_point(event.position):
+		_copy_room_code()
+		get_viewport().set_input_as_handled()
+
+
+func _draw_copy_button() -> void:
+	if not Session.is_online():
+		return
+	var rect := _copy_button_rect()
+	var hover := rect.grow(3.0).has_point(get_local_mouse_position())
+	Util.draw_panel(self, rect, Palette.BG_SOFT, Palette.CYAN if hover else Palette.GREY_DARK)
+	var ink := Palette.WHITE if hover else Palette.GREY
+	draw_rect(Rect2(rect.position + Vector2(7.0, 4.0), Vector2(6.0, 7.0)), ink, false, 1.0)
+	draw_rect(Rect2(rect.position + Vector2(4.0, 7.0), Vector2(6.0, 7.0)), ink, false, 1.0)
+
+
 func _mode_label(mode: String) -> String:
 	return {"story": "HISTORIA", "endless": "INFINITO", "competitive": "CORRIDA", "sandbox": "SANDBOX"}.get(mode, mode.to_upper())
 
@@ -143,3 +178,4 @@ func draw_header() -> void:
 		y += 12.0
 	if not message.is_empty():
 		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 138.0, Palette.MAGENTA, 1)
+	_draw_copy_button()

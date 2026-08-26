@@ -66,6 +66,13 @@ func _handle_input() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if online and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+			and event.pressed and _paste_button_rect().grow(3.0).has_point(event.position):
+		_paste_room_code()
+		_editing = ""
+		_input_cooldown = 0.12
+		get_viewport().set_input_as_handled()
+		return
 	if _editing.is_empty() or not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
@@ -135,6 +142,31 @@ func _set_text(id: String, value: String) -> void:
 		"address": address = value
 		"password": password = value
 	_refresh()
+
+
+func _paste_button_rect() -> Rect2:
+	return Rect2(450.0, list_top + line_height * 2.0 - 3.0, 18.0, 16.0)
+
+
+func _paste_room_code() -> void:
+	var copied := DisplayServer.clipboard_get().strip_edges().to_upper()
+	if copied.is_empty():
+		message = "AREA DE TRANSFERENCIA VAZIA"
+		return
+	room_code = copied.left(32)
+	message = "CODIGO COLADO"
+	_refresh()
+
+
+func _draw_paste_button() -> void:
+	if not online:
+		return
+	var rect := _paste_button_rect()
+	var hover := rect.grow(3.0).has_point(get_local_mouse_position())
+	Util.draw_panel(self, rect, Palette.BG_SOFT, Palette.CYAN if hover else Palette.GREY_DARK)
+	var ink := Palette.WHITE if hover else Palette.GREY
+	draw_rect(Rect2(rect.position + Vector2(4.0, 5.0), Vector2(6.0, 7.0)), ink, false, 1.0)
+	draw_rect(Rect2(rect.position + Vector2(7.0, 3.0), Vector2(6.0, 7.0)), ink, false, 1.0)
 
 
 func _on_session_state(next: int, _reason: String) -> void:
@@ -209,9 +241,13 @@ func _rebuild_items() -> void:
 	cursor = clampi(cursor, 0, maxi(items.size() - 1, 0))
 
 
+## draw_header() runs before the title (see Menu._draw()), and the title
+## sits scale-3 across y 34-55 — a status line inside that band draws behind
+## the title's own glyphs instead of above or below them. The band above the
+## title is otherwise empty, so the message goes there instead.
 func draw_header() -> void:
 	if not message.is_empty():
-		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 50.0, Palette.MAGENTA, 1)
+		PixelFont.draw_text_centered(self, message, SCREEN.x * 0.5, 8.0, Palette.MAGENTA, 1)
 
 
 func _draw_item(i: int) -> void:
@@ -229,3 +265,5 @@ func _draw_item(i: int) -> void:
 		var size := PixelFont.measure(value, 1)
 		var value_color := Player.player_color(color_index) if str(item["id"]) == "color" else color
 		PixelFont.draw_text(self, value, Vector2(438.0 - size.x, y), value_color, 1)
+	if online and str(item["id"]) == "code":
+		_draw_paste_button()

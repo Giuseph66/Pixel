@@ -530,12 +530,8 @@ func _on_online_room_joined(session: Dictionary) -> void:
 	if not is_client() or not _online:
 		return
 	var room: Dictionary = session.get("room", {})
-	var raw_members: Variant = room.get("members", [])
-	var members: Array = []
-	if raw_members is Array:
-		members.assign(raw_members)
 	var host_member: Dictionary = {}
-	for raw_member: Variant in members:
+	for raw_member: Variant in Array(room.get("members", [])):
 		var candidate := Dictionary(raw_member)
 		if bool(candidate.get("host", false)):
 			host_member = candidate
@@ -546,7 +542,7 @@ func _on_online_room_joined(session: Dictionary) -> void:
 	var local_member: Dictionary = session.get("member", {})
 	var web_rtc := WebRtcTransport.new()
 	web_rtc.signal_outgoing.connect(_on_online_signal_outgoing)
-	for raw_member: Variant in members:
+	for raw_member: Variant in Array(room.get("members", [])):
 		web_rtc.register_member(Dictionary(raw_member))
 	var err := web_rtc.open_client(int(local_member.get("peer_id", 0)), host_member, _signal.ice_servers)
 	if err != OK:

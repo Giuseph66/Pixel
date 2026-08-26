@@ -6,6 +6,16 @@ extends NetworkTransport
 
 signal signal_outgoing(to: String, signal_type: String, data: Dictionary)
 
+## Transfer channels used by SessionManager RPCs. Channel zero is created by
+## WebRTCMultiplayerPeer itself; this array declares channels 1 through 4.
+## Host and client must use the exact same order and transfer modes.
+const EXTRA_CHANNELS := [
+	MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED, # 1: client input
+	MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED, # 2: host snapshots
+	MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED, # 3: client state
+	MultiplayerPeer.TRANSFER_MODE_RELIABLE,           # 4: player events
+]
+
 var _web_rtc: WebRTCMultiplayerPeer
 var _ice_servers: Array = []
 var _connections: Dictionary = {}
@@ -27,7 +37,7 @@ func open_host(ice_servers: Array) -> Error:
 	if native_error != OK:
 		return native_error
 	_web_rtc = WebRTCMultiplayerPeer.new()
-	var err := _web_rtc.create_server()
+	var err := _web_rtc.create_server(EXTRA_CHANNELS)
 	if err == OK:
 		peer = _web_rtc
 	return err
@@ -40,7 +50,7 @@ func open_client(local_id: int, host_member: Dictionary, ice_servers: Array) -> 
 	if native_error != OK:
 		return native_error
 	_web_rtc = WebRTCMultiplayerPeer.new()
-	var err := _web_rtc.create_client(local_id)
+	var err := _web_rtc.create_client(local_id, EXTRA_CHANNELS)
 	if err != OK:
 		return err
 	peer = _web_rtc
