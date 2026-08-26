@@ -65,6 +65,18 @@ static func blank_slot() -> Dictionary:
 		"play_time": 0.0,
 		"gems_taken": 0,        # every gem ever picked up, not the best per room
 		"codex": {},            # entry id -> true, once seen
+		# Step 11 — the remix's own progress, kept apart from the campaign's so
+		# a mirrored clear never counts toward cleared_count() and thus toward
+		# unlocking the remix itself. Declared here rather than created on
+		# first use because _read() only copies keys a blank slot already
+		# names: absent from this dictionary, it is absent from every loaded
+		# slot too, and every remix reader indexes it directly.
+		"remix": {
+			"best_times": {},   # room id -> seconds
+			"cleared": {},      # room id -> true
+			"gems": {},         # room id -> best gem count
+			"medals": {},       # room id -> bitmask, same bits as the campaign
+		},
 		# Bumped when the key format changes. Two things depend on it living
 		# here. _read() only copies keys a blank slot already declares, so a
 		# marker missing from this dictionary would never survive a restart and
@@ -127,6 +139,7 @@ func _read(path: String) -> void:
 
 	for slot: Dictionary in slots:
 		_migrate_to_schema_2(slot)
+		_repair_remix(slot)
 
 
 func _import_legacy() -> void:
@@ -161,6 +174,22 @@ const SCHEMA_1_ORDER := [
 	"spring_tower", "wall_finale", "first_dash", "crystal_chain", "platform_ride",
 	"beat", "dash_gauntlet", "mid_finale", "slam", "break_in", "chain_bounce",
 ]
+
+
+## _read() replaces a declared key with whatever the file held for it, so the
+## well-formed default above survives only as long as the file agrees. Every
+## remix reader indexes the four sub-dictionaries directly; this puts back any
+## the file is missing rather than letting the mode raise on the first read.
+## Saves written before the remix existed have no "remix" at all and land here
+## with the blank default already in place, which is exactly right.
+func _repair_remix(slot: Dictionary) -> void:
+	if typeof(slot.get("remix")) != TYPE_DICTIONARY:
+		slot["remix"] = blank_slot()["remix"]
+		return
+	var remix: Dictionary = slot["remix"]
+	for field: String in ["best_times", "cleared", "gems", "medals"]:
+		if typeof(remix.get(field)) != TYPE_DICTIONARY:
+			remix[field] = {}
 
 
 func _migrate_to_schema_2(slot: Dictionary) -> void:
@@ -324,8 +353,13 @@ func record_clear_remix(index: int, time: float, gems: int, total_gems: int,
 		earned |= MEDAL_GEMS
 	if deaths == 0:
 		earned |= MEDAL_CLEAN
-	remix["medals"][key] = medals_remix(index) | earned
-	last_awarded = earned & ~medals_remix(index)
+	# Read what was held BEFORE writing the union back, the way _award() does.
+	# Reading it again afterwards asks "what is new" of a set that already
+	# contains everything this attempt won, which is always nothing — and a
+	# first medal never got its flash on the results screen because of it.
+	var before := medals_remix(index)
+	remix["medals"][key] = before | earned
+	last_awarded = earned & ~before
 
 	save_game()
 	return record

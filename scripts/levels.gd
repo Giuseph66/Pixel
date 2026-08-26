@@ -98,11 +98,21 @@ static func mirror(rows: PackedStringArray) -> PackedStringArray:
 
 	for y in out.size():
 		var x := out[y].find("X")
-		if x > 0:
-			var line := out[y]
-			line[x] = "."
-			line[x - 1] = "X"
-			out[y] = line
+		if x <= 0:
+			continue
+		# Only when the door still has something to stand on afterwards. A door
+		# built on the last tile of its slab reverses onto that slab's first
+		# tile, and nudging it one further walks it off the end into the drop
+		# the slab was there to finish — a correction to how the frame is
+		# drawn is not worth breaking where the frame actually sits.
+		var below := "#" if y + 1 >= out.size() else out[y + 1][x - 1]
+		if below != "#" and below != "-" and below != "~" \
+				and below != ">" and below != "<":
+			continue
+		var line := out[y]
+		line[x] = "."
+		line[x - 1] = "X"
+		out[y] = line
 	return out
 
 

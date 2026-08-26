@@ -24,6 +24,7 @@ func _ready() -> void:
 	failures += _check_copy()
 	failures += await _check_input_guard()
 	failures += _check_mirror()
+	failures += _check_remix_save()
 	failures += await _check_switch()
 	failures += await _check_wind()
 	failures += await _check_phase()
@@ -517,6 +518,75 @@ func _check_mirror() -> int:
 		if spawns != 1:
 			bad += _fail("mirror('%s') has %d spawns, expected 1" % [id, spawns])
 
+		# The door shift is a visual correction, and it used to be applied
+		# without asking what the door was standing on: a door built on the
+		# last tile of its slab lands one column past the end of that slab
+		# once the room is reversed, hanging over the drop it was meant to
+		# finish. Counting doors cannot see that — only the tile under it can.
+		bad += _check_door_footing(id, mirrored)
+
+	return bad
+
+
+## Ground directly under the exit, the same rule tools/verify_rooms.py applies
+## to the un-mirrored campaign.
+func _check_door_footing(id: String, rows: PackedStringArray) -> int:
+	for y in rows.size():
+		var x := rows[y].find("X")
+		if x < 0:
+			continue
+		var below := "#" if y + 1 >= rows.size() else rows[y + 1][x]
+		if below != "#" and below != "-" and below != "~" \
+				and below != ">" and below != "<":
+			return _fail("mirror('%s') left its door at (%d,%d) standing on '%s'"
+				% [id, x, y, below])
+	return 0
+
+
+## Step 11 — remix progress. Its four sub-dictionaries live under a "remix"
+## key that every remix reader indexes directly, and _read() only ever copies
+## keys blank_slot() already declares — so a slot missing the key is not a
+## stale field, it is every remix call in the game raising "Invalid access to
+## key 'remix'" the moment the mode is opened.
+func _check_remix_save() -> int:
+	var bad := 0
+
+	var blank := Save.blank_slot()
+	if not blank.has("remix"):
+		bad += _fail("blank_slot() does not declare a 'remix' key")
+	else:
+		for field: String in ["cleared", "best_times", "gems", "medals"]:
+			if not (blank["remix"] as Dictionary).has(field):
+				bad += _fail("a blank slot's remix data has no '%s'" % field)
+
+	# Every reader, against a fresh slot, exactly as the level select calls
+	# them for each room it draws.
+	var restore := Save.data
+	var was_tracking := Save.tracking
+	Save.data = Save.blank_slot()
+	Save.tracking = true
+
+	if Save.is_cleared_remix(0) or Save.medals_remix(0) != 0 \
+			or Save.best_gems_remix(0) != 0 or Save.best_time_remix(0) != 0.0:
+		bad += _fail("a fresh slot reports remix progress it never had")
+
+	# Medals are handed out cumulatively, and last_awarded is meant to carry
+	# only what this attempt won for the first time — reading the stored set
+	# after it has already been written back makes that difference zero, and
+	# a first medal never gets its flash on the results screen.
+	Save.record_clear_remix(0, 1.0, 1, 1, 0, 100.0)
+	if Save.last_awarded != (Save.MEDAL_TIME | Save.MEDAL_GEMS | Save.MEDAL_CLEAN):
+		bad += _fail("a first remix clear awarded %d, wanted all three medals"
+			% Save.last_awarded)
+	if Save.medals_remix(0) != (Save.MEDAL_TIME | Save.MEDAL_GEMS | Save.MEDAL_CLEAN):
+		bad += _fail("a first remix clear stored %d medals" % Save.medals_remix(0))
+
+	Save.record_clear_remix(0, 1.0, 1, 1, 0, 100.0)
+	if Save.last_awarded != 0:
+		bad += _fail("repeating a remix clear re-awarded %d" % Save.last_awarded)
+
+	Save.data = restore
+	Save.tracking = was_tracking
 	return bad
 
 
