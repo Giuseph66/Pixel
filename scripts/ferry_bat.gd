@@ -8,6 +8,7 @@ extends AnimatableBody2D
 ## is ever a ride, which is what keeps it a creature rather than a slab.
 
 signal dived
+signal state_changed(at: Vector2, state: int, time: float, direction: int, carrying: bool, carry: float)
 
 const SPEED := 26.0
 const SPAN := 48.0       # generous fixed reach — wide enough for the gaps the
@@ -100,10 +101,13 @@ func _check_carry(delta: float) -> void:
 		for player: Player in players:
 			if not player.alive:
 				continue
+			if Session.is_active() and not player.locally_controlled:
+				continue
 			var collision := player.get_last_slide_collision()
 			if collision != null and collision.get_collider() == self:
 				_carrying = true
 				_carry = CARRY_TIME
+				_emit_state_changed()
 				break
 	if not _carrying:
 		return
@@ -124,11 +128,19 @@ func _dive() -> void:
 	set_deferred("collision_layer", 0)
 	_mortal.set_deferred("monitoring", false)
 	dived.emit()
+	_emit_state_changed()
+
+
+func _emit_state_changed() -> void:
+	state_changed.emit(global_position, _state, _time, _direction, _carrying, _carry)
 
 
 func _on_touched(body: Node2D) -> void:
 	if body is Player and (body as Player).alive:
-		(body as Player).kill()
+		var player := body as Player
+		if Session.is_active() and not player.locally_controlled:
+			return
+		player.kill()
 
 
 func network_state() -> Dictionary:

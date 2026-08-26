@@ -396,25 +396,18 @@ func network_snapshot() -> Dictionary:
 		"anim": _network_anim if client_authority else _sprite_key,
 		"charge": charge_ratio,
 		"wall": _network_wall_dir if client_authority else _wall_dir,
+		"gravity": gravity_dir,
 		"dashing": _dash > 0.0,
+		"input": moving_input,
 	}
 
 
 func apply_network_snapshot(snapshot: Dictionary) -> void:
 	var target := Vector2(float(snapshot.get("x", position.x)), float(snapshot.get("y", position.y)))
 	if locally_controlled and Session.is_client():
-		# The local client already simulated this player. Only host-owned states
-		# such as death and freeze are accepted back; position stays responsive.
-		var was_alive := alive
-		alive = bool(snapshot.get("alive", alive))
-		# The local door tween begins before the host's next snapshot. Keep it
-		# frozen so an older host snapshot cannot reveal the player again.
-		frozen = true if _door_entering else bool(snapshot.get("frozen", frozen))
-		if not alive or (not was_alive and alive):
-			position = target
-			_network_target = target
-			velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
-		_sync_sprite_visibility()
+		# A client owns its character completely: accepting an older host snapshot
+		# here could undo a locally verified death, jump or collision for a frame.
+		# The host still forwards this state to every *other* peer.
 		return
 	if locally_controlled:
 		if position.distance_to(target) > 18.0:
@@ -432,6 +425,9 @@ func apply_network_snapshot(snapshot: Dictionary) -> void:
 	_network_anim = _player_animation(str(snapshot.get("anim", _network_anim)))
 	_network_charge = clampf(float(snapshot.get("charge", 0.0)), 0.0, 1.0)
 	_network_wall_dir = clampi(int(snapshot.get("wall", 0)), -1, 1)
+	gravity_dir = -1.0 if float(snapshot.get("gravity", gravity_dir)) < 0.0 else 1.0
+	up_direction = Vector2(0.0, -gravity_dir)
+	moving_input = bool(snapshot.get("input", moving_input))
 	_apply_network_dash(bool(snapshot.get("dashing", false)))
 	_sync_sprite_visibility()
 
@@ -450,6 +446,9 @@ func apply_client_state(snapshot: Dictionary) -> void:
 	_network_anim = _player_animation(str(snapshot.get("anim", _network_anim)))
 	_network_charge = clampf(float(snapshot.get("charge", 0.0)), 0.0, 1.0)
 	_network_wall_dir = clampi(int(snapshot.get("wall", 0)), -1, 1)
+	gravity_dir = -1.0 if float(snapshot.get("gravity", gravity_dir)) < 0.0 else 1.0
+	up_direction = Vector2(0.0, -gravity_dir)
+	moving_input = bool(snapshot.get("input", moving_input))
 	_apply_network_dash(bool(snapshot.get("dashing", false)))
 	_sync_sprite_visibility()
 
@@ -649,6 +648,8 @@ func is_dashing() -> bool:
 ## progress keeps landing on this new heading too, since otherwise it would
 ## finish travelling toward a direction the exit never pointed at.
 func redirect(new_velocity: Vector2) -> void:
+	if not accepts_local_interactions():
+		return
 	velocity = new_velocity
 	if _dash > 0.0:
 		_dash_dir = new_velocity.normalized() if new_velocity != Vector2.ZERO else _dash_dir
@@ -1128,6 +1129,7 @@ func _update_remote_sprite() -> void:
 		sprite.flip_h = _network_wall_dir > 0
 	else:
 		sprite.flip_h = facing < 0
+	sprite.flip_v = gravity_dir < 0.0
 
 
 func network_action(kind: String, direction: Vector2) -> void:
@@ -1192,8 +1194,14 @@ static func player_color_name(index: int) -> String:
 
 # ------------------------------------------------------------- reactions ---
 
+## In an online room, each machine validates collisions and reactions for its
+## own avatar. Remote puppets are render-only, even while their state is being
+## mirrored by the host.
+func accepts_local_interactions() -> bool:
+	return not networked or locally_controlled
+
 func spring_bounce() -> void:
-	if frozen or not alive:
+	if frozen or not alive or not accepts_local_interactions():
 		return
 	_add_verb(Verb.SPRING)
 	refill_dash()
@@ -1208,7 +1216,7 @@ func spring_bounce() -> void:
 ## Bouncing off an enemy. Each one taken without touching the ground in
 ## between throws you higher, so a row of them is a route rather than a queue.
 func stomp() -> void:
-	if frozen or not alive:
+	if frozen or not alive or not accepts_local_interactions():
 		return
 	_found("stomp")
 	_add_verb(Verb.STOMP)
@@ -1277,6 +1285,8 @@ func wall_tile() -> String:
 
 
 func push(force: Vector2) -> void:
+	if not accepts_local_interactions():
+		return
 	external_force += force
 
 
@@ -1302,9 +1312,7 @@ func enter_door(at: Vector2) -> void:
 func kill() -> void:
 	if not alive or frozen:
 		return
-	# Only the host may decide a network death. Clients receive it in the next
-	# authoritative snapshot instead of killing themselves on a divergent frame.
-	if networked and Session.is_client():
+	if not accepts_local_interactions():
 		return
 	alive = false
 	velocity = Vector2.ZERO
@@ -1314,7 +1322,22 @@ func kill() -> void:
 		fx.emit(_fx_at(), 26, Palette.CYAN, 130.0, Vector2.ZERO, TAU, 0.6, 300.0)
 		fx.emit(_fx_at(), 10, Palette.WHITE, 90.0, Vector2.ZERO, TAU, 0.4, 260.0)
 	visual_event.emit("death", _fx_at(), Vector2.ZERO)
+	# `_physics_process()` exits while dead, so report this transition now
+	# instead of waiting for a later movement snapshot that will never happen.
+	if networked and locally_controlled and Session.is_client():
+		Session.publish_client_state(network_snapshot())
 	died.emit()
+
+
+## Applies a death accepted from another peer without emitting `died` again.
+## Level owns respawn scheduling; this only mirrors the visible state.
+func apply_network_death() -> void:
+	if not alive:
+		return
+	alive = false
+	velocity = Vector2.ZERO
+	if sprite != null:
+		sprite.visible = false
 
 
 func respawn(at: Vector2) -> void:

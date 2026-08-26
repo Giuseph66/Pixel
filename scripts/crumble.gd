@@ -9,6 +9,8 @@ extends Node2D
 const BREAK_DELAY := 0.38
 const GONE := 2.0
 
+signal state_changed(at: Vector2, state: int, time_left: float)
+
 var _sprite: Sprite2D
 var _body: StaticBody2D
 var _sensor: Area2D
@@ -49,10 +51,10 @@ func _physics_process(delta: float) -> void:
 		0:
 			for body in _sensor.get_overlapping_bodies():
 				if body is Player and (body as Player).alive:
-					_state = 1
-					_timer = BREAK_DELAY
-					_sprite.texture = PixelArt.tex("crumble_cracked")
-					Audio.play("land")
+					var player := body as Player
+					if Session.is_active() and not player.locally_controlled:
+						continue
+					_begin_break()
 					break
 		1:
 			_timer -= delta
@@ -64,6 +66,16 @@ func _physics_process(delta: float) -> void:
 			_timer -= delta
 			if _timer <= 0.0:
 				_restore()
+
+
+func _begin_break() -> void:
+	if _state != 0:
+		return
+	_state = 1
+	_timer = BREAK_DELAY
+	_sprite.texture = PixelArt.tex("crumble_cracked")
+	Audio.play("land")
+	state_changed.emit(global_position, _state, _timer)
 
 
 func _fall() -> void:
@@ -104,3 +116,11 @@ func apply_network_state(state: Dictionary) -> void:
 		_body.process_mode = Node.PROCESS_MODE_INHERIT
 		for child in _body.get_children():
 			(child as CollisionShape2D).set_deferred("disabled", false)
+
+
+func network_begin_break(time_left: float = BREAK_DELAY) -> void:
+	if _state != 0:
+		return
+	_state = 1
+	_timer = maxf(time_left, 0.0)
+	_sprite.texture = PixelArt.tex("crumble_cracked")

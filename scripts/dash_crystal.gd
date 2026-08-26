@@ -6,6 +6,8 @@ extends Area2D
 
 const RECHARGE := 1.6
 
+signal activated(at: Vector2)
+
 var _sprite: Sprite2D
 var _time := 0.0
 var _cooldown := 0.0
@@ -44,10 +46,12 @@ func _process(delta: float) -> void:
 		var player := body as Player
 		if not player.alive or player.has_dash:
 			continue
+		if Session.is_active() and not player.locally_controlled:
+			continue
 		player.refill_dash()
-		_cooldown = RECHARGE
-		_sprite.texture = PixelArt.tex("crystal_used")
+		network_activate()
 		Audio.play("crystal")
+		activated.emit(global_position)
 		break
 
 
@@ -58,3 +62,8 @@ func network_state() -> Dictionary:
 func apply_network_state(state: Dictionary) -> void:
 	_cooldown = maxf(float(state.get("crystal_cooldown", _cooldown)), 0.0)
 	_sprite.texture = PixelArt.tex("crystal_used" if _cooldown > 0.0 else "crystal")
+
+
+func network_activate() -> void:
+	_cooldown = RECHARGE
+	_sprite.texture = PixelArt.tex("crystal_used")

@@ -63,7 +63,7 @@ func _check_player() -> void:
 		if not (body is Player):
 			continue
 		var player := body as Player
-		if not player.alive:
+		if not player.alive or (Session.is_active() and not player.locally_controlled):
 			continue
 		var from_above := player.velocity.y > 20.0 and player.global_position.y < global_position.y - 2.0
 		if from_above:
@@ -79,6 +79,32 @@ func die() -> void:
 		return
 	alive = false
 	squashed.emit(global_position)
+	_area.set_deferred("monitoring", false)
+	var tween := create_tween()
+	tween.tween_property(_sprite, "modulate:a", 0.0, 0.2)
+	tween.parallel().tween_property(_sprite, "position:y", 8.0, 0.2)
+	tween.tween_callback(queue_free)
+
+
+func network_state() -> Dictionary:
+	return {
+		"alive": alive,
+		"time": _time,
+		"direction": _direction,
+	}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_time = float(state.get("time", _time))
+	_direction = int(state.get("direction", _direction))
+	if not bool(state.get("alive", alive)):
+		apply_network_defeat()
+
+
+func apply_network_defeat() -> void:
+	if not alive:
+		return
+	alive = false
 	_area.set_deferred("monitoring", false)
 	var tween := create_tween()
 	tween.tween_property(_sprite, "modulate:a", 0.0, 0.2)

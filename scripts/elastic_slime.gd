@@ -71,6 +71,8 @@ func _check_players() -> void:
 func _check_player(player: Player) -> void:
 	if not is_instance_valid(player) or not player.alive or player.frozen:
 		return
+	if Session.is_active() and not player.locally_controlled:
+		return
 
 	var delta_pos := player.global_position - global_position
 	var touching := absf(delta_pos.x) < (Player.WIDTH + BOX.x) * 0.5 \
@@ -89,3 +91,17 @@ func _check_player(player: Player) -> void:
 		_squash = SQUASH
 	else:
 		player.kill()
+
+
+func network_state() -> Dictionary:
+	return {"direction": direction, "time": _time, "squash": _squash}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	direction = int(state.get("direction", direction))
+	_time = float(state.get("time", _time))
+	_squash = maxf(float(state.get("squash", _squash)), 0.0)
+
+
+func network_bounce() -> void:
+	_squash = SQUASH

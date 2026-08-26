@@ -118,6 +118,17 @@ func _apply(solid: bool, instant: bool = false) -> void:
 	t.tween_property(_sprite, "modulate:a", target, FADE)
 
 
+func network_state() -> Dictionary:
+	return {"solid": _solid, "moving": _moving}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_moving = bool(state.get("moving", _moving))
+	var solid := bool(state.get("solid", _solid))
+	if solid != _solid:
+		_apply(solid, true)
+
+
 ## One tile of art repeated across the run, cached by PixelArt per frame and
 ## length — same trick Conveyor uses, for the same reason.
 func _bake(frame: String) -> ImageTexture:

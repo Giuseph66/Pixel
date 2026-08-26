@@ -145,3 +145,12 @@ func _physics_process(delta: float) -> void:
 			position.y = _origin.y + offset
 		else:
 			position.x = _origin.x + offset
+
+
+func network_state() -> Dictionary:
+	return {"direction": _direction, "angle": _angle}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_direction = float(state.get("direction", _direction))
+	_angle = float(state.get("angle", _angle))

@@ -6,6 +6,8 @@ extends Area2D
 
 const COOLDOWN := 0.25
 
+signal bounced(at: Vector2)
+
 var _sprite: Sprite2D
 var _cooldown := 0.0
 
@@ -36,11 +38,18 @@ func _physics_process(delta: float) -> void:
 	for body in get_overlapping_bodies():
 		if body is Player:
 			var player := body as Player
+			if Session.is_active() and not player.locally_controlled:
+				continue
 			if player.velocity.y >= -10.0 and player.global_position.y < global_position.y:
 				player.spring_bounce()
-				_cooldown = COOLDOWN
-				_sprite.texture = PixelArt.tex("spring_fired")
+				_trigger()
 				break
+
+
+func _trigger() -> void:
+	_cooldown = COOLDOWN
+	_sprite.texture = PixelArt.tex("spring_fired")
+	bounced.emit(global_position)
 
 
 func network_state() -> Dictionary:
@@ -50,3 +59,8 @@ func network_state() -> Dictionary:
 func apply_network_state(state: Dictionary) -> void:
 	_cooldown = maxf(float(state.get("spring_cooldown", _cooldown)), 0.0)
 	_sprite.texture = PixelArt.tex("spring_fired" if _cooldown > 0.0 else "spring")
+
+
+func network_trigger() -> void:
+	_cooldown = COOLDOWN
+	_sprite.texture = PixelArt.tex("spring_fired")

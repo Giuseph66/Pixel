@@ -56,5 +56,17 @@ func _physics_process(delta: float) -> void:
 
 	for body in _area.get_overlapping_bodies():
 		if body is Player and (body as Player).alive:
-			(body as Player).kill()
+			var player := body as Player
+			if Session.is_active() and not player.locally_controlled:
+				continue
+			player.kill()
 			return
+
+
+func network_state() -> Dictionary:
+	return {"direction": direction, "time": _time}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	direction = int(state.get("direction", direction))
+	_time = float(state.get("time", _time))

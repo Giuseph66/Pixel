@@ -42,6 +42,8 @@ func _physics_process(delta: float) -> void:
 	for player: Player in players:
 		if not is_instance_valid(player) or not player.alive or player.frozen:
 			continue
+		if Session.is_active() and not player.locally_controlled:
+			continue
 		# Lava and player share the Level's local space. Comparing this against
 		# global position counted the HUD offset as lava overlap.
 		if player.position.y + Player.HEIGHT * 0.5 >= _surface:

@@ -42,3 +42,13 @@ func shatter() -> void:
 
 func is_gone() -> bool:
 	return _gone
+
+
+func apply_network_break() -> void:
+	if _gone:
+		return
+	_gone = true
+	for child in _body.get_children():
+		(child as CollisionShape2D).set_deferred("disabled", true)
+	_sprite.visible = false
+	queue_free()

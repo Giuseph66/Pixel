@@ -73,6 +73,8 @@ func _check_players() -> void:
 func _check_player(player: Player) -> void:
 	if not is_instance_valid(player) or not player.alive or player.frozen:
 		return
+	if Session.is_active() and not player.locally_controlled:
+		return
 
 	var delta_pos := player.global_position - global_position
 	var touching := absf(delta_pos.x) < (Player.WIDTH + BOX.x) * 0.5 \
@@ -96,6 +98,28 @@ func die() -> void:
 		return
 	alive = false
 	squashed.emit(global_position)
+	_sprite.texture = PixelArt.tex("slime_b")
+	_sprite.scale = Vector2(1.4, 0.4)
+	var tween := create_tween()
+	tween.tween_property(_sprite, "modulate:a", 0.0, 0.18)
+	tween.tween_callback(queue_free)
+
+
+func network_state() -> Dictionary:
+	return {"alive": alive, "direction": direction, "time": _time}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	direction = int(state.get("direction", direction))
+	_time = float(state.get("time", _time))
+	if not bool(state.get("alive", alive)):
+		apply_network_defeat()
+
+
+func apply_network_defeat() -> void:
+	if not alive:
+		return
+	alive = false
 	_sprite.texture = PixelArt.tex("slime_b")
 	_sprite.scale = Vector2(1.4, 0.4)
 	var tween := create_tween()

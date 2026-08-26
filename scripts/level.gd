@@ -126,6 +126,7 @@ var _lava: Lava
 var _spawn := Vector2.ZERO
 var _snapshot_time := 0.0
 var _door_arrivals: Dictionary = {}
+var _pending_respawns: Dictionary = {}
 var competitive := false
 
 
@@ -699,6 +700,7 @@ func _spawn_entities() -> void:
 				"J":
 					var spring := Spring.new()
 					spring.position = tile_center(tx, ty)
+					spring.bounced.connect(_on_spring_bounced.bind(spring))
 					_entities.add_child(spring)
 				"S":
 					var slime := Slime.new()
@@ -706,7 +708,7 @@ func _spawn_entities() -> void:
 					slime.position = tile_center(tx, ty)
 					slime.is_wall = Callable(self, "is_wall_or_gate")
 					slime.is_ground = Callable(self, "is_ground")
-					slime.squashed.connect(_on_slime_squashed)
+					slime.squashed.connect(_on_slime_squashed.bind(slime))
 					_entities.add_child(slime)
 				"W":
 					var saw := Saw.new()
@@ -719,20 +721,22 @@ func _spawn_entities() -> void:
 					var bat := Bat.new()
 					bat.speed_scale = intensity
 					bat.position = tile_center(tx, ty)
-					bat.squashed.connect(_on_bat_squashed)
+					bat.squashed.connect(_on_bat_squashed.bind(bat))
 					_entities.add_child(bat)
 				"c":
 					var block := Crumble.new()
 					block.position = tile_center(tx, ty)
+					block.state_changed.connect(_on_crumble_state_changed.bind(block))
 					_entities.add_child(block)
 				"k":
 					var breakable := Breakable.new()
 					breakable.position = tile_center(tx, ty)
-					breakable.broken.connect(_on_block_broken)
+					breakable.broken.connect(_on_block_broken.bind(breakable))
 					_entities.add_child(breakable)
 				"d":
 					var crystal := DashCrystal.new()
 					crystal.position = tile_center(tx, ty)
+					crystal.activated.connect(_on_crystal_activated.bind(crystal))
 					_entities.add_child(crystal)
 				"t", "T":
 					var timed := TimedBlock.new()
@@ -746,7 +750,7 @@ func _spawn_entities() -> void:
 					elastic.position = tile_center(tx, ty)
 					elastic.is_wall = Callable(self, "is_wall_or_gate")
 					elastic.is_ground = Callable(self, "is_ground")
-					elastic.bounced.connect(_on_elastic_bounced)
+					elastic.bounced.connect(_on_elastic_bounced.bind(elastic))
 					_entities.add_child(elastic)
 				"E":
 					var shield := ShieldEnemy.new()
@@ -754,7 +758,7 @@ func _spawn_entities() -> void:
 					shield.position = tile_center(tx, ty)
 					shield.is_wall = Callable(self, "is_wall_or_gate")
 					shield.is_ground = Callable(self, "is_ground")
-					shield.squashed.connect(_on_slime_squashed)
+					shield.squashed.connect(_on_slime_squashed.bind(shield))
 					_entities.add_child(shield)
 				"p":
 					var phase := PhaseBlock.new()
@@ -765,6 +769,7 @@ func _spawn_entities() -> void:
 					var ferry := FerryBat.new()
 					ferry.speed_scale = intensity
 					ferry.position = tile_center(tx, ty)
+					ferry.state_changed.connect(_on_ferry_state_changed.bind(ferry))
 					_entities.add_child(ferry)
 				"L", "K":
 					var laser := Laser.new()
@@ -964,6 +969,7 @@ func _spawn_ghost_blocks() -> void:
 
 func _spawn_players() -> void:
 	_players = {}
+	_pending_respawns.clear()
 	var peer_ids: Array = [1]
 	if Session.is_active():
 		peer_ids = Session.participants.keys()
@@ -1113,25 +1119,34 @@ func _on_player_pounded(at: Vector2, player: Player) -> void:
 		# The nearest 20Hz sample not yet appended — up to one tick (50ms) off
 		# the real landing, which a flash of squash never shows.
 		last_recording_pounds.append(last_recording.size())
-	if Session.is_active() and not Session.is_host():
-		if player.locally_controlled:
-			Session.publish_player_event("POUND", {"x": at.x, "y": at.y})
+	if Session.is_active() and not player.locally_controlled:
 		return
 	shake(5.0)
 	fx.emit(fx.to_local(at), 16, Palette.CYAN, 110.0, Vector2.UP, PI, 0.4, 220.0)
 
+	var hits: Array[Dictionary] = []
 	for child in _entities.get_children():
 		var distance := at.distance_to((child as Node2D).global_position)
 		if child is Breakable and distance <= Player.POUND_REACH + 6.0:
 			(child as Breakable).shatter()
+			hits.append({"node": str(child.name), "action": "BREAK"})
 		elif child is Slime and distance <= Player.POUND_REACH:
 			(child as Slime).die()
+			hits.append({"node": str(child.name), "action": "DEFEAT"})
 		elif child is Bat and distance <= Player.POUND_REACH:
 			(child as Bat).die()
+			hits.append({"node": str(child.name), "action": "DEFEAT"})
 		elif child is ShieldEnemy and distance <= Player.POUND_REACH:
 			(child as ShieldEnemy).die()
+			hits.append({"node": str(child.name), "action": "DEFEAT"})
 		# ElasticSlime is deliberately absent: it is a route as much as a
 		# hazard, and a pound that erased it would erase the way across.
+	if Session.is_client() and player.locally_controlled:
+		Session.publish_player_event("POUND", {
+			"x": at.x,
+			"y": at.y,
+			"hits": hits,
+		})
 
 
 ## Combo colours read as a temperature: cyan is nothing special yet, gold is a
@@ -1163,6 +1178,7 @@ func _on_switch_pressed(player: Player) -> void:
 	if Session.is_active():
 		if Session.is_client():
 			if player.locally_controlled:
+				_apply_switch_state(not switch_state)
 				Session.publish_player_event("SWITCH_PRESSED")
 			return
 		# Remote host puppets use their explicit client event; physical overlap
@@ -1292,24 +1308,64 @@ func _overlaps_any_phase(pos: Vector2) -> bool:
 	return false
 
 
-func _on_block_broken(at: Vector2) -> void:
+func _on_block_broken(at: Vector2, block: Breakable) -> void:
 	Audio.play_varied("break")
 	fx.emit(fx.to_local(at), 12, Palette.GOLD, 95.0, Vector2.ZERO, TAU, 0.45, 260.0)
+	_report_entity_action("BREAK", block)
 
 
-func _on_bat_squashed(at: Vector2) -> void:
+func _on_bat_squashed(at: Vector2, bat: Bat) -> void:
 	fx.emit(fx.to_local(at), 12, Palette.PURPLE, 90.0, Vector2.UP, PI, 0.4, 260.0)
 	shake(2.0)
+	_report_entity_action("DEFEAT", bat)
 
 
-func _on_elastic_bounced(at: Vector2) -> void:
+func _on_elastic_bounced(at: Vector2, elastic: ElasticSlime) -> void:
 	fx.emit(fx.to_local(at), 8, Palette.GOLD, 70.0, Vector2.UP, PI, 0.3, 220.0)
 	shake(1.5)
+	_report_entity_action("ELASTIC", elastic)
 
 
-func _on_slime_squashed(at: Vector2) -> void:
+func _on_slime_squashed(at: Vector2, mob: Node2D) -> void:
 	fx.emit(fx.to_local(at), 12, Palette.GREEN, 90.0, Vector2.UP, PI, 0.4, 260.0)
 	shake(2.0)
+	_report_entity_action("DEFEAT", mob)
+
+
+func _on_spring_bounced(_at: Vector2, spring: Spring) -> void:
+	_report_entity_action("SPRING", spring)
+
+
+func _on_crystal_activated(_at: Vector2, crystal: DashCrystal) -> void:
+	_report_entity_action("CRYSTAL", crystal)
+
+
+func _on_crumble_state_changed(_at: Vector2, state: int, time_left: float, crumble: Crumble) -> void:
+	if state == 1:
+		_report_entity_action("CRUMBLE", crumble, {"time_left": time_left})
+
+
+func _on_ferry_state_changed(_at: Vector2, state: int, time: float, direction: int,
+		carrying: bool, carry: float, ferry: FerryBat) -> void:
+	_report_entity_action("FERRY", ferry, {
+		"state": state,
+		"time": time,
+		"direction": direction,
+		"carrying": carrying,
+		"carry": carry,
+	})
+
+
+func _report_entity_action(action: String, entity: Node, extra: Dictionary = {}) -> void:
+	if not Session.is_active() or not is_instance_valid(entity):
+		return
+	var payload: Dictionary = {"action": action, "node": str(entity.name)}
+	for key: Variant in extra:
+		payload[key] = extra[key]
+	if Session.is_host():
+		Session.publish_world_event("ENTITY_ACTION", payload)
+	else:
+		Session.publish_player_event("ENTITY_ACTION", payload)
 
 
 func _update_door_charge() -> void:
@@ -1370,18 +1426,25 @@ func _finish_room() -> void:
 
 
 func _on_player_died(player: Player) -> void:
-	if finished:
+	if finished or _pending_respawns.has(player.peer_id):
 		return
+	_pending_respawns[player.peer_id] = true
 	deaths += 1
 	_door_arrivals.erase(player.peer_id)
 	_on_player_dash_changed(false, player)
 	if _door != null:
 		_door.reset_player(player.peer_id)
-	if not Session.is_active() or Session.is_host():
-		Save.add_death()
+	if Session.is_active():
+		if Session.is_host():
+			Session.publish_world_event("PLAYER_DIED", {"peer_id": player.peer_id})
+		elif player.locally_controlled:
+			Session.publish_player_event("PLAYER_DIED")
 	shake(4.0)
 	player_died.emit()
+	if not Session.is_active() or Session.is_host():
+		Save.add_death()
 	await get_tree().create_timer(RESPAWN_DELAY).timeout
+	_pending_respawns.erase(player.peer_id)
 	if is_inside_tree() and not finished:
 		if Session.is_active():
 			player.respawn(_spawn)
@@ -1446,11 +1509,25 @@ func _on_client_player_event(peer_id: int, kind: String, payload: Dictionary) ->
 			_on_gem_collected(gem as Gem, player)
 		return
 	if kind == "POUND":
-		_on_player_pounded(Vector2(float(payload.get("x", player.global_position.x)),
-			float(payload.get("y", player.global_position.y))), player)
+		var raw_hits: Variant = payload.get("hits", [])
+		if raw_hits is Array:
+			for raw_hit: Variant in raw_hits:
+				if raw_hit is Dictionary:
+					_apply_client_entity_action(raw_hit)
 		return
 	if kind == "SWITCH_PRESSED":
 		toggle_switch()
+		return
+	if kind == "PLAYER_DIED":
+		if not _pending_respawns.has(peer_id):
+			player.apply_network_death()
+			_on_player_died(player)
+		return
+	if kind == "ENTITY_ACTION":
+		_apply_client_entity_action(payload)
+		var action := str(payload.get("action", ""))
+		if action != "DEFEAT" and action != "BREAK":
+			Session.publish_world_event("ENTITY_ACTION", payload)
 		return
 	if kind != "FX":
 		return
@@ -1458,6 +1535,84 @@ func _on_client_player_event(peer_id: int, kind: String, payload: Dictionary) ->
 	event["peer_id"] = peer_id
 	_play_player_fx(str(event.get("kind", "")), event)
 	Session.publish_world_event("PLAYER_FX", event)
+
+
+func _apply_client_entity_action(payload: Dictionary) -> void:
+	var node_name := str(payload.get("node", ""))
+	var entity := _entities.get_node_or_null(NodePath(node_name))
+	if entity == null:
+		return
+	match str(payload.get("action", "")):
+		"DEFEAT":
+			if entity is Slime:
+				(entity as Slime).die()
+			elif entity is Bat:
+				(entity as Bat).die()
+			elif entity is ShieldEnemy:
+				(entity as ShieldEnemy).die()
+		"BREAK":
+			if entity is Breakable:
+				(entity as Breakable).shatter()
+		"ELASTIC":
+			if entity is ElasticSlime:
+				(entity as ElasticSlime).network_bounce()
+		"SPRING":
+			if entity is Spring:
+				(entity as Spring).network_trigger()
+		"CRYSTAL":
+			if entity is DashCrystal:
+				(entity as DashCrystal).network_activate()
+		"CRUMBLE":
+			if entity is Crumble:
+				(entity as Crumble).network_begin_break(float(payload.get("time_left", 0.0)))
+		"FERRY":
+			if entity is FerryBat:
+				(entity as FerryBat).apply_network_state(payload)
+
+
+func _apply_network_entity_action(payload: Dictionary) -> void:
+	var node_name := str(payload.get("node", ""))
+	var entity := _entities.get_node_or_null(NodePath(node_name))
+	if entity == null:
+		return
+	var action := str(payload.get("action", ""))
+	_play_network_entity_action_fx(action, entity)
+	match action:
+		"DEFEAT":
+			if entity.has_method("apply_network_defeat"):
+				entity.call("apply_network_defeat")
+		"BREAK":
+			if entity is Breakable:
+				(entity as Breakable).apply_network_break()
+		"ELASTIC":
+			if entity is ElasticSlime:
+				(entity as ElasticSlime).network_bounce()
+		"SPRING":
+			if entity is Spring:
+				(entity as Spring).network_trigger()
+		"CRYSTAL":
+			if entity is DashCrystal:
+				(entity as DashCrystal).network_activate()
+		"CRUMBLE":
+			if entity is Crumble:
+				(entity as Crumble).network_begin_break(float(payload.get("time_left", 0.0)))
+		"FERRY":
+			if entity is FerryBat:
+				(entity as FerryBat).apply_network_state(payload)
+
+
+func _play_network_entity_action_fx(action: String, entity: Node) -> void:
+	if fx == null or not (entity is Node2D):
+		return
+	var at := fx.to_local((entity as Node2D).global_position)
+	match action:
+		"BREAK":
+			fx.emit(at, 12, Palette.GOLD, 95.0, Vector2.ZERO, TAU, 0.45, 260.0)
+		"DEFEAT":
+			var color := Palette.PURPLE if entity is Bat else Palette.GREEN
+			fx.emit(at, 12, color, 90.0, Vector2.UP, PI, 0.4, 260.0)
+		"ELASTIC":
+			fx.emit(at, 8, Palette.GOLD, 70.0, Vector2.UP, PI, 0.3, 220.0)
 
 
 func _play_player_fx(kind: String, payload: Dictionary) -> void:
@@ -1485,14 +1640,10 @@ func _play_player_fx(kind: String, payload: Dictionary) -> void:
 
 
 func _observe_host_world() -> void:
-	# Clients only render enemy decisions. Their collision/AI must never mutate
-	# local gameplay before the host confirms the next snapshot.
-	for child in _entities.get_children():
-		if child is Slime or child is ElasticSlime or child is ShieldEnemy \
-				or child is Bat or child is Saw or child is Crumble \
-				or child is TimedBlock or child is RetractSpike or child is Laser \
-				or child is Lava or child is FerryBat or child is GhostBlock:
-			child.set_physics_process(false)
+	# Local players validate contact on their own machine. Entity state still
+	# receives frequent host snapshots, but hazards and mobs keep processing so
+	# a client never has to wait a network round trip before a collision counts.
+	pass
 
 
 func _apply_entity_snapshot(states: Array) -> void:
@@ -1526,6 +1677,14 @@ func _on_network_world_event(event: Dictionary) -> void:
 		"PLAYER_FX":
 			if int(payload.get("peer_id", -1)) != Session.local_peer_id():
 				_play_player_fx(str(payload.get("kind", "")), payload)
+		"PLAYER_DIED":
+			var dead_peer_id := int(payload.get("peer_id", -1))
+			if dead_peer_id != Session.local_peer_id():
+				var player: Player = _players.get(dead_peer_id)
+				if player != null:
+					player.apply_network_death()
+		"ENTITY_ACTION":
+			_apply_network_entity_action(payload)
 		"DOOR_ENTERED":
 			var peer_id := int(payload.get("peer_id", -1))
 			var player: Player = _players.get(peer_id)
@@ -1547,6 +1706,7 @@ func _on_roster_changed(roster: Dictionary) -> void:
 		player.queue_free()
 		_players.erase(peer_id)
 		_door_arrivals.erase(peer_id)
+		_pending_respawns.erase(peer_id)
 	for peer_id: int in roster.keys():
 		if _players.has(peer_id):
 			continue
