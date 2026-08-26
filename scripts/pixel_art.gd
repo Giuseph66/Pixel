@@ -672,26 +672,30 @@ const GRIDS := {
 	],
 	# Step 17 — ferry bat. Two tiles wide, with a gold strip along the back
 	# that reads as "you can stand here" the way the plain bat never needed
-	# to. ferry_dive is the wings-closed silhouette it drops into when the
+	# to. A blank row used to sit between that strip and the bat's own body,
+	# so the two read as an orange bar floating over an unrelated purple
+	# blob rather than one creature gripping its perch — wingtips now touch
+	# the strip directly, same claw-on-a-branch read a hanging bat needs.
+	# ferry_dive is the wings-closed silhouette it drops into when the
 	# deadline runs out.
 	"ferry_a": [
 		"yyyyyyyyyyyyyyyy",
-		"................",
 		"..#p......p#....",
 		".#pp......pp#...",
 		"..#pppppppp#....",
 		"...#w####w#.....",
 		"....########....",
 		"................",
+		"................",
 	],
 	"ferry_b": [
 		"yyyyyyyyyyyyyyyy",
-		"................",
 		"...#p......p#...",
 		"....#p....p#....",
 		"..#pp########pp#",
 		"...#wwwwwwww#...",
 		"....########....",
+		"................",
 		"................",
 	],
 	"ferry_dive": [
