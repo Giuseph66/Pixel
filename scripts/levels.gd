@@ -2109,8 +2109,14 @@ static func _campaign() -> Array:
 	]
 
 
+## Counted off the cached id list, never off all(). Both give the same number —
+## ids() is built from all() — but all() repaints every room to answer, and the
+## screens that ask for a count ask from inside _draw(): the level select twice
+## a frame through Save.remix_unlocked(), the saves screen once per slot. At 80
+## rooms that was ~51 ms a call, so those screens were spending more than a
+## tenth of a second per frame rebuilding maps nobody was going to look at.
 static func count() -> int:
-	return all().size()
+	return ids().size()
 
 
 ## Room ids in campaign order, built once.

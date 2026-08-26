@@ -25,6 +25,7 @@ func _ready() -> void:
 	failures += await _check_input_guard()
 	failures += _check_mirror()
 	failures += _check_remix_save()
+	failures += _check_count_is_cheap()
 	failures += await _check_switch()
 	failures += await _check_wind()
 	failures += await _check_phase()
@@ -541,6 +542,29 @@ func _check_door_footing(id: String, rows: PackedStringArray) -> int:
 			return _fail("mirror('%s') left its door at (%d,%d) standing on '%s'"
 				% [id, x, y, below])
 	return 0
+
+
+## Levels.count() is asked for from inside _draw() on three separate screens —
+## twice a frame on the level select, once per slot on the saves screen. Answer
+## it with all() and each of those calls repaints every room in the game: 80
+## rooms measured ~51 ms, which is the whole frame budget several times over and
+## is exactly what "the level screen is very slow" turned out to be. This pins
+## it to the cached path rather than trusting a comment to keep it there.
+func _check_count_is_cheap() -> int:
+	var bad := 0
+	if Levels.count() != Levels.all().size():
+		bad += _fail("Levels.count() disagrees with all().size()")
+
+	Levels.ids()          # the cache is warm in the real game before any screen draws
+	var started := Time.get_ticks_usec()
+	for i in 200:
+		Levels.count()
+	var each := float(Time.get_ticks_usec() - started) / 200000.0
+	# A cached count is microseconds. Anything approaching a millisecond means
+	# it is rebuilding rooms again; a whole frame is 16.6.
+	if each > 1.0:
+		bad += _fail("Levels.count() costs %.2f ms a call — it is rebuilding rooms" % each)
+	return bad
 
 
 ## Step 11 — remix progress. Its four sub-dictionaries live under a "remix"

@@ -139,9 +139,10 @@ func _draw() -> void:
 
 	PixelFont.draw_text_centered(self, Lang.t("select.footer"),
 		SCREEN.x * 0.5, SCREEN.y - 20.0, Palette.GREY_DARK, 1)
-	var remix_hint := Lang.t("remix.toggle") if Save.remix_unlocked() else Lang.t("remix.locked")
+	var unlocked := Save.remix_unlocked()
+	var remix_hint := Lang.t("remix.toggle") if unlocked else Lang.t("remix.locked")
 	PixelFont.draw_text_centered(self, remix_hint, SCREEN.x * 0.5, SCREEN.y - 11.0,
-		Palette.PURPLE if Save.remix_unlocked() else Palette.GREY_DARK, 1)
+		Palette.PURPLE if unlocked else Palette.GREY_DARK, 1)
 
 
 ## Small arrows down the right edge, so a screenful never looks like the whole
