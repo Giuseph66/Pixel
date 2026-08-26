@@ -293,25 +293,27 @@ static func _level_boost_zigzag() -> PackedStringArray:
 	rect(g, 24, 6, 2, 2, "#")
 	rect(g, 17, 8, 1, 2, "#")
 	rect(g, 24, 8, 1, 2, "#")
+	put(g, 23, 9, "o")
 	rect(g, 18, 10, 2, 3, "#")
 	rect(g, 26, 10, 2, 4, "#")
+	put(g, 16, 13, "X")
 	put(g, 18, 13, "#")
 	rect(g, 16, 14, 2, 4, "#")
 	rect(g, 22, 14, 2, 5, "#")
 	rect(g, 5, 17, 11, 1, "#")       # ledge over the left-hand trap
+	put(g, 21, 17, "o")
+	rect(g, 1, 18, 4, 1, "^")        # the trap: spikes, a floor, spikes again
 	rect(g, 5, 18, 1, 2, "#")
 	rect(g, 18, 18, 2, 3, "#")
+	rect(g, 1, 19, 4, 1, "#")
 	rect(g, 24, 19, 2, 3, "#")
+	rect(g, 1, 20, 5, 1, "v")
+	put(g, 17, 21, "o")
 	put(g, 18, 21, "#")
 	rect(g, 15, 22, 2, 3, "#")
 	rect(g, 21, 22, 2, 3, "#")
-	rect(g, 1, 18, 4, 1, "^")        # the trap: spikes, a floor, spikes again
-	rect(g, 1, 19, 4, 1, "#")
-	rect(g, 1, 20, 5, 1, "v")
-	put(g, 16, 12, "^")              # hung right over the door
-	puts(g, [Vector2i(23, 9), Vector2i(21, 17), Vector2i(17, 21)], "o")
 	put(g, 4, 26, "P")
-	put(g, 16, 13, "X")
+	rect(g, 1, 27, 58, 4, "#")
 	return bake(g)
 
 
