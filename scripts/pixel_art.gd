@@ -599,18 +599,21 @@ const GRIDS := {
 		"........",
 		"........",
 	],
-	# Step 14 — phase block. Purple hatch on a dotted border: solid enough to
-	# read as a wall, patterned enough to read as not a real one. Level dims it
-	# further (modulate.a) while it is actually passable.
+	# Step 14 — phase block. A real outline, same as every other block in the
+	# game, so the silhouette still reads as a wall — the dotted border this
+	# used to have broke that read entirely, closer to noise than a block.
+	# Diagonal purple stripes inside instead of scattered dots: caution-tape
+	# language for "not always solid," on a shape you can still tell is one.
+	# Level dims it further (modulate.a) while it is actually passable.
 	"phase_block": [
-		"#.#.#.#.",
-		".p.p.p.#",
-		"#.p.p.p.",
-		".p.p.p.#",
-		"#.p.p.p.",
-		".p.p.p.#",
-		"#.p.p.p.",
-		".#.#.#.#",
+		"########",
+		"#p.p.p.#",
+		"#.p.p.p#",
+		"#p.p.p.#",
+		"#.p.p.p#",
+		"#p.p.p.#",
+		"#.p.p.p#",
+		"########",
 	],
 	# Step 15 — portals. Same ring, cyan for one end and purple for the other —
 	# the colour is the only thing that says which tile belongs to which pair.
