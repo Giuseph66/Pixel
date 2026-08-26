@@ -5,7 +5,7 @@ extends Area2D
 ## switch_state, and every pad in the room flips the same one, which is what
 ## makes "walk back onto a switch" a real move rather than a dead end.
 
-signal pressed
+signal pressed(player: Player)
 
 var _armed := true
 var _sprite: Sprite2D
@@ -34,7 +34,7 @@ func _ready() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if body is Player and _armed:
 		_armed = false
-		pressed.emit()
+		pressed.emit(body as Player)
 
 
 func _on_body_exited(body: Node2D) -> void:

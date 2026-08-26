@@ -83,3 +83,24 @@ func _restore() -> void:
 	_body.process_mode = Node.PROCESS_MODE_INHERIT
 	for child in _body.get_children():
 		(child as CollisionShape2D).set_deferred("disabled", false)
+
+
+func network_state() -> Dictionary:
+	return {"crumble_state": _state, "crumble_timer": _timer}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_state = clampi(int(state.get("crumble_state", _state)), 0, 2)
+	_timer = float(state.get("crumble_timer", _timer))
+	_sprite.position.x = 0.0
+	if _state == 2:
+		_sprite.visible = false
+		_body.process_mode = Node.PROCESS_MODE_DISABLED
+		for child in _body.get_children():
+			(child as CollisionShape2D).set_deferred("disabled", true)
+	else:
+		_sprite.visible = true
+		_sprite.texture = PixelArt.tex("crumble_cracked" if _state == 1 else "crumble")
+		_body.process_mode = Node.PROCESS_MODE_INHERIT
+		for child in _body.get_children():
+			(child as CollisionShape2D).set_deferred("disabled", false)

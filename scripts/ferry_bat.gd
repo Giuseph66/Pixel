@@ -129,3 +129,30 @@ func _dive() -> void:
 func _on_touched(body: Node2D) -> void:
 	if body is Player and (body as Player).alive:
 		(body as Player).kill()
+
+
+func network_state() -> Dictionary:
+	return {
+		"state": _state,
+		"time": _time,
+		"direction": _direction,
+		"carrying": _carrying,
+		"carry": _carry,
+	}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_state = int(state.get("state", _state))
+	_time = float(state.get("time", _time))
+	_direction = int(state.get("direction", _direction))
+	_carrying = bool(state.get("carrying", _carrying))
+	_carry = float(state.get("carry", _carry))
+	_sprite.flip_h = _direction < 0
+	if _state == State.DIVE:
+		_sprite.texture = PixelArt.tex("ferry_dive")
+		collision_layer = 0
+		_mortal.set_deferred("monitoring", false)
+	else:
+		_sprite.texture = PixelArt.tex("ferry_a" if fmod(_time * 7.0, 2.0) < 1.0 else "ferry_b")
+		collision_layer = 2
+		_mortal.set_deferred("monitoring", true)

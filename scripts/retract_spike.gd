@@ -151,3 +151,17 @@ func _check_overlap() -> void:
 func _on_body_entered(body: Node2D) -> void:
 	if body is Player:
 		(body as Player).kill()
+
+
+func network_state() -> Dictionary:
+	return {"time": _time, "lethal": _lethal}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_time = float(state.get("time", _time))
+	_lethal = bool(state.get("lethal", _lethal))
+	_area.set_deferred("monitoring", _lethal)
+	if _lethal:
+		_raise()
+	else:
+		_retract()

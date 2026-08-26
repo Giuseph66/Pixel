@@ -13,10 +13,11 @@ signal game_start_requested(config: Dictionary)
 signal snapshot_received(snapshot: Dictionary)
 signal world_event_received(event: Dictionary)
 signal client_state_received(peer_id: int, snapshot: Dictionary)
+signal player_event_received(peer_id: int, kind: String, payload: Dictionary)
 signal lobby_requested
 signal host_left
 
-const PROTOCOL_VERSION := 1
+const PROTOCOL_VERSION := 4
 const DEFAULT_PORT := 27816
 
 enum State { OFFLINE, CONNECTING, LOBBY, LOADING, PLAYING, FAILED }
@@ -187,6 +188,11 @@ func send_input(frame: Dictionary) -> void:
 func publish_client_state(snapshot: Dictionary) -> void:
 	if is_client() and state == State.PLAYING:
 		receive_client_state.rpc_id(1, snapshot)
+
+
+func publish_player_event(kind: String, payload: Dictionary = {}) -> void:
+	if is_client() and state == State.PLAYING:
+		receive_player_event.rpc_id(1, kind, payload)
 
 
 func input_for(peer_id: int) -> Dictionary:
@@ -410,6 +416,16 @@ func receive_client_state(snapshot: Dictionary) -> void:
 	client_state_received.emit(peer_id, snapshot.duplicate(true))
 
 
+@rpc("any_peer", "call_remote", "reliable", 4)
+func receive_player_event(kind: String, payload: Dictionary) -> void:
+	if not is_host() or state != State.PLAYING:
+		return
+	var peer_id := multiplayer.get_remote_sender_id()
+	if not participants.has(peer_id):
+		return
+	player_event_received.emit(peer_id, kind, payload.duplicate(true))
+
+
 func _on_peer_connected(peer_id: int) -> void:
 	if not is_host() or state != State.LOBBY:
 		return
@@ -507,7 +523,9 @@ func _reset_ready() -> void:
 func _hash(text: String) -> String:
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
-	context.update(text.to_utf8_buffer())
+	var bytes := text.to_utf8_buffer()
+	if not bytes.is_empty():
+		context.update(bytes)
 	return context.finish().hex_encode()
 
 

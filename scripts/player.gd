@@ -19,6 +19,9 @@ signal combo_ended(final_count: int)
 ## Step 14 — phase blocks. Emitted the instant a dash starts and the instant
 ## it ends, so Level never has to poll is_dashing() to know when to react.
 signal dash_changed(active: bool)
+## A compact event lets the network reproduce a burst on the other screens.
+## The particles themselves remain local, so their random motion stays cheap.
+signal visual_event(kind: String, fx_position: Vector2, direction: Vector2)
 
 ## POUND is listed because the design does — a pound always resolves by
 ## touching the ground, which is the same instant the combo resets, so it is
@@ -126,18 +129,25 @@ var client_authority := false
 var color_index := 0
 var input_provider: Callable
 var _network_target := Vector2.ZERO
+var _network_age := 0.0
+var _network_anim := "player_idle"
+var _network_charge := 0.0
+var _network_wall_dir := 0
+var _sprite_key := "player_idle"
+var _door_entering := false
 
 const PLAYER_COLORS := [
-	Color.WHITE,
-	Color(1.0, 0.58, 0.82),
-	Color(0.64, 1.0, 0.66),
-	Color(1.0, 0.83, 0.40),
-	Color(0.78, 0.62, 1.0),
-	Color(1.0, 0.62, 0.45),
-	Color(0.60, 0.88, 1.0),
-	Color(0.86, 0.86, 0.90),
+	Palette.CYAN,
+	Palette.MAGENTA,
+	Palette.GREEN,
+	Palette.GOLD,
+	Palette.PURPLE,
+	Color("ff8957"),
+	Color("85eaff"),
+	Palette.GREY,
 ]
 const PLAYER_COLOR_NAMES := ["AZUL", "ROSA", "VERDE", "OURO", "ROXO", "LARANJA", "CEU", "PRATA"]
+static var _player_texture_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -154,7 +164,7 @@ func _ready() -> void:
 	add_child(shape)
 
 	sprite = Sprite2D.new()
-	sprite.texture = PixelArt.tex("player_idle")
+	sprite.texture = _player_texture("player_idle", color_index)
 	add_child(sprite)
 
 	previous_bottom = position.y + HEIGHT * 0.5
@@ -258,6 +268,7 @@ func _axis(controls: Dictionary, negative: String, positive: String) -> float:
 
 
 func network_snapshot() -> Dictionary:
+	var charge_ratio := _network_charge if client_authority else clampf(_charge / CHARGE_TIME, 0.0, 1.0)
 	return {
 		"peer_id": peer_id,
 		"x": position.x,
@@ -268,6 +279,10 @@ func network_snapshot() -> Dictionary:
 		"frozen": frozen,
 		"dash": has_dash,
 		"facing": facing,
+		"anim": _network_anim if client_authority else _sprite_key,
+		"charge": charge_ratio,
+		"wall": _network_wall_dir if client_authority else _wall_dir,
+		"dashing": _dash > 0.0,
 	}
 
 
@@ -278,13 +293,14 @@ func apply_network_snapshot(snapshot: Dictionary) -> void:
 		# such as death and freeze are accepted back; position stays responsive.
 		var was_alive := alive
 		alive = bool(snapshot.get("alive", alive))
-		frozen = bool(snapshot.get("frozen", frozen))
+		# The local door tween begins before the host's next snapshot. Keep it
+		# frozen so an older host snapshot cannot reveal the player again.
+		frozen = true if _door_entering else bool(snapshot.get("frozen", frozen))
 		if not alive or (not was_alive and alive):
 			position = target
 			_network_target = target
 			velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
-		if sprite != null:
-			sprite.visible = alive
+		_sync_sprite_visibility()
 		return
 	if locally_controlled:
 		if position.distance_to(target) > 18.0:
@@ -293,13 +309,17 @@ func apply_network_snapshot(snapshot: Dictionary) -> void:
 			position = position.lerp(target, 0.35)
 	else:
 		_network_target = target
+		_network_age = 0.0
 	velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
 	alive = bool(snapshot.get("alive", alive))
 	frozen = bool(snapshot.get("frozen", frozen))
 	has_dash = bool(snapshot.get("dash", has_dash))
 	facing = int(snapshot.get("facing", facing))
-	if sprite != null:
-		sprite.visible = alive
+	_network_anim = _player_animation(str(snapshot.get("anim", _network_anim)))
+	_network_charge = clampf(float(snapshot.get("charge", 0.0)), 0.0, 1.0)
+	_network_wall_dir = clampi(int(snapshot.get("wall", 0)), -1, 1)
+	_apply_network_dash(bool(snapshot.get("dashing", false)))
+	_sync_sprite_visibility()
 
 
 func apply_client_state(snapshot: Dictionary) -> void:
@@ -307,19 +327,44 @@ func apply_client_state(snapshot: Dictionary) -> void:
 		return
 	position = Vector2(float(snapshot.get("x", position.x)), float(snapshot.get("y", position.y)))
 	_network_target = position
+	_network_age = 0.0
 	velocity = Vector2(float(snapshot.get("vx", velocity.x)), float(snapshot.get("vy", velocity.y)))
 	alive = bool(snapshot.get("alive", alive))
 	frozen = bool(snapshot.get("frozen", frozen))
 	has_dash = bool(snapshot.get("dash", has_dash))
 	facing = int(snapshot.get("facing", facing))
-	if sprite != null:
-		sprite.visible = alive
+	_network_anim = _player_animation(str(snapshot.get("anim", _network_anim)))
+	_network_charge = clampf(float(snapshot.get("charge", 0.0)), 0.0, 1.0)
+	_network_wall_dir = clampi(int(snapshot.get("wall", 0)), -1, 1)
+	_apply_network_dash(bool(snapshot.get("dashing", false)))
+	_sync_sprite_visibility()
+
+
+func _apply_network_dash(active: bool) -> void:
+	var was_active := _dash > 0.0
+	_dash = DASH_TIME if active else 0.0
+	if was_active != active:
+		dash_changed.emit(active)
+
+
+func _sync_sprite_visibility() -> void:
+	if sprite == null:
+		return
+	# Once the door tween hid a frozen player, snapshots must not reveal it.
+	sprite.visible = alive and (not frozen or sprite.visible)
 
 
 func _tick_remote(delta: float) -> void:
 	_anim += delta
-	position = position.lerp(_network_target, minf(delta * 14.0, 1.0))
-	_update_sprite(0.0)
+	_network_age = minf(_network_age + delta, 0.10)
+	var predicted := _network_target
+	if alive and not frozen:
+		predicted += velocity * _network_age
+	if position.distance_to(predicted) > 28.0:
+		position = predicted
+	else:
+		position = position.lerp(predicted, minf(delta * 20.0, 1.0))
+	_update_remote_sprite()
 
 
 # ----------------------------------------------------------------- pound ---
@@ -368,6 +413,7 @@ func _land_pound() -> void:
 	Audio.play("stomp")
 	if fx != null:
 		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN, 14)
+	visual_event.emit("pound_land", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.DOWN)
 	# The level owns what a landing hits — blocks, slimes, bats. It knows where
 	# they all are; the player only knows it hit the ground hard.
 	pounded.emit(global_position + Vector2(0, HEIGHT * 0.5))
@@ -450,6 +496,7 @@ func _try_dash(input: float, controls: Dictionary) -> void:
 	_squash(Vector2(1.35, 0.65))
 	if fx != null:
 		fx.emit(_fx_at(), 8, Palette.CYAN, 90.0, -_dash_dir, 0.9, 0.3, 240.0)
+	visual_event.emit("dash", _fx_at(), _dash_dir)
 
 
 func _tick_dash(delta: float) -> void:
@@ -573,6 +620,7 @@ func _handle_jump(controls: Dictionary) -> void:
 			Audio.play_varied("jump")
 			if fx != null:
 				fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 6)
+			visual_event.emit("jump", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.UP)
 		elif _wall_dir != 0:
 			velocity.y = WALL_JUMP.y
 			velocity.x = -_wall_dir * WALL_JUMP.x
@@ -584,6 +632,8 @@ func _handle_jump(controls: Dictionary) -> void:
 			if fx != null:
 				fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 0.0)), 6,
 					Palette.CYAN, 70.0, Vector2(-_wall_dir, -0.5), 1.2, 0.3, 200.0)
+			visual_event.emit("wall_jump", _fx_at(Vector2(_wall_dir * 4.0, 0.0)),
+				Vector2(-_wall_dir, -0.5))
 
 	# Releasing the button early cuts the rise short.
 	if _pressed(controls, "jump_released") and velocity.y < 0.0:
@@ -594,13 +644,14 @@ func _on_land() -> void:
 	Audio.play_varied("land", 0.1)
 	if fx != null:
 		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5)), Palette.CYAN_DARK, 7)
+	visual_event.emit("land", _fx_at(Vector2(0, HEIGHT * 0.5)), Vector2.UP)
 	_squash(Vector2(1.25, 0.75))
 	_charge = 0.0
 
 
 ## Particles live in the level's coordinate space, not the player's.
 func _fx_at(offset: Vector2 = Vector2.ZERO) -> Vector2:
-	return fx.to_local(global_position + offset)
+	return fx.to_local(global_position + offset) if fx != null else global_position + offset
 
 
 func _squash(to: Vector2) -> void:
@@ -626,27 +677,90 @@ func _update_sprite(input: float) -> void:
 	if _pound > 0:
 		key = "player_fall"
 
-	sprite.texture = PixelArt.tex(key)
-	# Charging takes over the tint outright rather than blending into whatever
-	# the dash tint already set: mixing the dim dash blue with gold pulls the
-	# blue channel down harder than the green one, and against this sprite's
-	# own cyan that reads as green, not gold — a real bug this comment used to
-	# wave off as "the two never overlap in practice". They can, and did.
-	var base_color := player_color(color_index)
+	_sprite_key = key
+	var charge_ratio := clampf(_charge / CHARGE_TIME, 0.0, 1.0)
+	sprite.texture = _player_texture(key, color_index, charge_ratio)
+	# Charge brightens the player's own palette. Tinting the complete sprite
+	# gold multiplied cyan into green and also erased the chosen multiplayer
+	# colour; rebuilding its three colour shades keeps the original hue.
 	if _charge > 0.0:
-		var t := _charge / CHARGE_TIME
-		sprite.modulate = base_color.lerp(Palette.GOLD, t * 0.7)
+		sprite.modulate = Color.WHITE
 	elif has_dash or not dash_unlocked:
-		sprite.modulate = base_color
+		sprite.modulate = Color.WHITE
 	else:
 		# Spent dash reads as a dimmer sprite — visible without a meter
 		# stealing screen from a 480x270 room. Darkened from the original
 		# light blue on request; it read as washed out against the sky.
-		sprite.modulate = base_color.lerp(Palette.BG, 0.55)
+		sprite.modulate = Color(0.45, 0.48, 0.60)
 	if _wall_dir != 0:
 		sprite.flip_h = _wall_dir > 0
 	else:
 		sprite.flip_h = facing < 0
+
+
+func _update_remote_sprite() -> void:
+	_sprite_key = _network_anim
+	sprite.texture = _player_texture(_network_anim, color_index, _network_charge)
+	if _network_charge > 0.0:
+		sprite.modulate = Color.WHITE
+	else:
+		sprite.modulate = Color.WHITE if (has_dash or not dash_unlocked) else Color(0.45, 0.48, 0.60)
+	if _network_anim == "player_wall" and _network_wall_dir != 0:
+		sprite.flip_h = _network_wall_dir > 0
+	else:
+		sprite.flip_h = facing < 0
+
+
+func network_action(kind: String, direction: Vector2) -> void:
+	if locally_controlled or sprite == null:
+		return
+	match kind:
+		"dash":
+			_squash(Vector2(1.35, 0.65))
+		"jump", "wall_jump":
+			_squash(Vector2(0.85, 1.15))
+		"land", "pound_land":
+			_squash(Vector2(1.25, 0.75))
+	if absf(direction.x) > 0.1:
+		facing = -1 if direction.x < 0.0 else 1
+
+
+static func _player_animation(key: String) -> String:
+	return key if PixelArt.GRIDS.has(key) and key.begins_with("player_") else "player_idle"
+
+
+static func _player_texture(key: String, index: int, charge: float = 0.0) -> Texture2D:
+	# Four visible charge steps avoid rebuilding a texture every physics frame.
+	var charge_step := clampi(roundi(clampf(charge, 0.0, 1.0) * 4.0), 0, 4)
+	var texture_key := "%s:%d:%d" % [key, posmod(index, PLAYER_COLORS.size()), charge_step]
+	if _player_texture_cache.has(texture_key):
+		return _player_texture_cache[texture_key]
+	var rows: Array = PixelArt.GRIDS.get(key, [])
+	if rows.is_empty():
+		return PixelArt.tex(key)
+	var width := (rows[0] as String).length()
+	var image := Image.create_empty(width, rows.size(), false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var strength := float(charge_step) / 4.0
+	var primary := player_color(index).lerp(Palette.WHITE, 0.18 * strength)
+	var light := primary.lerp(Palette.WHITE, 0.45 + 0.15 * strength)
+	var dark := primary.darkened(0.45 - 0.12 * strength)
+	for y in rows.size():
+		var row: String = rows[y]
+		for x in row.length():
+			var glyph: String = row[x]
+			var pixel: Color = Palette.CHARS.get(glyph, Color(0, 0, 0, 0))
+			if glyph == "c":
+				pixel = light
+			elif glyph == "C":
+				pixel = primary
+			elif glyph == "D":
+				pixel = dark
+			if pixel.a > 0.0:
+				image.set_pixel(x, y, pixel)
+	var texture := ImageTexture.create_from_image(image)
+	_player_texture_cache[texture_key] = texture
+	return texture
 
 
 static func player_color(index: int) -> Color:
@@ -733,16 +847,21 @@ func push(force: Vector2) -> void:
 
 ## Walk into the exit: hand control over and get pulled into the frame.
 func enter_door(at: Vector2) -> void:
-	if frozen:
+	if _door_entering:
 		return
+	_door_entering = true
 	frozen = true
 	velocity = Vector2.ZERO
-	sprite.texture = PixelArt.tex("player_idle")
+	_sprite_key = "player_idle"
+	sprite.texture = _player_texture("player_idle", color_index)
 
 	var tween := create_tween().set_parallel(true)
 	tween.tween_property(self, "global_position", at, 0.3).set_trans(Tween.TRANS_SINE)
 	tween.tween_property(sprite, "scale", Vector2(0.15, 0.15), 0.32) \
 		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tween.finished.connect(func():
+		if _door_entering and sprite != null:
+			sprite.visible = false)
 
 
 func kill() -> void:
@@ -759,6 +878,7 @@ func kill() -> void:
 	if fx != null:
 		fx.emit(_fx_at(), 26, Palette.CYAN, 130.0, Vector2.ZERO, TAU, 0.6, 300.0)
 		fx.emit(_fx_at(), 10, Palette.WHITE, 90.0, Vector2.ZERO, TAU, 0.4, 260.0)
+	visual_event.emit("death", _fx_at(), Vector2.ZERO)
 	died.emit()
 
 
@@ -771,9 +891,16 @@ func respawn(at: Vector2) -> void:
 	_dash = 0.0
 	_pound = 0
 	_recover = 0.0
+	_charge = 0.0
+	_network_charge = 0.0
+	_network_wall_dir = 0
+	_network_anim = "player_idle"
+	_sprite_key = "player_idle"
+	_door_entering = false
 	combo = 0
 	_combo_verbs = 0
 	_network_target = at
+	_network_age = 0.0
 	if sprite != null:
 		sprite.visible = true
 		sprite.scale = Vector2.ONE

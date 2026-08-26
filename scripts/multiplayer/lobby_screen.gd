@@ -101,7 +101,7 @@ func _refresh(_unused: Dictionary = {}) -> void:
 		for peer_id: int in Session.participants.keys():
 			if peer_id != 1:
 				items.append({"id": "kick_%d" % peer_id, "label": "EXPULSAR " + str(Session.participants[peer_id].get("name", "PLAYER"))})
-	items.append({"id": "leave", "label": "SAIR"})
+	items.append({"id": "leave", "label": "SAIR DO SERVIDOR"})
 	cursor = clampi(cursor, 0, maxi(items.size() - 1, 0))
 	queue_redraw()
 

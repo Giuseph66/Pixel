@@ -49,3 +49,12 @@ func _process(delta: float) -> void:
 		_sprite.texture = PixelArt.tex("crystal_used")
 		Audio.play("crystal")
 		break
+
+
+func network_state() -> Dictionary:
+	return {"crystal_cooldown": _cooldown}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_cooldown = maxf(float(state.get("crystal_cooldown", _cooldown)), 0.0)
+	_sprite.texture = PixelArt.tex("crystal_used" if _cooldown > 0.0 else "crystal")

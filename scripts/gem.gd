@@ -1,7 +1,7 @@
 class_name Gem
 extends Area2D
 
-signal collected(gem: Gem)
+signal collected(gem: Gem, player: Player)
 
 var secret := false           # true for hidden gems that don't count toward door
 var _time := 0.0
@@ -34,4 +34,4 @@ func _process(delta: float) -> void:
 
 func _on_body_entered(body: Node2D) -> void:
 	if body is Player:
-		collected.emit(self)
+		collected.emit(self, body as Player)

@@ -196,6 +196,25 @@ func _on_body_entered(body: Node2D) -> void:
 		(body as Player).kill()
 
 
+func network_state() -> Dictionary:
+	return {"time": _time, "phase": _phase, "frozen": _frozen, "reach": _reach}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_time = float(state.get("time", _time))
+	_frozen = float(state.get("frozen", _frozen))
+	_reach = float(state.get("reach", _reach))
+	var phase := int(state.get("phase", _phase))
+	if phase == _phase:
+		return
+	_phase = phase
+	_area.set_deferred("monitoring", _phase == 2)
+	_sprite.texture = PixelArt.tex(["laser_idle", "laser_warn", "laser_fire"][_phase])
+	if _phase == 2:
+		_update_shape()
+	queue_redraw()
+
+
 func _draw() -> void:
 	if _phase == 0:
 		return

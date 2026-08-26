@@ -114,6 +114,7 @@ func _ready() -> void:
 		Session.roster_changed.connect(_on_roster_changed)
 		if Session.is_host():
 			Session.client_state_received.connect(_on_client_player_state)
+			Session.player_event_received.connect(_on_client_player_event)
 	running = true
 
 
@@ -145,12 +146,17 @@ func _physics_process(delta: float) -> void:
 	for child: Node2D in _entities.get_children():
 		if child is Player:
 			continue
-		entities.append({
+		var entity_state := {
 			"node": str(child.name),
 			"x": child.position.x,
 			"y": child.position.y,
 			"visible": child.visible,
-		})
+		}
+		if child.has_method("network_state"):
+			var extra: Dictionary = child.call("network_state")
+			for key: Variant in extra:
+				entity_state[key] = extra[key]
+		entities.append(entity_state)
 	Session.publish_snapshot({
 		"time": time,
 		"gems_taken": gems_taken,
@@ -530,7 +536,7 @@ func _spawn_entities() -> void:
 				"i":
 					var pad := SwitchPad.new()
 					pad.position = tile_center(tx, ty)
-					pad.pressed.connect(toggle_switch)
+					pad.pressed.connect(_on_switch_pressed)
 					_entities.add_child(pad)
 					_switches.append(pad)
 				"g", "G":
@@ -571,8 +577,18 @@ func _spawn_entities() -> void:
 	_spawn_conveyors()
 	_spawn_platforms()
 	_spawn_wind()
+	_stabilize_entity_names()
 	_spawn_players()
 	_discover_contents()
+
+
+## Auto-generated Godot names contain process-local instance numbers. Stable
+## order-based names let snapshots and gameplay events resolve the same entity
+## on every machine.
+func _stabilize_entity_names() -> void:
+	for i in _entities.get_child_count():
+		var child := _entities.get_child(i)
+		child.name = "entity_%03d" % i
 
 
 ## Walk the grid once and open a codex page for anything in it. Seeing counts:
@@ -718,10 +734,11 @@ func _spawn_player(peer_id: int) -> void:
 	player.pound_unlocked = pound_unlocked
 	player.surface_at = Callable(self, "tile_at")
 	player.died.connect(_on_player_died.bind(player))
-	player.pounded.connect(_on_player_pounded)
+	player.pounded.connect(_on_player_pounded.bind(player))
 	player.combo_changed.connect(_on_combo_changed.bind(player))
 	player.combo_ended.connect(_on_combo_ended)
 	player.dash_changed.connect(_on_player_dash_changed.bind(player))
+	player.visual_event.connect(_on_player_visual_event.bind(player))
 	_entities.add_child(player)
 	_players[peer_id] = player
 	if peer_id == Session.local_peer_id() or _player == null:
@@ -741,8 +758,14 @@ func get_players() -> Array[Player]:
 
 # --------------------------------------------------------------- events ---
 
-func _on_gem_collected(gem: Gem) -> void:
+func _on_gem_collected(gem: Gem, player: Player) -> void:
 	if Session.is_active() and not Session.is_host():
+		if player.locally_controlled:
+			var node_name := str(gem.name)
+			# Collection is immediate on the machine that touched it. The host
+			# trusts that event and relays the same removal to everyone else.
+			_collect_gem(gem)
+			Session.publish_player_event("GEM_TOUCHED", {"node": node_name})
 		return
 	_collect_gem(gem)
 	if Session.is_active():
@@ -778,8 +801,10 @@ func _collect_gem(gem: Gem) -> void:
 ## A ground pound clears the ground it lands on: blocks give way, and anything
 ## standing right there is squashed. The player does not know what is nearby,
 ## so the level answers for it.
-func _on_player_pounded(at: Vector2) -> void:
+func _on_player_pounded(at: Vector2, player: Player) -> void:
 	if Session.is_active() and not Session.is_host():
+		if player.locally_controlled:
+			Session.publish_player_event("POUND", {"x": at.x, "y": at.y})
 		return
 	shake(5.0)
 	fx.emit(fx.to_local(at), 16, Palette.CYAN, 110.0, Vector2.UP, PI, 0.4, 220.0)
@@ -823,8 +848,27 @@ func _on_combo_ended(count: int) -> void:
 const LASER_FREEZE := 4.0
 
 
+func _on_switch_pressed(player: Player) -> void:
+	if Session.is_active():
+		if Session.is_client():
+			if player.locally_controlled:
+				Session.publish_player_event("SWITCH_PRESSED")
+			return
+		# Remote host puppets use their explicit client event; physical overlap
+		# would otherwise flip the same switch twice.
+		if player.client_authority:
+			return
+	toggle_switch()
+
+
 func toggle_switch() -> void:
-	switch_state = not switch_state
+	_apply_switch_state(not switch_state)
+	if Session.is_active() and Session.is_host():
+		Session.publish_world_event("SWITCH_STATE", {"state": switch_state})
+
+
+func _apply_switch_state(value: bool) -> void:
+	switch_state = value
 	Audio.play("switch")
 	shake(2.0)
 
@@ -912,10 +956,21 @@ func _on_door_entered(player: Player) -> void:
 	if finished:
 		return
 	if Session.is_active() and not Session.is_host():
+		# A client renders every player, but may only report its own arrival.
+		# Without this guard, the host puppet touching the door on the client
+		# marks that client as ready and lets the host advance prematurely.
+		if not player.locally_controlled:
+			return
+		player.enter_door(_door.global_position)
+		Session.publish_player_event("DOOR_ENTERED")
 		return
 	if Session.is_active():
+		if _door_arrivals.has(player.peer_id):
+			return
 		_door_arrivals[player.peer_id] = true
-		if not competitive and _door_arrivals.size() < _players.size():
+		player.enter_door(_door.global_position)
+		Session.publish_world_event("DOOR_ENTERED", {"peer_id": player.peer_id})
+		if not competitive and not _all_players_entered_door():
 			return
 	else:
 		_door_arrivals[player.peer_id] = true
@@ -924,13 +979,22 @@ func _on_door_entered(player: Player) -> void:
 		Session.publish_world_event("ROOM_COMPLETED", {})
 
 
+func _all_players_entered_door() -> bool:
+	if _players.is_empty():
+		return false
+	for peer_id: int in _players.keys():
+		if not _door_arrivals.has(peer_id):
+			return false
+	return true
+
+
 func _finish_room() -> void:
 	if finished:
 		return
 	finished = true
 	running = false
 	for player: Player in _players.values():
-		if competitive or _door_arrivals.has(player.peer_id):
+		if Session.is_client() or competitive or _door_arrivals.has(player.peer_id):
 			player.enter_door(_door.global_position)
 	if _lava != null:
 		_lava.stop()
@@ -983,12 +1047,85 @@ func _on_client_player_state(peer_id: int, snapshot: Dictionary) -> void:
 		player.apply_client_state(snapshot)
 
 
+func _on_player_visual_event(kind: String, fx_position: Vector2, direction: Vector2,
+		player: Player) -> void:
+	if not Session.is_active():
+		return
+	var payload := {
+		"peer_id": player.peer_id,
+		"kind": kind,
+		"x": fx_position.x,
+		"y": fx_position.y,
+		"dx": direction.x,
+		"dy": direction.y,
+	}
+	if Session.is_host():
+		Session.publish_world_event("PLAYER_FX", payload)
+	elif player.locally_controlled:
+		Session.publish_player_event("FX", payload)
+
+
+func _on_client_player_event(peer_id: int, kind: String, payload: Dictionary) -> void:
+	if not Session.is_host() or finished:
+		return
+	var player: Player = _players.get(peer_id)
+	if player == null:
+		return
+	if kind == "DOOR_ENTERED":
+		_on_door_entered(player)
+		return
+	if kind == "GEM_TOUCHED":
+		var gem := _entities.get_node_or_null(NodePath(str(payload.get("node", ""))))
+		if gem is Gem:
+			_on_gem_collected(gem as Gem, player)
+		return
+	if kind == "POUND":
+		_on_player_pounded(Vector2(float(payload.get("x", player.global_position.x)),
+			float(payload.get("y", player.global_position.y))), player)
+		return
+	if kind == "SWITCH_PRESSED":
+		toggle_switch()
+		return
+	if kind != "FX":
+		return
+	var event := payload.duplicate(true)
+	event["peer_id"] = peer_id
+	_play_player_fx(str(event.get("kind", "")), event)
+	Session.publish_world_event("PLAYER_FX", event)
+
+
+func _play_player_fx(kind: String, payload: Dictionary) -> void:
+	var at := Vector2(float(payload.get("x", 0.0)), float(payload.get("y", 0.0)))
+	var direction := Vector2(float(payload.get("dx", 0.0)), float(payload.get("dy", 0.0)))
+	var player: Player = _players.get(int(payload.get("peer_id", -1)))
+	var color := Player.player_color(player.color_index) if player != null else Palette.CYAN
+	var dark := color.darkened(0.45)
+	if player != null:
+		player.network_action(kind, direction)
+	match kind:
+		"dash":
+			fx.emit(at, 8, color, 90.0, -direction, 0.9, 0.3, 240.0)
+		"jump":
+			fx.dust(at, dark, 6)
+		"wall_jump":
+			fx.emit(at, 6, color, 70.0, direction, 1.2, 0.3, 200.0)
+		"land":
+			fx.dust(at, dark, 7)
+		"pound_land":
+			fx.dust(at, color, 14)
+		"death":
+			fx.emit(at, 26, color, 130.0, Vector2.ZERO, TAU, 0.6, 300.0)
+			fx.emit(at, 10, Palette.WHITE, 90.0, Vector2.ZERO, TAU, 0.4, 260.0)
+
+
 func _observe_host_world() -> void:
 	# Clients only render enemy decisions. Their collision/AI must never mutate
 	# local gameplay before the host confirms the next snapshot.
 	for child in _entities.get_children():
 		if child is Slime or child is ElasticSlime or child is ShieldEnemy \
-				or child is Bat or child is Saw or child is Crumble:
+				or child is Bat or child is Saw or child is Crumble \
+				or child is TimedBlock or child is RetractSpike or child is Laser \
+				or child is Lava or child is FerryBat:
 			child.set_physics_process(false)
 
 
@@ -997,18 +1134,18 @@ func _apply_entity_snapshot(states: Array) -> void:
 	for state: Dictionary in states:
 		var node_name := str(state.get("node", ""))
 		live[node_name] = true
-		for child: Node2D in _entities.get_children():
-			if str(child.name) != node_name:
-				continue
-			child.position = Vector2(float(state.get("x", child.position.x)),
-				float(state.get("y", child.position.y)))
-			child.visible = bool(state.get("visible", child.visible))
-			child.process_mode = Node.PROCESS_MODE_INHERIT
-			break
+		var child := _entities.get_node_or_null(NodePath(node_name)) as Node2D
+		if child == null:
+			continue
+		child.position = Vector2(float(state.get("x", child.position.x)),
+			float(state.get("y", child.position.y)))
+		child.visible = bool(state.get("visible", child.visible))
+		if child.has_method("apply_network_state"):
+			child.call("apply_network_state", state)
+		child.process_mode = Node.PROCESS_MODE_INHERIT
 	for child: Node2D in _entities.get_children():
 		if not (child is Player) and not live.has(str(child.name)):
-			child.visible = false
-			child.process_mode = Node.PROCESS_MODE_DISABLED
+			child.queue_free()
 
 
 func _on_network_world_event(event: Dictionary) -> void:
@@ -1020,6 +1157,16 @@ func _on_network_world_event(event: Dictionary) -> void:
 			var node := _entities.get_node_or_null(NodePath(str(payload.get("node", ""))))
 			if node is Gem:
 				_collect_gem(node as Gem)
+		"PLAYER_FX":
+			if int(payload.get("peer_id", -1)) != Session.local_peer_id():
+				_play_player_fx(str(payload.get("kind", "")), payload)
+		"DOOR_ENTERED":
+			var peer_id := int(payload.get("peer_id", -1))
+			var player: Player = _players.get(peer_id)
+			if player != null and _door != null:
+				player.enter_door(_door.global_position)
+		"SWITCH_STATE":
+			_apply_switch_state(bool(payload.get("state", false)))
 		"ROOM_COMPLETED":
 			_finish_room()
 

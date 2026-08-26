@@ -41,3 +41,12 @@ func _physics_process(delta: float) -> void:
 				_cooldown = COOLDOWN
 				_sprite.texture = PixelArt.tex("spring_fired")
 				break
+
+
+func network_state() -> Dictionary:
+	return {"spring_cooldown": _cooldown}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_cooldown = maxf(float(state.get("spring_cooldown", _cooldown)), 0.0)
+	_sprite.texture = PixelArt.tex("spring_fired" if _cooldown > 0.0 else "spring")

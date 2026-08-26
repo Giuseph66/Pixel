@@ -200,6 +200,10 @@ func _clear_all() -> void:
 
 
 func _show_title() -> void:
+	# Reaching the title always means leaving the current network session. This
+	# also protects routes other than pause from leaving an ENet peer alive.
+	if Session.is_active():
+		Session.leave()
 	_clear_all()
 	var screen := TitleScreen.new()
 	screen.chosen.connect(_on_title_chosen)
@@ -255,6 +259,8 @@ func _on_title_chosen(id: String) -> void:
 		"options":
 			_go(_show_options)
 		"quit":
+			if Session.is_active():
+				Session.leave()
 			get_tree().quit()
 
 
@@ -780,6 +786,8 @@ func _open_pause() -> void:
 	_pause = PauseMenu.new()
 	_pause.endless = _endless
 	_pause.sandbox = _sandbox
+	_pause.networked = Session.is_active()
+	_pause.network_host = Session.is_host()
 	_pause.chosen.connect(_on_pause_chosen)
 	_pause.cancelled.connect(_close_pause)
 	add_child(_pause)
@@ -793,6 +801,23 @@ func _close_pause() -> void:
 		_pause = null
 
 
+func _suspend_pause_for_overlay() -> void:
+	if _pause == null:
+		return
+	# The overlay has its own input loop. Leaving the pause menu active here
+	# lets the same Escape/back press close both screens and drop the player
+	# out of the running match.
+	_pause.visible = false
+	_pause.set_process(false)
+
+
+func _resume_pause_after_overlay() -> void:
+	if _pause == null or not is_instance_valid(_pause):
+		return
+	_pause.visible = true
+	_pause.set_process(true)
+
+
 func _on_pause_chosen(id: String) -> void:
 	match id:
 		"resume":
@@ -802,10 +827,8 @@ func _on_pause_chosen(id: String) -> void:
 			book.opaque = false
 			book.cancelled.connect(func():
 				book.queue_free()
-				if _pause != null:
-					_pause.visible = true)
-			if _pause != null:
-				_pause.visible = false
+				_resume_pause_after_overlay())
+			_suspend_pause_for_overlay()
 			add_child(book)
 		"options":
 			var options := OptionsScreen.new()
@@ -814,21 +837,34 @@ func _on_pause_chosen(id: String) -> void:
 				if options.apply(id):
 					return
 				options.queue_free()
-				if _pause != null:
-					_pause.visible = true)
+				_resume_pause_after_overlay())
 			options.cancelled.connect(func():
 				options.queue_free()
-				if _pause != null:
-					_pause.visible = true)
-			if _pause != null:
-				_pause.visible = false
+				_resume_pause_after_overlay())
+			_suspend_pause_for_overlay()
 			add_child(options)
 		"restart":
 			_close_pause()
 			_restart_room()
 		"levels":
 			_close_pause()
-			_go(_show_select)
+			# A network room is selected only by the host's synchronized lobby.
+			if Session.is_active():
+				if Session.is_host():
+					Session.return_to_lobby()
+			else:
+				_go(_show_select)
+		"lobby":
+			_close_pause()
+			if Session.is_host():
+				Session.return_to_lobby()
+		"leave_server":
+			_close_pause()
+			Session.leave()
+			_sandbox = false
+			_endless = false
+			Save.tracking = true
+			_go(_show_title)
 		"edit":
 			_close_pause()
 			_go(_show_editor)
@@ -846,3 +882,10 @@ func _on_pause_chosen(id: String) -> void:
 				Save.record_endless(_depth, _run_gems)
 				_endless = false
 			_go(_show_title)
+
+
+func _exit_tree() -> void:
+	# Closing the window/application releases the socket and removes this peer
+	# from the host roster instead of relying on a later timeout.
+	if Session.is_active():
+		Session.leave()

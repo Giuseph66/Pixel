@@ -52,6 +52,17 @@ func stop() -> void:
 	running = false
 
 
+func network_state() -> Dictionary:
+	return {"surface": _surface, "time": _time, "running": running}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_surface = float(state.get("surface", _surface))
+	_time = float(state.get("time", _time))
+	running = bool(state.get("running", running))
+	queue_redraw()
+
+
 func _draw() -> void:
 	var w := float(Levels.COLS * Level.TILE)
 	var bottom := float(Levels.ROWS * Level.TILE)

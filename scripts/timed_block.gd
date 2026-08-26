@@ -58,3 +58,15 @@ func _apply(solid: bool) -> void:
 	_sprite.visible = true
 	_sprite.texture = PixelArt.tex("timed_on" if solid else "timed_off")
 	_shape.set_deferred("disabled", not solid)
+
+
+func network_state() -> Dictionary:
+	return {"time": _time, "solid": _solid, "displayed": _sprite.visible}
+
+
+func apply_network_state(state: Dictionary) -> void:
+	_time = float(state.get("time", _time))
+	var solid := bool(state.get("solid", _solid))
+	if solid != _solid:
+		_apply(solid)
+	_sprite.visible = bool(state.get("displayed", true))

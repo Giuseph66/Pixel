@@ -188,6 +188,8 @@ const STRINGS := {
 	"pause.restart": "RESTART ROOM",
 	"pause.rooms": "ROOMS",
 	"pause.menu": "TITLE",
+	"pause.lobby": "RETURN TO LOBBY",
+	"pause.leave_server": "LEAVE SERVER",
 
 	"results.title": "ROOM CLEAR",
 	"results.footer": "SPACE TO CONFIRM",
@@ -738,6 +740,8 @@ const STRINGS := {
 	"pause.restart": "REINICIAR SALA",
 	"pause.rooms": "SALAS",
 	"pause.menu": "MENU",
+	"pause.lobby": "VOLTAR AO LOBBY",
+	"pause.leave_server": "SAIR DO SERVIDOR",
 
 	"results.title": "SALA CONCLUIDA",
 	"results.footer": "ESPACO PARA CONFIRMAR",
@@ -1288,6 +1292,8 @@ const STRINGS := {
 	"pause.restart": "REINICIAR SALA",
 	"pause.rooms": "SALAS",
 	"pause.menu": "MENU",
+	"pause.lobby": "VOLVER AL LOBBY",
+	"pause.leave_server": "SALIR DEL SERVIDOR",
 
 	"results.title": "SALA COMPLETA",
 	"results.footer": "ESPACIO PARA CONFIRMAR",
