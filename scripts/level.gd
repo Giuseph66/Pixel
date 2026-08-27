@@ -64,6 +64,19 @@ var intensity := 1.0
 ## Endless sets both true; the story asks Save which rooms are open yet.
 var dash_unlocked := true
 var pound_unlocked := true
+## Bombado (doc/bombadao). Defaults false, the opposite of the two above,
+## because it is the exception rather than the rule: main.gd turns it on for
+## sandbox rooms only, and every other caller — including the smoke test —
+## gets a room where the key does nothing.
+var buff_unlocked := false
+## Built the first time the local player actually turns, torn down when they
+## turn back. Nothing exists on screen for a room whose player never uses it.
+var _buff_aura: BuffAura
+## The room never sits perfectly still while he is on it. Small enough that
+## you read it as weight rather than as a screen shake.
+const BUFF_RUMBLE := 0.9
+const BUFF_RUMBLE_SHAKE := 0.8
+var _buff_rumble := 0.0
 ## Step 23 — echo. Read from the room's own data in setup(), not set by
 ## main.gd like the two above: the ability belongs to specific rooms, not to
 ## story progress, so there is no mode-wide rule to apply here.
@@ -224,6 +237,7 @@ func _process(delta: float) -> void:
 		time += delta
 
 	_update_sensors()
+	_tick_buff_weather(delta)
 
 	if _shake > 0.0:
 		_shake = maxf(_shake - delta * 26.0, 0.0)
@@ -1028,6 +1042,8 @@ func _spawn_player(peer_id: int) -> void:
 	player.fx = fx
 	player.dash_unlocked = dash_unlocked
 	player.pound_unlocked = pound_unlocked
+	player.buff_unlocked = buff_unlocked
+	player.buff_changed.connect(_on_player_buff_changed.bind(player))
 	player.speed_scale = player_speed_scale
 	player.gravity_scale = player_gravity_scale
 	player.echo_max = echo_max
@@ -1121,22 +1137,28 @@ func _on_player_pounded(at: Vector2, player: Player) -> void:
 		last_recording_pounds.append(last_recording.size())
 	if Session.is_active() and not player.locally_controlled:
 		return
-	shake(5.0)
-	fx.emit(fx.to_local(at), 16, Palette.CYAN, 110.0, Vector2.UP, PI, 0.4, 220.0)
+	# A bombado landing is the same event, twice the crater. The reach is asked
+	# of the player rather than read off the constant, because only the player
+	# knows which body just hit the floor.
+	var reach := player.pound_reach()
+	var buff := player.is_buff()
+	shake(9.0 if buff else 5.0)
+	fx.emit(fx.to_local(at), 30 if buff else 16, Palette.CYAN,
+		170.0 if buff else 110.0, Vector2.UP, PI, 0.4, 220.0)
 
 	var hits: Array[Dictionary] = []
 	for child in _entities.get_children():
 		var distance := at.distance_to((child as Node2D).global_position)
-		if child is Breakable and distance <= Player.POUND_REACH + 6.0:
+		if child is Breakable and distance <= reach + 6.0:
 			(child as Breakable).shatter()
 			hits.append({"node": str(child.name), "action": "BREAK"})
-		elif child is Slime and distance <= Player.POUND_REACH:
+		elif child is Slime and distance <= reach:
 			(child as Slime).die()
 			hits.append({"node": str(child.name), "action": "DEFEAT"})
-		elif child is Bat and distance <= Player.POUND_REACH:
+		elif child is Bat and distance <= reach:
 			(child as Bat).die()
 			hits.append({"node": str(child.name), "action": "DEFEAT"})
-		elif child is ShieldEnemy and distance <= Player.POUND_REACH:
+		elif child is ShieldEnemy and distance <= reach:
 			(child as ShieldEnemy).die()
 			hits.append({"node": str(child.name), "action": "DEFEAT"})
 		# ElasticSlime is deliberately absent: it is a route as much as a
@@ -1282,6 +1304,44 @@ func _on_player_dash_changed(active: bool, player: Player) -> void:
 	if not anyone_dashing:
 		for other: Player in get_players():
 			_eject_from_phase(other)
+
+
+## Bombado (doc/bombadao). The heavy weather belongs to the screen the local
+## player is looking at, so a remote peer turning changes nothing here — their
+## own machine dims their own room. Built lazily and freed on the way out
+## rather than kept hidden, because a room whose player never transforms
+## should not be paying for an overlay that redraws every frame.
+func _on_player_buff_changed(active: bool, player: Player) -> void:
+	if player != _player:
+		return
+	if active:
+		if _buff_aura == null:
+			_buff_aura = BuffAura.new()
+			_buff_aura.player = player
+			add_child(_buff_aura)
+			# Between the terrain and the entities, not on top of everything.
+			# Every layer here shares z_index 0 and is ordered by the tree, so
+			# one move_child() is the whole of it. Drawn above the players the
+			# warm veil desaturates them — the room is supposed to look heavy,
+			# not the hero — and the particles Fx draws stay above it either
+			# way, since Fx is added after _entities.
+			move_child(_buff_aura, _entities.get_index())
+		_buff_aura.set_active(true)
+		_buff_rumble = BUFF_RUMBLE
+	elif _buff_aura != null:
+		# fade_out() frees the node once it has faded, so the aura is never
+		# yanked off screen mid-frame.
+		_buff_aura.set_active(false)
+		_buff_aura = null
+
+
+func _tick_buff_weather(delta: float) -> void:
+	if _player == null or not is_instance_valid(_player) or not _player.is_buff():
+		return
+	_buff_rumble -= delta
+	if _buff_rumble <= 0.0:
+		_buff_rumble = BUFF_RUMBLE
+		shake(BUFF_RUMBLE_SHAKE)
 
 
 ## The dash ended inside a block. Push along whatever direction the player was
@@ -1478,6 +1538,18 @@ func _on_client_player_state(peer_id: int, snapshot: Dictionary) -> void:
 
 func _on_player_visual_event(kind: String, fx_position: Vector2, direction: Vector2,
 		player: Player) -> void:
+	# Bombado needs the room itself to move, and this signal is the one channel
+	# a player already has for "something happened over here". Handled above
+	# the network guard on purpose: that guard returns early offline, and the
+	# shake has to land in single player too.
+	if player == _player:
+		match kind:
+			"buff_rise":
+				shake(3.0)
+			"buff_ready":
+				shake(12.0)
+			"buff_pose":
+				shake(2.0)
 	if not Session.is_active():
 		return
 	var payload := {
@@ -1634,6 +1706,13 @@ func _play_player_fx(kind: String, payload: Dictionary) -> void:
 			fx.dust(at, dark, 7)
 		"pound_land":
 			fx.dust(at, color, 14)
+		"buff_rise":
+			fx.emit(at, 2, Palette.FRAME, 130.0, direction, 1.5, 0.45, 220.0)
+		"buff_ready":
+			fx.emit(at, 20, color, 170.0, direction, PI, 0.5, 240.0)
+			fx.dust(at, Palette.FRAME, 12)
+		"buff_pose":
+			fx.dust(at, color, 6)
 		"death":
 			fx.emit(at, 26, color, 130.0, Vector2.ZERO, TAU, 0.6, 300.0)
 			fx.emit(at, 10, Palette.WHITE, 90.0, Vector2.ZERO, TAU, 0.4, 260.0)
@@ -1733,6 +1812,12 @@ func restart() -> void:
 	# needs pointing at the player restart() rebuilt.
 	if _darkness != null:
 		_darkness.player = _player
+	# The aura lives outside _entities too, but unlike darkness it belongs to a
+	# player who no longer exists — the wipe above freed the body that was
+	# bombado. Drop it outright rather than repointing it.
+	if _buff_aura != null:
+		_buff_aura.set_active(false)
+		_buff_aura = null
 	# The recording is of the attempt that just ended, not the accumulated
 	# time since the room first opened — a fresh attempt starts a fresh trace.
 	last_recording = PackedVector2Array()

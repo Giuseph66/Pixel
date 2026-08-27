@@ -19,6 +19,10 @@ signal combo_ended(final_count: int)
 ## Step 14 — phase blocks. Emitted the instant a dash starts and the instant
 ## it ends, so Level never has to poll is_dashing() to know when to react.
 signal dash_changed(active: bool)
+## Bombado (doc/bombadao). Emitted when the transformation finishes coming out
+## of the ground and again when it is gone, so Level can raise and drop the
+## heavy weather without polling is_buff() sixty times a second.
+signal buff_changed(active: bool)
 ## A compact event lets the network reproduce a burst on the other screens.
 ## The particles themselves remain local, so their random motion stays cheap.
 signal visual_event(kind: String, fx_position: Vector2, direction: Vector2)
@@ -96,6 +100,49 @@ const POUND_REACH := 13.0       # pixels around the landing that get cleared
 const FOOTLESS_TIME := 2.0
 const FOOTLESS_HEIGHT := 6.0
 
+# --- bombado ----------------------------------------------------------------
+# doc/bombadao. A sandbox-only super form, entered out of the footless state:
+# pound, land flat, press the key while the legs are still gone. He climbs out
+# of the ground, and everything about him is heavier from then on.
+#
+# The body more than doubles. Fourteen wide is past one tile and twenty-four
+# tall is three of them, so a corridor a normal player strolls down is closed
+# to him — that is the cost, and it is why _try_buff() refuses outright when
+# the space is not there rather than growing the box into a wall.
+const BUFF_WIDTH := 14.0
+const BUFF_HEIGHT := 24.0
+## The sprite is bigger still: the arms and the crown of the head hang outside
+## the box on purpose, because a hitbox drawn around a bodybuilder's wingspan
+## would catch on scenery he visibly clears.
+const BUFF_SPRITE_HEIGHT := 30.0
+
+const BUFF_RISE_TIME := 0.85
+const BUFF_SINK_TIME := 0.45
+## Nothing here is a new number: each is a factor on a constant above.
+const BUFF_SPEED := 0.78
+const BUFF_JUMP := 0.88
+const BUFF_GRAVITY := 1.25
+const BUFF_POUND_SPEED := 1.35
+const BUFF_POUND_REACH := 26.0
+
+## Idle poses. He starts showing off half a second after standing still, holds
+## a pose for a beat, drops back to idle for a shorter beat, then picks a new
+## one — never the same twice running.
+const POSE_WAIT := 0.5
+const POSE_HOLD := 1.0
+const POSE_GAP := 0.7
+const POSES: Array[String] = [
+	"buff_pose_double",
+	"buff_pose_lat",
+	"buff_pose_side",
+	"buff_pose_crab",
+	"buff_pose_back",
+	"buff_pose_point",
+	"buff_pose_kneel",
+]
+
+enum { BUFF_OFF, BUFF_RISE, BUFF_ON, BUFF_SINK }
+
 ## Stomping enemies without touching the ground pays more each time.
 const CHAIN_STEP := 0.09
 const CHAIN_MAX := 1.45
@@ -163,6 +210,19 @@ var _pound_dir := 1.0
 ## body embedded in terrain, so the state also waits for headroom.
 var _footless := false
 var _footless_left := 0.0
+## Bombado. Set by Level from its own buff_unlocked, which main.gd only turns
+## on for a sandbox room — false everywhere else, including by default here, so
+## a Player built by a test or by the story never has the move at all.
+var buff_unlocked := false
+var _buff := BUFF_OFF
+var _buff_t := 0.0
+## Which pose is showing, "" for none, and how long it has been showing.
+var _pose := ""
+var _pose_t := 0.0
+var _pose_last := -1
+## How long he has been standing still. Poses only start once this passes
+## POSE_WAIT, so walking into a wall never triggers a flex.
+var _still := 0.0
 var _shape: CollisionShape2D
 var _recover := 0.0
 var _chain := 0
@@ -246,7 +306,7 @@ func _ready() -> void:
 	# at the spawn position prevents that first frame from snapping it to (0, 0).
 	_network_target = position
 	_network_age = 0.0
-	previous_bottom = position.y + HEIGHT * 0.5 * gravity_dir
+	previous_bottom = position.y + body_height() * 0.5 * gravity_dir
 	# The two moves you have before the game teaches you anything.
 	Save.discover("run")
 	Save.discover("jump")
@@ -274,8 +334,15 @@ func _physics_process(delta: float) -> void:
 	if not alive or frozen:
 		return
 
+	# Bombado's two cutscenes own the frame outright: no gravity, no input, no
+	# collision changes. They are short and they always terminate, so nothing
+	# below ever waits on them.
+	if _buff == BUFF_RISE or _buff == BUFF_SINK:
+		_tick_buff_cutscene(delta)
+		return
+
 	_update_gravity_zone(delta)
-	previous_bottom = global_position.y + HEIGHT * 0.5 * gravity_dir
+	previous_bottom = global_position.y + body_height() * 0.5 * gravity_dir
 	_anim += delta
 	_coyote = maxf(_coyote - delta, 0.0)
 	_buffer = maxf(_buffer - delta, 0.0)
@@ -301,7 +368,7 @@ func _physics_process(delta: float) -> void:
 		pass
 	elif _recover > 0.0:
 		velocity.x = move_toward(velocity.x, 0.0, FRICTION_GROUND * delta)
-		velocity.y += GRAVITY_DOWN * gravity_scale * gravity_dir * delta
+		velocity.y += GRAVITY_DOWN * gravity_scale * _buff_gravity() * gravity_dir * delta
 	elif _pound > 0:
 		_tick_pound(delta)
 	elif _dash > 0.0:
@@ -311,6 +378,7 @@ func _physics_process(delta: float) -> void:
 		# and steering it is the whole of the state's movement. Everything that
 		# needs legs gets a zero instead: walking, and the charge that turns a
 		# stand into a jump.
+		_try_buff(controls)
 		_try_dash(input, controls)
 		_try_pound(controls)
 		_apply_horizontal(0.0, delta)
@@ -320,6 +388,7 @@ func _physics_process(delta: float) -> void:
 		# how you aim a dash downward as well as how you pound now, and the
 		# pound outranks the dash once it starts — asked the other way round,
 		# holding down to dash down would only ever produce a pound.
+		_try_buff(controls)
 		_try_dash(input, controls)
 		_try_pound(controls)
 		_apply_horizontal(input, delta)
@@ -345,6 +414,7 @@ func _physics_process(delta: float) -> void:
 		refill_dash()
 	_was_on_floor = is_on_floor()
 
+	_tick_poses(delta, input)
 	_update_sprite(input)
 	_update_echo_ghost()
 	if networked and locally_controlled and Session.is_client():
@@ -366,6 +436,7 @@ func _read_controls() -> Dictionary:
 		"jump_pressed": Input.is_action_just_pressed("p_jump"),
 		"jump_released": Input.is_action_just_released("p_jump"),
 		"echo_pressed": Input.is_action_just_pressed("p_echo"),
+		"buff_pressed": Input.is_action_just_pressed("p_buff"),
 	}
 
 
@@ -535,7 +606,7 @@ func _tick_pound(delta: float) -> void:
 			_pound = 2
 		return
 
-	velocity = Vector2(0.0, POUND_SPEED * _pound_dir)
+	velocity = Vector2(0.0, POUND_SPEED * (BUFF_POUND_SPEED if _buff == BUFF_ON else 1.0) * _pound_dir)
 	if fx != null and randf() < 0.6:
 		fx.emit(_fx_at(Vector2(0, -4 * _pound_dir)), 1, Palette.CYAN_MID, 26.0,
 			Vector2.UP * _pound_dir, 0.7, 0.2, 40.0)
@@ -548,17 +619,21 @@ func _land_pound() -> void:
 	_pound = 0
 	_recover = POUND_RECOVER
 	_chain = 0
-	_enter_footless()
+	# Bombado does not lose his legs to his own landing. Skipping the entry is
+	# also what keeps the two states from ever overlapping, which body_height()
+	# and _begin_rise() both depend on.
+	if _buff != BUFF_ON:
+		_enter_footless()
 	refill_dash()
 	velocity = Vector2.ZERO
 	_squash(Vector2(1.5, 0.5))
 	Audio.play("stomp")
 	if fx != null:
-		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN, 14)
-	visual_event.emit("pound_land", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.DOWN * gravity_dir)
+		fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.CYAN, 14)
+	visual_event.emit("pound_land", _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Vector2.DOWN * gravity_dir)
 	# The level owns what a landing hits — blocks, slimes, bats. It knows where
 	# they all are; the player only knows it hit the ground hard.
-	pounded.emit(global_position + Vector2(0, HEIGHT * 0.5 * gravity_dir))
+	pounded.emit(global_position + Vector2(0, body_height() * 0.5 * gravity_dir))
 
 
 func is_pounding() -> bool:
@@ -576,7 +651,7 @@ func _enter_footless() -> void:
 	if _footless:
 		return
 	_footless = true
-	_apply_body_height()
+	_apply_body_size()
 
 
 ## Only ever called once the timer is spent AND there is somewhere to stand up
@@ -586,22 +661,43 @@ func _leave_footless() -> void:
 		return
 	_footless = false
 	_footless_left = 0.0
-	_apply_body_height()
+	_apply_body_size()
 
 
-## The box shrinks off the top: its lower edge sits at the same offset either
-## way, so the feet stay put and only the head comes down.
-func _apply_body_height() -> void:
+## What the body measures right now. Three sizes share one bottom edge, so
+## everything that means "feet" elsewhere in the game — lava's waterline, a
+## slime reading whether it was stomped — keeps working without knowing any of
+## these states exist. Bombado wins over footless because he never has the two
+## at once: landing a pound as bombado skips the footless entry entirely.
+func body_width() -> float:
+	if _buff != BUFF_OFF:
+		return BUFF_WIDTH
+	return float(WIDTH)
+
+
+func body_height() -> float:
+	if _buff != BUFF_OFF:
+		return BUFF_HEIGHT
+	if _footless:
+		return FOOTLESS_HEIGHT
+	return float(HEIGHT)
+
+
+## The box grows and shrinks off the top: its lower edge sits at the same
+## offset whatever size it is, so the feet stay put and only the head moves.
+func _apply_body_size() -> void:
 	if _shape == null:
 		return
 	var rect := _shape.shape as RectangleShape2D
 	if rect == null:
 		return
-	var h := FOOTLESS_HEIGHT if _footless else float(HEIGHT)
-	rect.size = Vector2(WIDTH, h)
-	# Shrinks from the head side, whichever side that currently is: normal
-	# gravity, the head is +y-ward of centre already, so this is unchanged;
-	# inverted, it flips so the feet — now the +y-ward side — still stay put.
+	var h := body_height()
+	rect.size = Vector2(body_width(), h)
+	# Offset from the head side, whichever side that currently is: normal
+	# gravity, the head is -y-ward of centre already, so this is unchanged;
+	# inverted, it flips so the feet — now the -y-ward side — still stay put.
+	# A body taller than HEIGHT (bombado) gives a negative offset, which is the
+	# same rule read the other way: the extra height goes onto the head.
 	_shape.position.y = (float(HEIGHT) - h) * 0.5 * gravity_dir
 
 
@@ -613,30 +709,308 @@ func _tick_footless(delta: float) -> void:
 		_leave_footless()
 
 
-## Whether a full-height body would fit where the short one currently is. Reads
-## the grid rather than asking physics: a shape query would have to grow the box
-## first to learn that growing it was a mistake.
+## Whether a full-height body would fit where the short one currently is.
 func _has_headroom() -> bool:
+	return _fits(float(WIDTH), float(HEIGHT))
+
+
+## Whether a box this size, standing on the current feet, would be clear of
+## solid tiles. Reads the grid rather than asking physics: a shape query would
+## have to grow the box first to learn that growing it was a mistake.
+##
+## Nothing is assumed about which end is "top" — inverting gravity_dir swaps
+## that — so the row range is taken min-to-max, and the columns are widened
+## from the centre in both directions for the same reason.
+func _fits(width: float, height: float) -> bool:
 	if not surface_at.is_valid():
 		return true
 	# Same framing as ground_tile(): surface_at reads Level's own grid, so the
-	# node-local position is the one that lines up with it. Mirrored by
-	# gravity_dir same as everywhere else — and the row range is taken
-	# min-to-max rather than assumed ascending, since inverting gravity_dir
-	# flips which end is "top".
-	var bottom := position.y + HEIGHT * 0.5 * gravity_dir
-	var standing_top := bottom - (float(HEIGHT) - 1.0) * gravity_dir
-	var crouched_top := bottom - FOOTLESS_HEIGHT * gravity_dir
-	var left := floori((position.x - WIDTH * 0.5 + 1.0) / TILE)
-	var right := floori((position.x + WIDTH * 0.5 - 1.0) / TILE)
-	var row_a := floori(standing_top / TILE)
-	var row_b := floori(crouched_top / TILE)
+	# node-local position is the one that lines up with it.
+	var bottom := position.y + body_height() * 0.5 * gravity_dir
+	var target_top := bottom - (height - 1.0) * gravity_dir
+	var current_top := bottom - body_height() * gravity_dir
+	var left := floori((position.x - width * 0.5 + 1.0) / TILE)
+	var right := floori((position.x + width * 0.5 - 1.0) / TILE)
+	var row_a := floori(target_top / TILE)
+	var row_b := floori(current_top / TILE)
 	for ty in range(mini(row_a, row_b), maxi(row_a, row_b) + 1):
 		for tx in range(left, right + 1):
 			var ch: String = surface_at.call(tx, ty)
 			if ch == "#" or ch == "~" or ch == ">" or ch == "<":
 				return false
 	return true
+
+
+# ---------------------------------------------------------------- bombado ---
+# doc/bombadao. Four states, two of which are short cutscenes that always end:
+# OFF -> RISE -> ON -> SINK -> OFF. Death and restart cut straight back to OFF.
+
+func is_buff() -> bool:
+	return _buff == BUFF_ON
+
+
+## How far a landing pound clears. Asked of the player rather than read off the
+## constant by Level, because only the player knows which body just hit.
+func pound_reach() -> float:
+	return BUFF_POUND_REACH if _buff == BUFF_ON else POUND_REACH
+
+
+## The key. Getting in has to pass every gate below; getting out only has to be
+## standing on something, so the move can never trap anyone who took it.
+func _try_buff(controls: Dictionary) -> void:
+	if not _pressed(controls, "buff_pressed"):
+		return
+	if not buff_unlocked or not accepts_local_interactions():
+		return
+
+	if _buff == BUFF_ON:
+		if is_on_floor():
+			_begin_sink()
+		return
+	if _buff != BUFF_OFF:
+		return
+
+	# The window: the two seconds a pound leaves you flat on the floor. Asking
+	# for footless rather than for a fresh pound means a dash spent while
+	# flattened does not close it — the state is the condition, not the timing.
+	if not pound_unlocked or not _footless or not is_on_floor():
+		return
+	# Ten wide by sixteen tall wants two tiles across and two up. Refusing is
+	# the only safe answer: grown into a wall he would be stuck there, and the
+	# footless timer that would normally free him has nothing to shrink.
+	if not _fits(BUFF_WIDTH, BUFF_HEIGHT):
+		if fx != null:
+			fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.GREY_DARK, 6)
+		Audio.play("menu_back")
+		return
+
+	_begin_rise()
+
+
+func _begin_rise() -> void:
+	# Footless and bombado are mutually exclusive by construction — body_height()
+	# reads _buff first — but leaving the flag set would have him pop back to a
+	# six-pixel body the moment the timer ran out under him.
+	_footless = false
+	_footless_left = 0.0
+	_buff = BUFF_RISE
+	_buff_t = 0.0
+	_pound = 0
+	_dash = 0.0
+	_charge = 0.0
+	velocity = Vector2.ZERO
+	# Grown up front, not at the end: the plunge out of the ground has to end
+	# with the real body already standing where the animation says it is.
+	_apply_body_size()
+	Audio.play("buff_rise")
+
+
+func _begin_sink() -> void:
+	_buff = BUFF_SINK
+	_buff_t = 0.0
+	_pose = ""
+	_pose_t = 0.0
+	velocity = Vector2.ZERO
+	buff_changed.emit(false)
+	Audio.play("buff_sink")
+
+
+## Both cutscenes: frozen in place, the sprite doing all the work. The body is
+## already the size it will be when the animation ends, so nothing can grow
+## into geometry halfway through.
+func _tick_buff_cutscene(delta: float) -> void:
+	_buff_t += delta
+	velocity = Vector2.ZERO
+	_anim += delta
+
+	if _buff == BUFF_RISE:
+		var t := clampf(_buff_t / BUFF_RISE_TIME, 0.0, 1.0)
+		_erupt(t)
+		_draw_emerging(t)
+		if t >= 1.0:
+			_finish_rise()
+		return
+
+	var sink := clampf(_buff_t / BUFF_SINK_TIME, 0.0, 1.0)
+	if fx != null and randf() < 0.7:
+		fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.FRAME, 3)
+	# Sinking is the rise played backwards, so the same revealer draws it.
+	_draw_emerging(1.0 - sink)
+	if sink >= 1.0:
+		_leave_buff(true)
+
+
+## Earth thrown out of the hole he is climbing through, ramping with the rise.
+## Terrain colours rather than the player's, so it reads as ground breaking
+## rather than as another particle burst from the body.
+func _erupt(t: float) -> void:
+	if fx == null:
+		return
+	var feet := _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir))
+	var up := Vector2.UP * gravity_dir
+	fx.emit(feet, 2, Palette.FRAME, 60.0 + 120.0 * t, up, 1.5, 0.45, 220.0)
+	if randf() < 0.5:
+		fx.emit(feet, 1, Palette.BG_SOFT, 40.0 + 90.0 * t, up, 2.2, 0.55, 200.0)
+	if randf() < 0.35:
+		fx.emit(feet, 1, Palette.CYAN, 90.0 + 110.0 * t, up, 0.9, 0.35, 120.0)
+	# Shake is Level's, reached the same way every other player effect reaches
+	# it — through the signal it already listens to. The signal carries no
+	# magnitude, so the ramp is in how often it fires rather than in how hard:
+	# rare taps at the start, near every frame by the time he is out.
+	if randf() < 0.12 + 0.55 * t:
+		visual_event.emit("buff_rise", feet, up)
+
+
+func _finish_rise() -> void:
+	_buff = BUFF_ON
+	_buff_t = 0.0
+	_pose = ""
+	_pose_t = POSE_GAP
+	_pose_last = -1
+	_still = 0.0
+	sprite.region_enabled = false
+	_apply_sprite_offset()
+	refill_dash()
+	_squash(Vector2(1.3, 0.7))
+	Audio.play("buff_ready")
+	if fx != null:
+		var feet := _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir))
+		fx.emit(feet, 26, Palette.CYAN, 190.0, Vector2.UP * gravity_dir, PI, 0.5, 240.0)
+		fx.dust(feet, Palette.FRAME, 18)
+		fx.popup(_fx_at(Vector2(0, -body_height() * 0.6)), Lang.t("buff.name"), Palette.GOLD, 1.1)
+	visual_event.emit("buff_ready", _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)),
+		Vector2.UP * gravity_dir)
+	buff_changed.emit(true)
+
+
+## `instant` is the only way out that skips the sink: death, respawn and the
+## room restarting all need the body back to normal this frame.
+func _leave_buff(instant: bool = false) -> void:
+	if _buff == BUFF_OFF:
+		return
+	var was_on := _buff == BUFF_ON
+	_buff = BUFF_OFF
+	_buff_t = 0.0
+	_pose = ""
+	_pose_t = 0.0
+	_still = 0.0
+	if sprite != null:
+		sprite.region_enabled = false
+		sprite.offset = Vector2.ZERO
+	_apply_body_size()
+	# BUFF_SINK already announced the end when it started, so only a cut short
+	# from BUFF_ON still owes Level the signal.
+	if was_on:
+		buff_changed.emit(false)
+	if not instant:
+		_squash(Vector2(0.8, 1.2))
+
+
+## Poses, while standing still on the floor. Any input at all cancels: the
+## fantasy is that he stops to flex, not that he flexes through a jump.
+func _tick_poses(delta: float, input: float) -> void:
+	if _buff != BUFF_ON:
+		return
+	var settled := is_on_floor() and absf(input) < 0.01 and absf(velocity.x) < 4.0 \
+		and not moving_input
+	if not settled:
+		_still = 0.0
+		_pose = ""
+		_pose_t = POSE_GAP
+		return
+
+	_still += delta
+	if _still < POSE_WAIT:
+		return
+
+	_pose_t -= delta
+	if _pose_t > 0.0:
+		return
+	if _pose != "":
+		# A pose just ended; stand normally for a beat before the next one.
+		_pose = ""
+		_pose_t = POSE_GAP
+		return
+	_pose = POSES[_pick_pose()]
+	_pose_t = POSE_HOLD
+	_squash(Vector2(1.18, 0.86))
+	Audio.play_varied("buff_pose", 0.10)
+	if fx != null:
+		fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.CYAN, 6)
+	visual_event.emit("buff_pose", _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)),
+		Vector2.UP * gravity_dir)
+
+
+## Never the same pose twice running — a repeat reads as the animation having
+## frozen rather than as a new pose.
+func _pick_pose() -> int:
+	if POSES.size() < 2:
+		return 0
+	var next := randi() % POSES.size()
+	if next == _pose_last:
+		next = (next + 1 + randi() % (POSES.size() - 1)) % POSES.size()
+	_pose_last = next
+	return next
+
+
+## Coming out of the ground, without a shader or a mask: Sprite2D draws only
+## the slice of its texture that region_rect asks for, so revealing the top
+## `t` of the sprite and pinning that slice's bottom edge to the floor line is
+## exactly a body rising through it.
+func _draw_emerging(t: float) -> void:
+	if sprite == null:
+		return
+	var texture := _player_texture("buff_rise", color_index)
+	sprite.texture = texture
+	sprite.flip_h = facing < 0
+	sprite.flip_v = gravity_dir < 0.0
+	sprite.modulate = Color.WHITE
+
+	var shown := maxf(1.0, roundf(BUFF_SPRITE_HEIGHT * clampf(t, 0.0, 1.0)))
+	sprite.region_enabled = true
+	# The slice taken is the TOP of the sprite — the crown of the head first,
+	# which is what climbing out of the ground looks like.
+	sprite.region_rect = Rect2(0.0, 0.0, float(texture.get_width()), shown)
+	# Sprite2D centres whatever it draws, so the slice's own centre has to sit
+	# where its bottom edge meets the floor line. Holding that edge still while
+	# the slice grows upward is the entire effect: the body does not slide up,
+	# more of it simply exists above ground each frame.
+	sprite.offset = _sprite_offset_for(shown)
+
+
+## Where a sprite of `visible_height` has to sit for its bottom edge to land on
+## the floor line. _apply_body_size() pins the collision box's lower edge at a
+## fixed HEIGHT * 0.5 below the node whatever size the body is, so that one
+## number is the whole calculation — and it is the same one whether the sprite
+## is the full thirty rows or the growing slice _draw_emerging() reveals.
+func _sprite_offset_for(visible_height: float) -> Vector2:
+	return Vector2(0.0, (float(HEIGHT) - visible_height) * 0.5 * gravity_dir)
+
+
+func _apply_sprite_offset() -> void:
+	if sprite == null:
+		return
+	if _buff == BUFF_OFF:
+		sprite.offset = Vector2.ZERO
+		return
+	sprite.offset = _sprite_offset_for(BUFF_SPRITE_HEIGHT)
+
+
+# --- how much heavier he is --------------------------------------------------
+# Every physics function reads its factor from here instead of carrying an
+# `if _buff` of its own, so the movement code stays one model with a weight on
+# it rather than two models side by side.
+
+func _buff_speed() -> float:
+	return BUFF_SPEED if _buff == BUFF_ON else 1.0
+
+
+func _buff_jump() -> float:
+	return BUFF_JUMP if _buff == BUFF_ON else 1.0
+
+
+func _buff_gravity() -> float:
+	return BUFF_GRAVITY if _buff == BUFF_ON else 1.0
 
 
 func is_dashing() -> bool:
@@ -691,6 +1065,11 @@ func _try_dash(input: float, controls: Dictionary) -> void:
 	# Holding dash chains automatically whenever a new charge is available.
 	if not dash_unlocked or not has_dash or _dash_cool > 0.0 \
 			or not _held(controls, "dash"):
+		return
+	# Bombado does not dash. He is the one state in the game that trades the
+	# fast verb away outright — the whole read is that he walks through things
+	# instead of around them.
+	if _buff != BUFF_OFF:
 		return
 	if _in_zone(no_dash_zone_at):
 		return
@@ -802,10 +1181,10 @@ func _try_echo(controls: Dictionary) -> bool:
 func _overlaps_solid(pos: Vector2) -> bool:
 	if not surface_at.is_valid():
 		return false
-	var left := floori((pos.x - WIDTH * 0.5 + 1.0) / TILE)
-	var right := floori((pos.x + WIDTH * 0.5 - 1.0) / TILE)
-	var top := floori((pos.y - HEIGHT * 0.5 + 1.0) / TILE)
-	var bottom := floori((pos.y + HEIGHT * 0.5 - 1.0) / TILE)
+	var left := floori((pos.x - body_width() * 0.5 + 1.0) / TILE)
+	var right := floori((pos.x + body_width() * 0.5 - 1.0) / TILE)
+	var top := floori((pos.y - body_height() * 0.5 + 1.0) / TILE)
+	var bottom := floori((pos.y + body_height() * 0.5 - 1.0) / TILE)
 	for ty in range(top, bottom + 1):
 		for tx in range(left, right + 1):
 			var ch: String = surface_at.call(tx, ty)
@@ -847,7 +1226,7 @@ func _apply_horizontal(input: float, delta: float) -> void:
 	elif tile == "<":
 		carry = -CONVEYOR_PUSH
 
-	var target := input * RUN_SPEED * speed_scale + carry
+	var target := input * RUN_SPEED * speed_scale * _buff_speed() + carry
 	var rate := 0.0
 	if absf(input) > 0.01:
 		if not is_on_floor():
@@ -924,13 +1303,13 @@ func _update_gravity_zone(delta: float) -> void:
 			_grav_dwell = GRAV_DWELL
 		if gravity_dir != was:
 			# The footless box hangs off whichever side is currently the head
-			# (_apply_body_height()), so its offset is written in terms of
+			# (_apply_body_size()), so its offset is written in terms of
 			# gravity_dir. Leave it stale across a flip and the box sits on
 			# the wrong side of centre until footless next changes — then it
 			# snaps back the full HEIGHT - FOOTLESS_HEIGHT at once, which is
 			# how a player tucked against a surface ended up standing four
 			# pixels inside it, stuck.
-			_apply_body_height()
+			_apply_body_size()
 	# Has to land before move_and_slide() for is_on_floor()/is_on_wall() to
 	# read the right surface as "floor" this same frame.
 	up_direction = Vector2(0.0, -gravity_dir)
@@ -970,7 +1349,7 @@ func _apply_gravity(input: float, delta: float) -> void:
 	# +y — that is the one substitution this whole function makes.
 	var rising := velocity.y * gravity_dir < 0.0
 	var g := GRAVITY_UP if rising else GRAVITY_DOWN
-	velocity.y += g * gravity_scale * gravity_dir * delta
+	velocity.y += g * gravity_scale * _buff_gravity() * gravity_dir * delta
 
 	var falling := velocity.y * gravity_dir > 0.0
 	if _wall_dir != 0 and falling:
@@ -985,9 +1364,9 @@ func _apply_gravity(input: float, delta: float) -> void:
 			fx.emit(_fx_at(Vector2(_wall_dir * 4.0, 2.0 * gravity_dir)), 1,
 				Palette.CYAN_DARK, 22.0, Vector2(-_wall_dir, -0.4 * gravity_dir), 0.9, 0.28, 90.0)
 	elif gravity_dir > 0.0:
-		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale)
+		velocity.y = minf(velocity.y, MAX_FALL * gravity_scale * _buff_gravity())
 	else:
-		velocity.y = maxf(velocity.y, -MAX_FALL * gravity_scale)
+		velocity.y = maxf(velocity.y, -MAX_FALL * gravity_scale * _buff_gravity())
 
 
 ## Standing still with no input on the ground charges the next jump. It
@@ -1002,7 +1381,7 @@ func _tick_charge(input: float, delta: float) -> void:
 			_charge_particle_t += delta
 			if _charge_particle_t >= 0.08:
 				_charge_particle_t = 0.0
-				fx.emit(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), 1, Palette.GOLD, 20.0,
+				fx.emit(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), 1, Palette.GOLD, 20.0,
 					Vector2.UP * gravity_dir, 0.3, 0.3, 40.0)
 		if not was_full and _charge >= CHARGE_TIME:
 			_found("charge")
@@ -1019,14 +1398,14 @@ func _handle_jump(controls: Dictionary) -> void:
 	if _buffer > 0.0:
 		if _coyote > 0.0:
 			var boost := CHARGE_BOOST if _charge >= CHARGE_TIME else 1.0
-			velocity.y = JUMP_VELOCITY * boost * gravity_dir
+			velocity.y = JUMP_VELOCITY * boost * _buff_jump() * gravity_dir
 			_charge = 0.0
 			_buffer = 0.0
 			_coyote = 0.0
 			Audio.play_varied("jump")
 			if fx != null:
-				fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN_DARK, 6)
-			visual_event.emit("jump", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
+				fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.CYAN_DARK, 6)
+			visual_event.emit("jump", _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
 		elif _wall_dir != 0:
 			# Step 19 — wall boost. Only the horizontal component scales: a
 			# taller wall jump would quietly change what every existing room's
@@ -1058,8 +1437,8 @@ func _handle_jump(controls: Dictionary) -> void:
 func _on_land() -> void:
 	Audio.play_varied("land", 0.1)
 	if fx != null:
-		fx.dust(_fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Palette.CYAN_DARK, 7)
-	visual_event.emit("land", _fx_at(Vector2(0, HEIGHT * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
+		fx.dust(_fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Palette.CYAN_DARK, 7)
+	visual_event.emit("land", _fx_at(Vector2(0, body_height() * 0.5 * gravity_dir)), Vector2.UP * gravity_dir)
 	_squash(Vector2(1.25, 0.75))
 	_charge = 0.0
 
@@ -1095,6 +1474,12 @@ func _update_sprite(input: float) -> void:
 	# it happens to be doing — including dashing on stumps.
 	if _footless:
 		key = "player_stump"
+	# Later word still: bombado is a whole other body, so the same decisions
+	# above are replayed against his own set rather than patched onto the
+	# normal one. A pose, when one is running, outranks all of it — he has
+	# stopped moving, which is the only way to be holding one.
+	if _buff == BUFF_ON:
+		key = _buff_key(input)
 
 	_sprite_key = key
 	var charge_ratio := clampf(_charge / CHARGE_TIME, 0.0, 1.0)
@@ -1116,6 +1501,27 @@ func _update_sprite(input: float) -> void:
 	else:
 		sprite.flip_h = facing < 0
 	sprite.flip_v = gravity_dir < 0.0
+	_apply_sprite_offset()
+
+
+## Which of the buff grids to show. Same shape as the block above, one set
+## further down: there is no wall slide because a ten-wide body rarely finds a
+## chimney to hold, and no dash because he does not have one.
+func _buff_key(input: float) -> String:
+	if _pose != "":
+		return _pose
+	if not is_on_floor():
+		if velocity.y * gravity_dir < -20.0:
+			return "buff_jump"
+		if velocity.y * gravity_dir > 40.0:
+			return "buff_fall"
+		return "buff_idle"
+	if _pound > 0:
+		return "buff_fall"
+	if absf(input) > 0.01 and absf(velocity.x) > 12.0:
+		# Slower cycle than the normal run: the legs are carrying more.
+		return "buff_run_a" if fmod(_anim * 6.5, 2.0) < 1.0 else "buff_run_b"
+	return "buff_idle"
 
 
 func _update_remote_sprite() -> void:
@@ -1130,6 +1536,14 @@ func _update_remote_sprite() -> void:
 	else:
 		sprite.flip_h = facing < 0
 	sprite.flip_v = gravity_dir < 0.0
+	# A puppet has no _buff of its own — the form arrives as nothing but an
+	# animation name — so the offset is read off that name instead. Without it
+	# a remote bombado stands buried to the shins.
+	sprite.region_enabled = false
+	if _network_anim.begins_with("buff_"):
+		sprite.offset = _sprite_offset_for(BUFF_SPRITE_HEIGHT)
+	else:
+		sprite.offset = Vector2.ZERO
 
 
 func network_action(kind: String, direction: Vector2) -> void:
@@ -1147,7 +1561,13 @@ func network_action(kind: String, direction: Vector2) -> void:
 
 
 static func _player_animation(key: String) -> String:
-	return key if PixelArt.GRIDS.has(key) and key.begins_with("player_") else "player_idle"
+	# "buff_" is allowed through alongside "player_" so a peer watching someone
+	# turn bombado in a sandbox room draws the right body. Nothing else about
+	# the form crosses the wire — the collision box stays local, exactly as
+	# footless already does.
+	if PixelArt.GRIDS.has(key) and (key.begins_with("player_") or key.begins_with("buff_")):
+		return key
+	return "player_idle"
 
 
 static func _player_texture(key: String, index: int, charge: float = 0.0) -> Texture2D:
@@ -1166,6 +1586,10 @@ static func _player_texture(key: String, index: int, charge: float = 0.0) -> Tex
 	var primary := player_color(index).lerp(Palette.WHITE, 0.18 * strength)
 	var light := primary.lerp(Palette.WHITE, 0.45 + 0.15 * strength)
 	var dark := primary.darkened(0.45 - 0.12 * strength)
+	# Bombado only — see Palette.CYAN_DEEP. Every player_* grid stops at three
+	# shades; the buff grids are three times the size and need a fourth step to
+	# keep a crease from reading as a smudge.
+	var deep := primary.darkened(0.72 - 0.10 * strength)
 	for y in rows.size():
 		var row: String = rows[y]
 		for x in row.length():
@@ -1177,6 +1601,8 @@ static func _player_texture(key: String, index: int, charge: float = 0.0) -> Tex
 				pixel = primary
 			elif glyph == "D":
 				pixel = dark
+			elif glyph == "S":
+				pixel = deep
 			if pixel.a > 0.0:
 				image.set_pixel(x, y, pixel)
 	var texture := ImageTexture.create_from_image(image)
@@ -1266,7 +1692,7 @@ func ground_tile() -> String:
 	# Under inverted gravity the feet — and so the ground — are on the other
 	# side of centre, hence the gravity_dir on the offset.
 	var tx := floori(position.x / TILE)
-	var ty := floori((position.y + (HEIGHT * 0.5 + 2.0) * gravity_dir) / TILE)
+	var ty := floori((position.y + (body_height() * 0.5 + 2.0) * gravity_dir) / TILE)
 	return surface_at.call(tx, ty)
 
 
@@ -1275,9 +1701,9 @@ func ground_tile() -> String:
 func wall_tile() -> String:
 	if not surface_at.is_valid() or _wall_dir == 0:
 		return "."
-	var tx := floori((position.x + float(_wall_dir) * (WIDTH * 0.5 + 2.0)) / TILE)
-	var top := floori((position.y - HEIGHT * 0.5 + 1.0) / TILE)
-	var bottom := floori((position.y + HEIGHT * 0.5 - 1.0) / TILE)
+	var tx := floori((position.x + float(_wall_dir) * (body_width() * 0.5 + 2.0)) / TILE)
+	var top := floori((position.y - body_height() * 0.5 + 1.0) / TILE)
+	var bottom := floori((position.y + body_height() * 0.5 - 1.0) / TILE)
 	for ty in range(top, bottom + 1):
 		if surface_at.call(tx, ty) == "~":
 			return "~"
@@ -1316,6 +1742,9 @@ func kill() -> void:
 		return
 	alive = false
 	velocity = Vector2.ZERO
+	# Dying as bombado drops the form outright, aura and all. No sink
+	# animation: the body it would play on is already gone.
+	_leave_buff(true)
 	sprite.visible = false
 	Audio.play("death")
 	if fx != null:
@@ -1359,7 +1788,11 @@ func respawn(at: Vector2) -> void:
 	# across a death would hand it out for free at the start of the next try.
 	_footless = false
 	_footless_left = 0.0
-	_apply_body_height()
+	# Same reasoning for bombado, and one more besides: the aura belongs to a
+	# body that just stopped existing, so it has to be told before the next
+	# attempt starts under it.
+	_leave_buff(true)
+	_apply_body_size()
 	_recover = 0.0
 	_charge = 0.0
 	echo_left = echo_max

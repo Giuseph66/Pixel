@@ -125,6 +125,32 @@ static func library() -> Dictionary:
 		])),
 		# Wind-up whine, then the hit is the existing stomp.
 		"pound": to_stream(tone(220.0, 0.10, Wave.PULSE, 0.22, 2.6, 0.002, 0.03)),
+		# Bombado (doc/bombadao). Everything here is low and slow, which is the
+		# whole point: the rest of the library lives above 200Hz, so a rumble
+		# at 46Hz is unmistakably a different kind of event.
+		#
+		# Ground tearing open: a long rise with grit mixed over it. The noise is
+		# a second layer rather than a third note so the two run together, the
+		# way earth and pressure would.
+		"buff_rise": to_stream(mix_into(concat([
+			tone(46.0, 0.55, Wave.TRIANGLE, 0.34, 2.4, 0.02, 0.10),
+			tone(110.0, 0.35, Wave.SAW, 0.20, 1.7, 0.01, 0.14),
+		]), tone(90.0, 0.70, Wave.NOISE, 0.11, 1.0, 0.06, 0.22), 0)),
+		# The instant he is out. Two fifths stacked, short, no sweep.
+		"buff_ready": to_stream(mix_into(
+			tone(note_freq(38), 0.30, Wave.SQUARE, 0.24, 1.0, 0.002, 0.14),
+			tone(note_freq(45), 0.30, Wave.TRIANGLE, 0.20, 1.0, 0.002, 0.14), 0)),
+		# One pose landing. Dry and short, so a pose every couple of seconds
+		# never turns into a drone.
+		"buff_pose": to_stream(concat([
+			tone(150.0, 0.04, Wave.PULSE, 0.20, 0.5, 0.001, 0.015),
+			tone(70.0, 0.07, Wave.NOISE, 0.13, 1.0, 0.001, 0.05),
+		])),
+		# Going back down: buff_rise reversed in intent — falling sweep, less
+		# grit, shorter.
+		"buff_sink": to_stream(mix_into(
+			tone(150.0, 0.40, Wave.TRIANGLE, 0.26, 0.32, 0.01, 0.16),
+			tone(80.0, 0.40, Wave.NOISE, 0.09, 1.0, 0.02, 0.16), 0)),
 		"break": to_stream(concat([
 			tone(320.0, 0.05, Wave.NOISE, 0.26, 1.0, 0.001, 0.02),
 			tone(140.0, 0.09, Wave.SQUARE, 0.2, 0.5, 0.001, 0.05),

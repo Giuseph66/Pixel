@@ -107,6 +107,12 @@ func _setup_input() -> void:
 	# story hands out to four rooms and nowhere else, so the left shoulder
 	# button is free to double up the same way p_codex's key already does.
 	_action("p_echo", [KEY_E, KEY_L], [JOY_BUTTON_LEFT_SHOULDER])
+	# Bombado (doc/bombadao). Only ever read inside a sandbox room, and only
+	# during the two seconds a pound leaves you flattened, so a key of its own
+	# costs nothing anywhere else. F is the last letter near WASD that no
+	# screen claims — the editor's KEY_F is a different screen entirely — and
+	# the right stick is the only pad button still unspoken for.
+	_action("p_buff", [KEY_F], [JOY_BUTTON_RIGHT_STICK])
 
 
 func _parse_network_args() -> void:
@@ -597,6 +603,11 @@ func _build_room(index: int, data: Dictionary) -> void:
 	# against, and a networked room has more than one player's position to
 	# be a ghost of.
 	_level.ghost_enabled = not _sandbox and not _endless and not Session.is_active()
+	# Bombado is a sandbox toy and nothing else. Unlike dash and pound it is
+	# never handed out by story progress or by an endless run, and a custom
+	# room cannot switch it off either — there is no room field for it, so a
+	# sandbox room built before this existed still gets it.
+	_level.buff_unlocked = _sandbox
 	_level.is_remix = _remix
 	_level.position = Vector2(0, HUD_HEIGHT)
 	_level.completed.connect(_on_room_completed)

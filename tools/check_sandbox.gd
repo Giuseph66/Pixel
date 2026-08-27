@@ -34,6 +34,7 @@ func _ready() -> void:
 	failures += await _check_ferry()
 	failures += await _check_charge()
 	failures += await _check_pound()
+	failures += await _check_buff()
 	failures += await _check_modifier_grid()
 	failures += _check_wrap()
 
@@ -49,7 +50,8 @@ func _ready() -> void:
 ## smoke test drowns in "action doesn't exist".
 func _fake_input() -> void:
 	for action: String in ["p_left", "p_right", "p_up", "p_down", "p_accept",
-			"p_cancel", "p_codex", "p_jump", "p_dash", "p_restart", "p_pause"]:
+			"p_cancel", "p_codex", "p_jump", "p_dash", "p_restart", "p_pause",
+			"p_echo", "p_buff"]:
 		if not InputMap.has_action(action):
 			InputMap.add_action(action, 0.35)
 
@@ -1332,6 +1334,157 @@ func _check_pound() -> int:
 		bad += _fail("a respawn kept the legs off")
 
 	player.queue_free()
+	await get_tree().process_frame
+	return bad
+
+
+## Bombado (doc/bombadao). The sandbox-only super form: the gate that keeps it
+## out of story and endless, the window that lets it in, and the body swap.
+##
+## Unlike every other player check in this file this one builds a real floor
+## and lets physics settle on it, because the entry condition is is_on_floor()
+## and there is no honest way to fake that.
+func _check_buff() -> int:
+	var bad := 0
+
+	# The art first: a glyph outside Palette.CHARS is a silently transparent
+	# pixel, and these grids are hand-written.
+	var keys := ["buff_idle", "buff_run_a", "buff_run_b", "buff_jump",
+		"buff_fall", "buff_rise"]
+	keys.append_array(Player.POSES)
+	for key: String in keys:
+		if not PixelArt.GRIDS.has(key):
+			bad += _fail("no sprite grid named '%s'" % key)
+			continue
+		var rows: Array = PixelArt.GRIDS[key]
+		if rows.size() != int(Player.BUFF_SPRITE_HEIGHT):
+			bad += _fail("%s is %d rows tall, wanted %d"
+				% [key, rows.size(), int(Player.BUFF_SPRITE_HEIGHT)])
+		for row: String in rows:
+			if row.length() != 26:
+				bad += _fail("%s has a row %d wide, wanted 26" % [key, row.length()])
+			for i in row.length():
+				if not Palette.CHARS.has(row[i]):
+					bad += _fail("%s uses the unknown glyph '%s'" % [key, row[i]])
+
+	# Layer 2 is what Player.collision_mask looks for.
+	var ground := StaticBody2D.new()
+	ground.collision_layer = 2
+	ground.collision_mask = 0
+	var floor_shape := CollisionShape2D.new()
+	var floor_rect := RectangleShape2D.new()
+	floor_rect.size = Vector2(400.0, 16.0)
+	floor_shape.shape = floor_rect
+	ground.add_child(floor_shape)
+	ground.position = Vector2(0.0, 8.0)      # top surface at y = 0
+	add_child(ground)
+
+	var player := Player.new()
+	# Nothing solid in the grid, so the clearance checks are about the body and
+	# not about the room. The physics floor above is a separate thing entirely.
+	player.surface_at = func(_tx: int, _ty: int) -> String: return "."
+	# Never touch the InputMap: _try_buff is called directly below, and every
+	# awaited frame would otherwise poll actions this tool does not own.
+	player.input_provider = func() -> Dictionary: return {}
+	player.position = Vector2(0.0, -20.0)
+	add_child(player)
+
+	for i in 40:
+		await get_tree().physics_frame
+		if player.is_on_floor():
+			break
+	if not player.is_on_floor():
+		bad += _fail("the test player never landed; the rest of _check_buff is moot")
+		player.queue_free()
+		ground.queue_free()
+		await get_tree().process_frame
+		return bad
+
+	var rect := player._shape.shape as RectangleShape2D
+	var standing_bottom := player._shape.position.y + rect.size.y * 0.5
+	var pressed := {"buff_pressed": true}
+
+	# The gate. This is the check that keeps story and endless clean: without
+	# buff_unlocked the key does nothing at all, however right everything else
+	# about the moment is.
+	player.buff_unlocked = false
+	player._enter_footless()
+	player._try_buff(pressed)
+	if player._buff != Player.BUFF_OFF:
+		bad += _fail("a locked player turned bombado")
+
+	# Unlocked but standing normally: outside the window, so still nothing.
+	player.buff_unlocked = true
+	player._leave_footless()
+	player._try_buff(pressed)
+	if player._buff != Player.BUFF_OFF:
+		bad += _fail("bombado started outside the footless window")
+
+	# In the window, with room to grow.
+	player._enter_footless()
+	player._try_buff(pressed)
+	if player._buff != Player.BUFF_RISE:
+		bad += _fail("pressing the key while footless did not start the rise")
+	if player.is_footless():
+		bad += _fail("bombado and footless were both live at once")
+	if not is_equal_approx(rect.size.x, Player.BUFF_WIDTH) \
+			or not is_equal_approx(rect.size.y, Player.BUFF_HEIGHT):
+		bad += _fail("a bombado body is %s x %s, wanted %s x %s"
+			% [rect.size.x, rect.size.y, Player.BUFF_WIDTH, Player.BUFF_HEIGHT])
+	var buff_bottom := player._shape.position.y + rect.size.y * 0.5
+	if not is_equal_approx(buff_bottom, standing_bottom):
+		bad += _fail("growing moved the feet: bottom went from %s to %s"
+			% [standing_bottom, buff_bottom])
+
+	# The rise is a cutscene of fixed length, and it always ends.
+	for i in 120:
+		await get_tree().physics_frame
+		if player._buff == Player.BUFF_ON:
+			break
+	if player._buff != Player.BUFF_ON:
+		bad += _fail("the rise never finished")
+	if not player.is_buff():
+		bad += _fail("is_buff() disagrees with the state")
+	if not is_equal_approx(player.pound_reach(), Player.BUFF_POUND_REACH):
+		bad += _fail("a bombado pound reaches %s" % player.pound_reach())
+
+	# A landing pound does not take his legs the way it takes everyone else's
+	# — which is also what keeps the two states from ever overlapping.
+	player._pound = 2
+	player._land_pound()
+	if player.is_footless():
+		bad += _fail("a bombado pound landing took his legs")
+
+	# Out again, and the body is exactly what it was before any of this.
+	player._leave_buff(true)
+	if player._buff != Player.BUFF_OFF:
+		bad += _fail("leaving did not clear the state")
+	if not is_equal_approx(rect.size.x, float(Player.WIDTH)) \
+			or not is_equal_approx(rect.size.y, float(Player.HEIGHT)):
+		bad += _fail("leaving left the body %s x %s" % [rect.size.x, rect.size.y])
+
+	# A ceiling pressed against the head refuses the whole thing rather than
+	# growing into it — the one failure mode that would strand a player.
+	player.surface_at = func(_tx: int, _ty: int) -> String: return "#"
+	player._recover = 0.0
+	player._enter_footless()
+	player._try_buff(pressed)
+	if player._buff != Player.BUFF_OFF:
+		bad += _fail("bombado grew into solid rock")
+	if not is_equal_approx(rect.size.y, Player.FOOTLESS_HEIGHT):
+		bad += _fail("a refused transformation still resized the body")
+
+	# Poses never repeat back to back; a repeat reads as a frozen animation.
+	var last := -1
+	for i in 200:
+		var next := player._pick_pose()
+		if next == last:
+			bad += _fail("the pose picker repeated index %d" % next)
+			break
+		last = next
+
+	player.queue_free()
+	ground.queue_free()
 	await get_tree().process_frame
 	return bad
 

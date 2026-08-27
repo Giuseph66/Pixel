@@ -101,6 +101,11 @@ const STRINGS := {
 	"codex.cat.world": "WORLD",
 	"codex.unknown": "NOT FOUND YET",
 	"codex.new": "NEW!",
+	# Bombado (doc/bombadao). The callout the sandbox super form leaves when
+	# it comes out of the ground. Deliberately not a codex entry: the codex is
+	# shared with the story, and a page there would advertise a move the story
+	# does not have.
+	"buff.name": "SWOLE!",
 
 	"codex.run.name": "RUN",
 	"codex.run.text": "ARROWS OR A/D. THE ONLY THING YOU ALWAYS HAVE",
@@ -737,6 +742,7 @@ const STRINGS := {
 	"codex.cat.world": "MUNDO",
 	"codex.unknown": "AINDA NAO ENCONTRADO",
 	"codex.new": "NOVO!",
+	"buff.name": "BOMBADO!",
 
 	"codex.run.name": "CORRER",
 	"codex.run.text": "SETAS OU A/D. A UNICA COISA QUE VOCE SEMPRE TEM",
@@ -1373,6 +1379,7 @@ const STRINGS := {
 	"codex.cat.world": "MUNDO",
 	"codex.unknown": "AUN NO ENCONTRADO",
 	"codex.new": "NUEVO!",
+	"buff.name": "BESTIA!",
 
 	"codex.run.name": "CORRER",
 	"codex.run.text": "FLECHAS O A/D. LO UNICO QUE SIEMPRE TIENES",
