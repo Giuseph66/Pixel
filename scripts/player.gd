@@ -1513,17 +1513,10 @@ func _buff_key(input: float) -> String:
 	if not is_on_floor():
 		if _pound > 0:
 			return "buff_fall"
-		# No horizontal intent and almost no horizontal momentum means a vertical
-		# jump. Keep his exact frontal face/body; side art here made the face snap
-		# into a profile even though the player never moved sideways.
-		if absf(input) < 0.01 and absf(velocity.x) < 12.0:
-			return "buff_jump_front"
-		var vertical_speed := velocity.y * gravity_dir
-		if vertical_speed < -75.0:
-			return "buff_jump"
-		if vertical_speed > 75.0:
-			return "buff_fall"
-		return "buff_air"
+		# Horizontal motion already carries the jump. Rotating this body to a
+		# narrow side silhouette made both the face and the muscle mass pop, so
+		# every regular jump keeps the same frontal tuck that reads well in place.
+		return "buff_jump_front"
 	if absf(input) > 0.01 and absf(velocity.x) > 12.0:
 		# Four slow, weighty beats: contact, passing, opposite contact, passing.
 		# Four frames per second. Faster made a body this heavy look like it was
