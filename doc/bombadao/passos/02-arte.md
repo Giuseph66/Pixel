@@ -77,10 +77,10 @@ Locomocao:
 | `buff_run_pass_a` | passagem A, corpo 1px mais alto e pe de tras recolhido |
 | `buff_run_b` | contato B, bracos e pernas trocam profundidade |
 | `buff_run_pass_b` | passagem B, a outra perna sustenta o corpo |
-| `buff_jump` | impulso lateral, perna de apoio estendida e joelho liderando |
+| `buff_jump` | salto em movimento: mesmo tronco/rosto da passada aprovada |
 | `buff_jump_front` | pulo vertical parado: rosto e tronco de frente, joelhos recolhidos |
-| `buff_air` | topo do arco, joelhos recolhidos |
-| `buff_fall` | descida lateral, pernas novamente estendidas para o pouso |
+| `buff_air` | topo do arco: mesmo tronco, uma perna recolhida |
+| `buff_fall` | descida com passada oposta preparada para o pouso |
 | `buff_rise` | pose do nascimento: bracos para cima, **coroa da cabeca no topo** |
 
 Poses (uma para cada quadro da referencia):
