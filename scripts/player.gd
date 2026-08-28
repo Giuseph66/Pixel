@@ -105,16 +105,16 @@ const FOOTLESS_HEIGHT := 6.0
 # pound, land flat, press the key while the legs are still gone. He climbs out
 # of the ground, and everything about him is heavier from then on.
 #
-# The body more than doubles. Fourteen wide is past one tile and twenty-four
-# tall is three of them, so a corridor a normal player strolls down is closed
+# The body more than triples. Eighteen wide is past two tiles and thirty-two
+# tall is four of them, so a corridor a normal player strolls down is closed
 # to him — that is the cost, and it is why _try_buff() refuses outright when
 # the space is not there rather than growing the box into a wall.
-const BUFF_WIDTH := 14.0
-const BUFF_HEIGHT := 24.0
+const BUFF_WIDTH := 18.0
+const BUFF_HEIGHT := 32.0
 ## The sprite is bigger still: the arms and the crown of the head hang outside
 ## the box on purpose, because a hitbox drawn around a bodybuilder's wingspan
 ## would catch on scenery he visibly clears.
-const BUFF_SPRITE_HEIGHT := 30.0
+const BUFF_SPRITE_HEIGHT := 44.0
 
 const BUFF_RISE_TIME := 0.85
 const BUFF_SINK_TIME := 0.45
@@ -1505,22 +1505,38 @@ func _update_sprite(input: float) -> void:
 
 
 ## Which of the buff grids to show. Same shape as the block above, one set
-## further down: there is no wall slide because a ten-wide body rarely finds a
+## further down: there is no wall slide because an eighteen-wide body rarely finds a
 ## chimney to hold, and no dash because he does not have one.
 func _buff_key(input: float) -> String:
 	if _pose != "":
 		return _pose
 	if not is_on_floor():
-		if velocity.y * gravity_dir < -20.0:
-			return "buff_jump"
-		if velocity.y * gravity_dir > 40.0:
+		if _pound > 0:
 			return "buff_fall"
-		return "buff_idle"
-	if _pound > 0:
-		return "buff_fall"
+		# No horizontal intent and almost no horizontal momentum means a vertical
+		# jump. Keep his exact frontal face/body; side art here made the face snap
+		# into a profile even though the player never moved sideways.
+		if absf(input) < 0.01 and absf(velocity.x) < 12.0:
+			return "buff_jump_front"
+		var vertical_speed := velocity.y * gravity_dir
+		if vertical_speed < -75.0:
+			return "buff_jump"
+		if vertical_speed > 75.0:
+			return "buff_fall"
+		return "buff_air"
 	if absf(input) > 0.01 and absf(velocity.x) > 12.0:
-		# Slower cycle than the normal run: the legs are carrying more.
-		return "buff_run_a" if fmod(_anim * 6.5, 2.0) < 1.0 else "buff_run_b"
+		# Four slow, weighty beats: contact, passing, opposite contact, passing.
+		# Four frames per second. Faster made a body this heavy look like it was
+		# jogging in place; one full stride now takes exactly one second.
+		match int(fmod(_anim * 4.0, 4.0)):
+			0:
+				return "buff_run_a"
+			1:
+				return "buff_run_pass_a"
+			2:
+				return "buff_run_b"
+			_:
+				return "buff_run_pass_b"
 	return "buff_idle"
 
 

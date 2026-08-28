@@ -10,14 +10,14 @@ godot --headless res://tools/check_sandbox.tscn
 
 O que ele cobre:
 
-1. **Arte** — as 13 grades existem, todas 26x30, e todo caractere usado esta
+1. **Arte** — as 17 grades existem, todas 36x44, e todo caractere usado esta
    em `Palette.CHARS`. Uma letra errada vira pixel transparente silencioso sem
    isso.
 2. **Gate** — `buff_unlocked = false` + `footless` + F: nao transforma. E o
    teste que garante que historia e infinito continuam limpos.
 3. **Janela** — `buff_unlocked = true` mas **sem** `footless`: nao transforma.
 4. **Entrada** — liberado, achatado, no chao, com espaco: entra em `BUFF_RISE`
-   e depois em `BUFF_ON`, e a caixa de colisao passa a medir 14x24.
+   e depois em `BUFF_ON`, e a caixa de colisao passa a medir 18x32.
 5. **Espaco** — com o teto colado, a transformacao e negada e o jogador
    continua do tamanho normal.
 6. **Saida** — `_leave_buff(true)` devolve a caixa para 6x10.

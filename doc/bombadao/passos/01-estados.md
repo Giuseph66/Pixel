@@ -37,8 +37,8 @@ Condicoes, todas ao mesmo tempo, no instante em que `p_buff` e pressionada:
    pousou. E essa a janela: pular, apertar baixo no ar, pousar achatado, F.
 3. `is_on_floor()`.
 4. Vivo, nao congelado, controlado localmente.
-5. **Espaco livre**: o corpo bombado e 14x24 (contra 6x10 do normal), entao
-   precisa de 2 tiles de largura por 3 de altura livres em volta dos pes.
+5. **Espaco livre**: o corpo bombado e 18x32 (contra 6x10 do normal), entao
+   precisa de 3 tiles de largura por 4 de altura livres em volta dos pes.
    Sem espaco, o poder e negado com uma poeirinha e um som seco, e o
    `footless` continua correndo normalmente. Melhor negar do que prender o
    jogador dentro da parede.
@@ -74,8 +74,8 @@ sao multiplicadores em cima das constantes que ja existem em `player.gd`.
 
 | coisa | normal | bombado | por que |
 |---|---|---|---|
-| corpo | 6 x 10 | 14 x 24 | e a leitura da forca; custa passagem estreita |
-| sprite | 8 x 10 | 26 x 30 | bracos e topo da cabeca passam da caixa de proposito |
+| corpo | 6 x 10 | 18 x 32 | e a leitura da forca; custa passagem estreita |
+| sprite | 8 x 10 | 36 x 44 | bracos e topo da cabeca passam da caixa de proposito |
 | `RUN_SPEED` | 112 | x 0.78 | massa |
 | `JUMP_VELOCITY` | -262 | x 0.88 | massa |
 | gravidade | 900 / 1180 | x 1.25 | cai como pedra |

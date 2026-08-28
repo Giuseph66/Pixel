@@ -26,7 +26,7 @@ o bombado sai azul no jogador 1, rosa no jogador 2, etc., de graca.
 
 `S` (`Palette.CYAN_DEEP`) existe **so** para estas grades e e a unica excecao a
 regra das dezesseis cores. Motivo: com tres tons, o passo de `c` pra `C` e
-pequeno demais para separar um peitoral de um deltoide num corpo de 26x30 —
+pequeno demais para separar um peitoral de um deltoide num corpo de 36x44 —
 todo vinco sumia e ele lia como um bloco azul. Num sprite de 8x10 tres tons
 bastam; neste, nao.
 
@@ -41,28 +41,25 @@ Duas regras seguram o quarto tom:
 
 ## Formato
 
-Toda grade do bombado tem **26 colunas x 30 linhas**.
+Toda grade do bombado tem **36 colunas x 44 linhas**.
 
-- **Cabeca: as 7 primeiras linhas sao a cabeca do proprio personagem**,
-  copiada pixel a pixel de `player_idle` — 8 de largura, colunas 9-16, os
+- **Cabeca: as primeiras linhas sao a cabeca do proprio personagem**,
+  ampliada de `player_idle` — cerca de 12 de largura, centrada, com os
   mesmos dois olhos brancos com pupila. E o que faz a forma continuar sendo
-  *ele*: 8 de cabeca contra 26 de ombro, exatamente a proporcao da referencia.
-- Trapezio na linha 7, saindo direto do cranio — sem pescoco.
-- Deltoides se soltando como bolas proprias nas linhas 9-10, ombro cheio nas
-  linhas 10-12.
-- **O braco e um membro inteiro**: deltoide (10-11), biceps (12-14), cotovelo
-  (15), antebraco (16-17), punho (18-19), nos dos dedos (20). Ele deixa as
-  costelas na linha 12 e fica com fundo de verdade entre o braco e o tronco ate
+  *ele*: 12 de cabeca contra 36 de ombro, proporcao da referencia.
+- Trapezio sai direto do cranio — sem pescoco.
+- Deltoides se soltam como bolas proprias; ombro ocupa a largura total.
+- **O braco e um membro inteiro**: deltoide, biceps, cotovelo, antebraco,
+  punho e nos dos dedos. Ele deixa as costelas e fica com fundo real ate
   o fim. Isso passou por tres versoes: um braco que funde no tronco e some na
   altura do umbigo le como nadadeira, que era exatamente o problema da segunda.
 - Punho fecha na altura do quadril, como na referencia.
-- Gluteo na linha 21.
-- **A perna tambem e um membro inteiro**: coxa grossa ate o joelho (22-24),
-  vinco do joelho (25), panturrilha voltando a inchar (26-27), tornozelo (28),
-  pe como bloco escuro proprio (29). Perna que afina ate sumir tem o mesmo
+- **A perna tambem e um membro inteiro**: coxa grossa ate o joelho,
+  vinco do joelho, panturrilha voltando a inchar, tornozelo e
+  pe como bloco escuro proprio. Perna que afina ate sumir tem o mesmo
   problema que o braco antigo tinha.
 
-O sprite e maior que a colisao (14x24) de proposito: os bracos e o topo da
+O sprite e maior que a colisao (18x32) de proposito: os bracos e o topo da
 cabeca passam por fora da caixa. Para o pe cair na linha do chao,
 `_sprite_offset_for()` calcula `(HEIGHT - altura_visivel) / 2`, multiplicado por
 `gravity_dir`. Essa mesma conta serve para o sprite inteiro e para a fatia que
@@ -76,10 +73,14 @@ Locomocao:
 | chave | o que e |
 |---|---|
 | `buff_idle` | parado de frente, bracos caidos e afastados do corpo |
-| `buff_run_a` | passada A |
-| `buff_run_b` | passada B (corpo 1px mais alto, igual o ciclo do normal) |
-| `buff_jump` | subindo, bracos recolhidos |
-| `buff_fall` | caindo, bracos abertos |
+| `buff_run_a` | contato A, corpo de perfil e perna da frente estendida |
+| `buff_run_pass_a` | passagem A, corpo 1px mais alto e pe de tras recolhido |
+| `buff_run_b` | contato B, bracos e pernas trocam profundidade |
+| `buff_run_pass_b` | passagem B, a outra perna sustenta o corpo |
+| `buff_jump` | impulso lateral, perna de apoio estendida e joelho liderando |
+| `buff_jump_front` | pulo vertical parado: rosto e tronco de frente, joelhos recolhidos |
+| `buff_air` | topo do arco, joelhos recolhidos |
+| `buff_fall` | descida lateral, pernas novamente estendidas para o pouso |
 | `buff_rise` | pose do nascimento: bracos para cima, **coroa da cabeca no topo** |
 
 Poses (uma para cada quadro da referencia):

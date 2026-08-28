@@ -23,7 +23,7 @@ das notas que `p_codex` e `p_echo` ja carregam.
 
 ## 3. Arte
 
-`scripts/pixel_art.gd`: 13 grades novas de 26x30 em `GRIDS`, agrupadas sob um
+`scripts/pixel_art.gd`: 17 grades novas de 36x44 em `GRIDS`, agrupadas sob um
 comentario de bloco. A cabeca de `player_idle` entra inteira em cada uma.
 
 `scripts/palette.gd`: `CYAN_DEEP` novo e `"S"` em `CHARS`.
@@ -45,8 +45,8 @@ para o boneco remoto conseguir desenhar a forma.
 
 `scripts/player.gd`:
 
-- constantes `BUFF_WIDTH := 14.0`, `BUFF_HEIGHT := 24.0`,
-  `BUFF_SPRITE_HEIGHT := 30.0`;
+- constantes `BUFF_WIDTH := 18.0`, `BUFF_HEIGHT := 32.0`,
+  `BUFF_SPRITE_HEIGHT := 44.0`;
 - `body_width()` / `body_height()` respondem pelo estado atual
   (bombado > footless > normal);
 - `_apply_body_height()` vira `_apply_body_size()` e passa a mexer tambem na

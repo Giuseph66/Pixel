@@ -31,14 +31,14 @@ window/size/window_width_override=1440
 window/size/window_height_override=810
 window/stretch/mode="canvas_items"
 
+[network]
+
+multiplayer/signal_url="https://pixel-signal.neurelix.com.br"
+
 [physics]
 
 3d/physics_engine="Jolt Physics"
 2d/default_gravity=900.0
-
-[network]
-
-multiplayer/signal_url="https://pixel-signal.neurelix.com.br"
 
 [rendering]
 

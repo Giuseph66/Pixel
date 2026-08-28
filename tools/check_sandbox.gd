@@ -1349,7 +1349,8 @@ func _check_buff() -> int:
 
 	# The art first: a glyph outside Palette.CHARS is a silently transparent
 	# pixel, and these grids are hand-written.
-	var keys := ["buff_idle", "buff_run_a", "buff_run_b", "buff_jump",
+	var keys := ["buff_idle", "buff_run_a", "buff_run_pass_a", "buff_run_b",
+		"buff_run_pass_b", "buff_jump", "buff_jump_front", "buff_air",
 		"buff_fall", "buff_rise"]
 	keys.append_array(Player.POSES)
 	for key: String in keys:
@@ -1361,8 +1362,8 @@ func _check_buff() -> int:
 			bad += _fail("%s is %d rows tall, wanted %d"
 				% [key, rows.size(), int(Player.BUFF_SPRITE_HEIGHT)])
 		for row: String in rows:
-			if row.length() != 26:
-				bad += _fail("%s has a row %d wide, wanted 26" % [key, row.length()])
+			if row.length() != 36:
+				bad += _fail("%s has a row %d wide, wanted 36" % [key, row.length()])
 			for i in row.length():
 				if not Palette.CHARS.has(row[i]):
 					bad += _fail("%s uses the unknown glyph '%s'" % [key, row[i]])
